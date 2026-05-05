@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión - Refrigeración</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="flex h-screen overflow-hidden">
+        <aside class="w-64 bg-slate-800 text-white flex-shrink-0 flex flex-col z-10">
+            <div class="p-6">
+                <h1 class="text-xl font-bold border-b border-slate-700 pb-4 text-sky-400">RefriGestion V1.0</h1>
+            </div>
+            <nav class="mt-2 flex-1">
+                <a href="#" onclick="showScreen('dashboard')" class="flex items-center py-3 px-6 bg-slate-700 border-l-4 border-sky-500 transition duration-200" id="nav-dashboard">
+                    <i class="fas fa-chart-line mr-3 w-5 text-center"></i> Dashboard
+                </a>
+                <a href="#" onclick="showScreen('clientes')" class="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200" id="nav-clientes">
+                    <i class="fas fa-users mr-3 w-5 text-center"></i> Clientes
+                </a>
+                <a href="#" onclick="showScreen('insumos')" class="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200" id="nav-insumos">
+                    <i class="fas fa-box-open mr-3 w-5 text-center"></i> Insumos
+                </a>
+                <a href="#" onclick="showScreen('ordenes')" class="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200" id="nav-ordenes">
+                    <i class="fas fa-clipboard-list mr-3 w-5 text-center"></i> Órdenes
+                </a>
+                <a href="#" onclick="showScreen('facturacion')" class="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200" id="nav-facturacion">
+                    <i class="fas fa-file-invoice-dollar mr-3 w-5 text-center"></i> Facturación
+                </a>
+                <a href="#" onclick="showScreen('reportes')" class="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200" id="nav-reportes">
+                    <i class="fas fa-chart-pie mr-3 w-5 text-center"></i> Reportes
+                </a>
+            </nav>
+            <div class="p-4 text-xs text-slate-500 border-t border-slate-700">
+                Itec - Prácticas Prof. I
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8 relative">
+            
+            <div id="screen-dashboard" class="screen block">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Panel Principal</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500">
+                        <h3 class="text-lg font-semibold mb-4 text-blue-700"><i class="fas fa-tools mr-2"></i> Trabajos en Curso</h3>
+                        <ul class="space-y-3">
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span class="font-medium text-gray-700">Carlos Gómez</span>
+                                <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold">EN PROCESO</span>
+                            </li>
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span class="font-medium text-gray-700">Heladería Glaciar</span>
+                                <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded font-bold">PENDIENTE</span>
+                            </li>
+                        </ul>
+                        <button onclick="showScreen('ordenes')" class="w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-semibold text-right">Ver todas las órdenes &rarr;</button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-orange-500">
+                        <h3 class="text-lg font-semibold mb-4 text-orange-700"><i class="fas fa-exclamation-triangle mr-2"></i> Alertas de Stock Bajo</h3>
+                        <ul class="space-y-3">
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span>Caño Cobre 1/4</span>
+                                <span class="text-red-600 font-bold">3m (Mín: 15m)</span>
+                            </li>
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span>Capacitor 35uf</span>
+                                <span class="text-red-600 font-bold">1 unid (Mín: 5)</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-500">
+                        <h3 class="text-lg font-semibold mb-4 text-red-700"><i class="fas fa-clock mr-2"></i> Facturas por Vencer</h3>
+                        <ul class="space-y-3">
+                            <li class="flex justify-between items-center border-b pb-2 text-red-600 font-semibold">
+                                <span>Cliente: Heladería Glaciar</span>
+                                <span>VENCIDA ($120.000)</span>
+                            </li>
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span>Cliente: Supermercado Día</span>
+                                <span class="text-orange-600 font-medium">Vence mañana</span>
+                            </li>
+                            <li class="flex justify-between items-center border-b pb-2">
+                                <span>Cliente: Juan Pérez</span>
+                                <span class="text-gray-600">Vence en 5 días</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="screen-clientes" class="screen hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Gestión de Clientes</h2>
+                    <button onclick="openModal('modal-cliente')" class="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">+ Nuevo Cliente</button>
+                </div>
+                <div class="bg-white p-4 rounded shadow mb-6 flex gap-4">
+                    <input type="text" placeholder="Buscar por Nombre..." class="border p-2 rounded w-1/3">
+                    <input type="text" placeholder="DNI / CUIT..." class="border p-2 rounded w-1/4">
+                    <select class="border p-2 rounded">
+                        <option>Todos los Estados</option>
+                        <option>Activo</option>
+                        <option>Inactivo</option>
+                    </select>
+                    <button class="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700 transition">Filtrar</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b">
+                            <tr>
+                                <th class="p-4">Nombre / Razón Social</th>
+                                <th class="p-4">DNI / CUIT</th>
+                                <th class="p-4">Contacto</th>
+                                <th class="p-4">Estado</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 font-medium text-gray-800">Juan Pérez</td>
+                                <td class="p-4 text-gray-600">20-33444555-9</td>
+                                <td class="p-4 text-gray-600">3496-123456<br><span class="text-xs text-gray-400">juan@email.com</span></td>
+                                <td class="p-4"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">ACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-600 mr-2 hover:text-blue-800" title="Editar"><i class="fas fa-edit"></i></button>
+                                    <button class="text-red-600 hover:text-red-800" title="Dar de baja"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 font-medium text-gray-800">Heladería Glaciar S.A.</td>
+                                <td class="p-4 text-gray-600">30-71222333-5</td>
+                                <td class="p-4 text-gray-600">3496-987654<br><span class="text-xs text-gray-400">adm@glaciar.com.ar</span></td>
+                                <td class="p-4"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">ACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-600 mr-2 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                    <button class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b bg-gray-50 text-gray-400">
+                                <td class="p-4 font-medium">Carlos Gómez</td>
+                                <td class="p-4">20-11222333-8</td>
+                                <td class="p-4">3496-555444</td>
+                                <td class="p-4"><span class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs font-bold">INACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-400 mr-2 cursor-not-allowed"><i class="fas fa-edit"></i></button>
+                                    <button class="text-red-400 cursor-not-allowed"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="screen-insumos" class="screen hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Control de Insumos</h2>
+                    <button onclick="openModal('modal-insumo')" class="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">+ Nuevo Insumo</button>
+                </div>
+                <div class="bg-white p-4 rounded shadow mb-6 flex gap-4">
+                    <input type="text" placeholder="Buscar por Nombre..." class="border p-2 rounded w-1/3">
+                    <select class="border p-2 rounded w-1/4">
+                        <option>Todos los Proveedores</option>
+                        <option>Refrigeración Sur</option>
+                        <option>Metalúrgica Centro</option>
+                    </select>
+                    <select class="border p-2 rounded w-1/4">
+                        <option>Todos los Estados</option>
+                        <option>Activo</option>
+                        <option>Inactivo</option>
+                    </select>
+                    <button class="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700">Filtrar</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b">
+                            <tr>
+                                <th class="p-4">Nombre / Descripción</th>
+                                <th class="p-4">Proveedor</th>
+                                <th class="p-4 text-center">Stock vs Mínimo</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4">
+                                    <div class="font-bold text-gray-800">Gas Refrigerante R410</div>
+                                    <div class="text-xs text-gray-500">Garrafa x 10kg</div>
+                                </td>
+                                <td class="p-4 text-gray-600">Refrigeración Sur</td>
+                                <td class="p-4">
+                                    <div class="flex items-center justify-center">
+                                        <span class="font-bold text-green-600 mr-2">12 kg</span>
+                                        <span class="text-xs text-gray-400">(Mín: 5)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1"><div class="bg-green-500 h-1.5 rounded-full" style="width: 80%"></div></div>
+                                </td>
+                                <td class="p-4 text-center"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">ACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-600 mr-2 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b hover:bg-yellow-50">
+                                <td class="p-4">
+                                    <div class="font-bold text-gray-800">Cinta Aislante 3M</div>
+                                    <div class="text-xs text-gray-500">Rollos</div>
+                                </td>
+                                <td class="p-4 text-gray-600">Ferretería El Tornillo</td>
+                                <td class="p-4">
+                                    <div class="flex items-center justify-center">
+                                        <span class="font-bold text-orange-500 mr-2">12 unid</span>
+                                        <span class="text-xs text-gray-400">(Mín: 10)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1"><div class="bg-orange-500 h-1.5 rounded-full" style="width: 30%"></div></div>
+                                </td>
+                                <td class="p-4 text-center"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">ACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-600 mr-2 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b bg-red-50/50 hover:bg-red-50">
+                                <td class="p-4">
+                                    <div class="font-bold text-gray-800">Caño de Cobre 1/4</div>
+                                    <div class="text-xs text-gray-500">Rollo por metro</div>
+                                </td>
+                                <td class="p-4 text-gray-600">Metalúrgica Centro</td>
+                                <td class="p-4">
+                                    <div class="flex items-center justify-center">
+                                        <span class="font-bold text-red-600 mr-2">3 m</span>
+                                        <span class="text-xs text-gray-500">(Mín: 15)</span>
+                                    </div>
+                                    <div class="w-full bg-red-200 rounded-full h-1.5 mt-1"><div class="bg-red-600 h-1.5 rounded-full" style="width: 15%"></div></div>
+                                </td>
+                                <td class="p-4 text-center"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">ACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-600 mr-2 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b bg-gray-50 text-gray-400">
+                                <td class="p-4">
+                                    <div class="font-bold">Compresor 1HP Viejo Modelo</div>
+                                    <div class="text-xs">Descontinuado</div>
+                                </td>
+                                <td class="p-4">Refrigeración Sur</td>
+                                <td class="p-4 text-center">-</td>
+                                <td class="p-4 text-center"><span class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs font-bold">INACTIVO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-blue-400 cursor-not-allowed"><i class="fas fa-edit"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="screen-ordenes" class="screen hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Órdenes de Trabajo</h2>
+                    <button onclick="openModal('modal-orden')" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition"><i class="fas fa-plus mr-2"></i>Nueva Orden</button>
+                </div>
+                <div class="bg-white p-4 rounded shadow mb-6 flex gap-4">
+                    <input type="text" placeholder="Buscar por Cliente..." class="border p-2 rounded w-1/3">
+                    <select class="border p-2 rounded w-1/4">
+                        <option>Todos los Estados</option>
+                        <option>Pendiente</option>
+                        <option>En proceso</option>
+                        <option>Finalizado</option>
+                    </select>
+                    <button class="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700 transition">Filtrar</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b">
+                            <tr>
+                                <th class="p-4">N° Orden</th>
+                                <th class="p-4">Cliente</th>
+                                <th class="p-4">Fecha Creación</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 font-bold text-gray-700">#00042</td>
+                                <td class="p-4 font-medium text-gray-800">Carlos Gómez<br><span class="text-xs text-gray-500">Instalación Split 3000F</span></td>
+                                <td class="p-4 text-gray-600">06/11/2025</td>
+                                <td class="p-4 text-center"><span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold border border-yellow-200">EN PROCESO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-gray-500 mr-2 hover:text-blue-600" title="Ver / Editar"><i class="fas fa-edit"></i></button>
+                                    <button class="text-gray-300 cursor-not-allowed" title="Aún no se puede facturar"><i class="fas fa-file-invoice-dollar"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="border-b hover:bg-gray-50 bg-green-50/30">
+                                <td class="p-4 font-bold text-gray-700">#00041</td>
+                                <td class="p-4 font-medium text-gray-800">Heladería Glaciar S.A.<br><span class="text-xs text-gray-500">Carga de Gas R410</span></td>
+                                <td class="p-4 text-gray-600">04/11/2025</td>
+                                <td class="p-4 text-center"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold border border-green-200">FINALIZADO</span></td>
+                                <td class="p-4 text-center">
+                                    <button class="text-gray-500 mr-2 hover:text-blue-600" title="Ver / Editar"><i class="fas fa-eye"></i></button>
+                                    <button onclick="showScreen('facturacion'); toggleFacturaView('formulario')" class="text-green-600 hover:text-green-800 font-bold" title="Generar Factura"><i class="fas fa-file-invoice-dollar mr-1"></i> Facturar</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="screen-facturacion" class="screen hidden">
+                
+                <div id="vista-lista-facturas" class="block">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-bold text-gray-800">Facturación</h2>
+                        <button onclick="toggleFacturaView('formulario')" class="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition"><i class="fas fa-plus mr-2"></i>Nuevo Comprobante Manual</button>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow mb-6 flex gap-4">
+                        <input type="text" placeholder="N° Comprobante..." class="border p-2 rounded w-1/5">
+                        <input type="text" placeholder="Cliente..." class="border p-2 rounded w-1/4">
+                        <select class="border p-2 rounded w-1/4">
+                            <option>Todos los Estados</option>
+                            <option>Pagada</option>
+                            <option>Impaga</option>
+                            <option>Pendiente</option>
+                            <option>Anulada</option>
+                        </select>
+                        <button class="bg-gray-800 text-white px-6 py-2 rounded">Filtrar</button>
+                    </div>
+                    <div class="bg-white rounded shadow overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-100 border-b">
+                                <tr>
+                                    <th class="p-4">Fecha / Venc.</th>
+                                    <th class="p-4">Comprobante</th>
+                                    <th class="p-4">Cliente</th>
+                                    <th class="p-4 text-right">Importe Total</th>
+                                    <th class="p-4 text-center">Estado</th>
+                                    <th class="p-4 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="p-4"><span class="text-gray-800">06/11/2025</span></td>
+                                    <td class="p-4 font-semibold text-gray-700">Factura A-0001</td>
+                                    <td class="p-4 text-gray-600">Juan Pérez</td>
+                                    <td class="p-4 font-bold text-sky-700 text-right">$ 45.000,00</td>
+                                    <td class="p-4 text-center"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">PAGADA</span></td>
+                                    <td class="p-4 text-center text-gray-500">
+                                        <button class="hover:text-sky-600 mr-2" title="Ver/Imprimir"><i class="fas fa-print"></i></button>
+                                        <button class="hover:text-blue-600" title="Editar"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b bg-red-50/30 hover:bg-red-50">
+                                    <td class="p-4"><span class="text-gray-800">10/10/2025</span><br><span class="text-xs text-red-600 font-bold">Venció 10/11</span></td>
+                                    <td class="p-4 font-semibold text-gray-700">Factura B-0042</td>
+                                    <td class="p-4 text-gray-600">Heladería Glaciar S.A.</td>
+                                    <td class="p-4 font-bold text-sky-700 text-right">$ 120.000,00</td>
+                                    <td class="p-4 text-center"><span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold border border-red-200">IMPAGA</span></td>
+                                    <td class="p-4 text-center text-gray-500">
+                                        <button class="hover:text-green-600 mr-2" title="Registrar Cobro"><i class="fas fa-hand-holding-dollar"></i></button>
+                                        <button class="hover:text-sky-600" title="Ver/Imprimir"><i class="fas fa-print"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="p-4"><span class="text-gray-800">15/11/2025</span><br><span class="text-xs text-gray-500">Válido 15 días</span></td>
+                                    <td class="p-4 font-semibold text-gray-500">Presupuesto P-015</td>
+                                    <td class="p-4 text-gray-600">Carlos Gómez</td>
+                                    <td class="p-4 font-bold text-gray-600 text-right">$ 85.000,00</td>
+                                    <td class="p-4 text-center"><span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold">PENDIENTE</span></td>
+                                    <td class="p-4 text-center text-gray-500">
+                                        <button class="hover:text-blue-600 mr-2" title="Convertir a Factura"><i class="fas fa-file-invoice"></i></button>
+                                        <button class="hover:text-sky-600" title="Ver/Imprimir"><i class="fas fa-print"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="p-4"><span class="text-gray-800">14/11/2025</span></td>
+                                    <td class="p-4 font-semibold text-gray-500">Remito R-0010</td>
+                                    <td class="p-4 text-gray-600">Supermercado Día</td>
+                                    <td class="p-4 font-bold text-gray-400 text-right">-</td>
+                                    <td class="p-4 text-center"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">ENTREGADO</span></td>
+                                    <td class="p-4 text-center text-gray-500">
+                                        <button class="hover:text-sky-600" title="Ver/Imprimir"><i class="fas fa-print"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="border-b bg-gray-50 text-gray-400">
+                                    <td class="p-4">01/11/2025</td>
+                                    <td class="p-4 font-semibold line-through">Factura C-0089</td>
+                                    <td class="p-4">Consumidor Final</td>
+                                    <td class="p-4 font-bold text-right line-through">$ 15.000,00</td>
+                                    <td class="p-4 text-center"><span class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs font-bold">ANULADA</span></td>
+                                    <td class="p-4 text-center">
+                                        <button class="text-gray-400 cursor-not-allowed" title="Anulada"><i class="fas fa-ban"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="vista-formulario-factura" class="hidden">
+                    <div class="flex items-center mb-6">
+                        <button onclick="toggleFacturaView('lista')" class="text-gray-500 hover:text-sky-600 mr-4 text-xl"><i class="fas fa-arrow-left"></i></button>
+                        <h2 class="text-3xl font-bold text-gray-800">Generar Nuevo Comprobante</h2>
+                    </div>
+                    
+                    <div class="bg-white p-8 rounded-lg shadow-lg max-w-4xl border-t-4 border-sky-600">
+                        <div class="grid grid-cols-2 gap-6 mb-5">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                                <input type="text" placeholder="Buscar cliente por nombre o CUIT..." class="w-full border p-2 rounded bg-gray-50 focus:border-sky-500 outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Comprobante</label>
+                                    <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                                        <option>Factura A</option>
+                                        <option>Factura B</option>
+                                        <option>Factura C</option>
+                                        <option>Nota de Débito A</option>
+                                        <option>Nota de Débito B</option>
+                                        <option>Nota de Crédito A</option>
+                                        <option>Nota de Crédito B</option>
+                                        <option>Presupuesto</option>
+                                        <option>Remito</option>
+                                        <option>Compra</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                    <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                                        <option value="borrador">Borrador</option>
+                                        <option value="pendiente">Pendiente</option>
+                                        <option value="pagada">Pagada</option>
+                                        <option value="impaga">Impaga</option>
+                                        <option value="anulada">Anulada</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Número de Comprobante</label>
+                                <div class="flex items-end gap-2">
+                                    <div class="flex flex-col">
+                                        <span class="text-xs text-gray-500 mb-1">Pto. Venta</span>
+                                        <input type="text" id="pto-venta" placeholder="0001" maxlength="4"
+                                            class="w-20 border p-2 rounded bg-gray-50 outline-none focus:border-sky-500 text-center font-mono tracking-widest"
+                                            oninput="updateNumeroCompleto()">
+                                    </div>
+                                    <span class="text-xl text-gray-400 pb-2">-</span>
+                                    <div class="flex flex-col">
+                                        <span class="text-xs text-gray-500 mb-1">N° Factura</span>
+                                        <input type="text" id="nro-factura" placeholder="00000001" maxlength="8"
+                                            class="w-32 border p-2 rounded bg-gray-50 outline-none focus:border-sky-500 text-center font-mono tracking-widest"
+                                            oninput="updateNumeroCompleto()">
+                                    </div>
+                                    <div class="flex flex-col ml-3">
+                                        <span class="text-xs text-gray-500 mb-1">Vista previa</span>
+                                        <span id="numero-completo" class="font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded px-3 py-2 text-sm whitespace-nowrap">0001-00000001</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Condición de Pago</label>
+                                <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                                    <option>Contado</option>
+                                    <option>15 Días</option>
+                                    <option>30 Días</option>
+                                </select>
+                            </div>
+                        </div>
+                        <table class="w-full mb-6">
+                            <thead>
+                                <tr class="border-b text-gray-600 uppercase text-xs">
+                                    <th class="py-2 text-left w-1/2">Descripción (Servicio/Insumo)</th>
+                                    <th class="py-2 text-right">Cantidad</th>
+                                    <th class="py-2 text-right">Precio Unit.</th>
+                                    <th class="py-2 text-right">Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b">
+                                    <td class="py-4 text-gray-800"><input type="text" placeholder="Ej: Carga de Gas..." class="w-full border-b outline-none focus:border-sky-500"></td>
+                                    <td class="py-4 text-right"><input type="number" value="1" class="w-16 text-right border-b outline-none"></td>
+                                    <td class="py-4 text-right flex justify-end items-center"><span class="text-gray-500 mr-1">$</span><input type="text" placeholder="0,00" class="w-20 text-right border-b outline-none"></td>
+                                    <td class="py-4 text-right font-semibold text-gray-800">$ 0,00</td>
+                                    <td class="py-4 text-center"><button class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="text-sm text-sky-600 hover:text-sky-800 font-medium"><i class="fas fa-plus-circle"></i> Agregar Ítem</button>
+                        
+                        <div class="flex flex-col items-end space-y-2 border-t pt-4 mt-4">
+                            <div class="text-gray-600">Subtotal: <span class="font-semibold text-gray-800 w-32 inline-block text-right">$ 0,00</span></div>
+                            <div class="text-green-600 flex items-center">
+                                Descuento: <span class="ml-2 mr-1">- $</span><input type="text" placeholder="0,00" class="w-24 text-right border-b border-green-300 outline-none text-green-700 bg-transparent">
+                            </div>
+                            <div class="text-2xl font-bold text-slate-800 mt-2">TOTAL: <span class="text-sky-700">$ 0,00</span></div>
+                        </div>
+                        <div class="mt-8 flex justify-end space-x-4">
+                            <button onclick="toggleFacturaView('lista')" class="px-6 py-2 border rounded text-gray-600 hover:bg-gray-50 transition">Cancelar</button>
+                            <button onclick="toggleFacturaView('lista')" class="px-6 py-2 bg-sky-600 text-white rounded shadow font-bold hover:bg-sky-700 transition">Generar Comprobante</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="screen-reportes" class="screen hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Reportes y Alertas</h2>
+                    <div class="flex space-x-3">
+                        <button class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50 transition"><i class="fas fa-print mr-2"></i>Imprimir</button>
+                        <button class="bg-green-600 text-white px-4 py-2 rounded shadow-sm hover:bg-green-700 transition"><i class="fas fa-file-excel mr-2"></i>Exportar Excel</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded shadow mb-6 flex flex-wrap gap-4 items-end">
+                    <div class="w-full md:w-1/3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Reporte</label>
+                        <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                            <option>Mensual de Ingresos y Egresos</option>
+                            <option>Libro de IVA (Compras/Ventas)</option>
+                            <option>Servicios Realizados</option>
+                            <option>Estado de Cobranzas</option>
+                        </select>
+                    </div>
+                    <div class="w-full md:w-1/4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                        <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                            <option>Noviembre</option>
+                            <option>Octubre</option>
+                        </select>
+                    </div>
+                    <div class="w-full md:w-1/4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                        <select class="w-full border p-2 rounded bg-gray-50 outline-none focus:border-sky-500">
+                            <option>2025</option>
+                        </select>
+                    </div>
+                    <button class="bg-slate-800 text-white px-6 py-2 rounded hover:bg-slate-700 transition h-[42px]">Generar</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded shadow border-l-4 border-green-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase tracking-wide">Total Ingresos</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2">$ 165.000,00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded shadow border-l-4 border-red-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase tracking-wide">Total Egresos (Insumos)</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2">$ 35.000,00</p>
+                    </div>
+                    <div class="bg-white p-6 rounded shadow border-l-4 border-sky-500">
+                        <h3 class="text-gray-500 text-sm font-medium uppercase tracking-wide">Balance General</h3>
+                        <p class="text-3xl font-bold text-gray-800 mt-2">$ 130.000,00</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h3 class="text-sm font-semibold text-gray-700">Detalle de Movimientos - Noviembre 2025</h3>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead class="bg-white border-b">
+                            <tr class="text-gray-600 text-sm">
+                                <th class="p-4 font-semibold">Fecha</th>
+                                <th class="p-4 font-semibold">Comprobante</th>
+                                <th class="p-4 font-semibold">Detalle / Entidad</th>
+                                <th class="p-4 text-right font-semibold">Ingreso (+)</th>
+                                <th class="p-4 text-right font-semibold">Egreso (-)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 text-gray-800">06/11/2025</td>
+                                <td class="p-4"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">Factura A-0001</span></td>
+                                <td class="p-4 text-gray-600">Juan Pérez - Mant. Split</td>
+                                <td class="p-4 text-right text-green-600 font-medium">$ 45.000,00</td>
+                                <td class="p-4 text-right text-gray-400">-</td>
+                            </tr>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 text-gray-800">08/11/2025</td>
+                                <td class="p-4"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">Factura C-0045</span></td>
+                                <td class="p-4 text-gray-600">Heladería Glaciar - Carga Gas</td>
+                                <td class="p-4 text-right text-green-600 font-medium">$ 120.000,00</td>
+                                <td class="p-4 text-right text-gray-400">-</td>
+                            </tr>
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-4 text-gray-800">10/11/2025</td>
+                                <td class="p-4"><span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">Compra - 1204</span></td>
+                                <td class="p-4 text-gray-600">Refrigeración Sur - Compra Gas</td>
+                                <td class="p-4 text-right text-gray-400">-</td>
+                                <td class="p-4 text-right text-red-600 font-medium">$ 15.000,00</td>
+                            </tr>
+                            <tr class="border-b hover:bg-gray-50 bg-gray-50">
+                                <td class="p-4 text-gray-800">12/11/2025</td>
+                                <td class="p-4"><span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">Compra - 0889</span></td>
+                                <td class="p-4 text-gray-600">Metalúrgica Centro - Rollos Caño</td>
+                                <td class="p-4 text-right text-gray-400">-</td>
+                                <td class="p-4 text-right text-red-600 font-medium">$ 20.000,00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="modal-cliente" class="fixed inset-0 bg-slate-900 bg-opacity-60 hidden flex justify-center items-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Alta de Cliente</h3>
+                <button onclick="closeModal('modal-cliente')" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <form class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nombre / Razón Social *</label>
+                    <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">DNI / CUIT *</label>
+                        <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                        <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Dirección</label>
+                    <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                </div>
+            </form>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeModal('modal-cliente')" class="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button onclick="closeModal('modal-cliente')" class="px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700">Guardar Cliente</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-insumo" class="fixed inset-0 bg-slate-900 bg-opacity-60 hidden flex justify-center items-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Alta de Insumo</h3>
+                <button onclick="closeModal('modal-insumo')" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <form class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nombre del Insumo *</label>
+                    <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Unidad (ej. Metros, Kg)</label>
+                        <input type="text" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Proveedor</label>
+                        <select class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                            <option>Refrigeración Sur</option>
+                            <option>Metalúrgica Centro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 border-t pt-4 mt-2">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Cantidad Inicial *</label>
+                        <input type="number" class="mt-1 w-full border p-2 rounded focus:border-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 text-red-600">Stock Mínimo (Alerta) *</label>
+                        <input type="number" class="mt-1 w-full border border-red-300 p-2 rounded focus:border-red-500 outline-none">
+                    </div>
+                </div>
+            </form>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeModal('modal-insumo')" class="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button onclick="closeModal('modal-insumo')" class="px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700">Guardar Insumo</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-orden" class="fixed inset-0 bg-slate-900 bg-opacity-60 hidden flex justify-center items-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Alta de Orden de Trabajo</h3>
+                <button onclick="closeModal('modal-orden')" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <form class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Cliente *</label>
+                        <select class="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none">
+                            <option>Seleccione un cliente...</option>
+                            <option>Carlos Gómez</option>
+                            <option>Heladería Glaciar S.A.</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Estado de la Orden</label>
+                        <select class="mt-1 w-full border p-2 rounded bg-yellow-50 font-semibold text-yellow-800 outline-none">
+                            <option>Pendiente</option>
+                            <option selected>En proceso</option>
+                            <option>Finalizado</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="border-t pt-4">
+                    <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-wrench mr-2 text-gray-400"></i>Servicios a Realizar</h4>
+                    <div class="flex gap-2 mb-2">
+                        <select class="flex-1 border p-2 rounded outline-none text-sm">
+                            <option>Seleccionar servicio del catálogo...</option>
+                            <option>Instalación Split 3000F</option>
+                            <option>Mantenimiento Preventivo</option>
+                        </select>
+                        <button type="button" class="bg-slate-200 px-3 rounded hover:bg-slate-300 text-sm">Añadir</button>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded border text-sm">
+                        <div class="flex justify-between border-b pb-1 mb-1">
+                            <span>1x Instalación Split 3000F</span>
+                            <span class="font-bold text-gray-600">$ 45.000,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t pt-4">
+                    <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-box mr-2 text-gray-400"></i>Hoja de Insumos (Materiales Usados)</h4>
+                    <div class="flex gap-2 mb-2">
+                        <select class="flex-1 border p-2 rounded outline-none text-sm">
+                            <option>Seleccionar insumo...</option>
+                            <option>Caño de Cobre 1/4</option>
+                            <option>Gas Refrigerante R410</option>
+                        </select>
+                        <input type="number" placeholder="Cant." class="w-20 border p-2 rounded text-sm">
+                        <button type="button" class="bg-slate-200 px-3 rounded hover:bg-slate-300 text-sm">Añadir</button>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded border text-sm text-gray-600">
+                        Aún no se han cargado insumos a esta orden.
+                    </div>
+                </div>
+
+                <div class="border-t pt-4">
+                    <label class="block text-sm font-medium text-gray-700">Notas Internas (No salen en factura)</label>
+                    <textarea class="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none" rows="2" placeholder="Ej: El cliente pidió pasar los caños por el techo..."></textarea>
+                </div>
+            </form>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeModal('modal-orden')" class="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button onclick="closeModal('modal-orden')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-bold">Guardar Orden</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => {
+                s.classList.remove('block');
+                s.classList.add('hidden');
+            });
+            
+            const selectedScreen = document.getElementById('screen-' + screenId);
+            selectedScreen.classList.remove('hidden');
+            selectedScreen.classList.add('block');
+            
+            document.querySelectorAll('nav a').forEach(a => {
+                a.classList.remove('bg-slate-700', 'border-l-4', 'border-sky-500');
+            });
+
+            const activeNav = document.getElementById('nav-' + screenId);
+            if (activeNav) {
+                activeNav.classList.add('bg-slate-700', 'border-l-4', 'border-sky-500');
+            }
+        }
+
+        function toggleFacturaView(vista) {
+            if (vista === 'formulario') {
+                document.getElementById('vista-lista-facturas').classList.add('hidden');
+                document.getElementById('vista-formulario-factura').classList.remove('hidden');
+            } else {
+                document.getElementById('vista-formulario-factura').classList.add('hidden');
+                document.getElementById('vista-lista-facturas').classList.remove('hidden');
+            }
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function updateNumeroCompleto() {
+            const pto = document.getElementById('pto-venta').value.padStart(4, '0') || '0001';
+            const nro = document.getElementById('nro-factura').value.padStart(8, '0') || '00000001';
+            document.getElementById('numero-completo').textContent = pto + '-' + nro;
+        }
+    </script>
+</body>
+</html>
