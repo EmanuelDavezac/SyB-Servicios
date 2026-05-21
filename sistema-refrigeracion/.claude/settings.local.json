@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-Content package.json)",
+      "PowerShell(npm list *)",
+      "WebFetch(domain:pris.ly)",
+      "WebFetch(domain:www.prisma.io)"
+    ]
+  }
+}

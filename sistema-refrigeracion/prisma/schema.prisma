@@ -147,3 +147,13 @@ model servicio {
   estado                 Boolean?                 @default(true)
   detalle_orden_servicio detalle_orden_servicio[]
 }
+
+model Cliente {
+  id_cliente Int      @id @default(autoincrement())
+  nombre     String
+  apellido   String
+  cuit       String   @unique
+  telefono   String?
+  email      String?
+  createdAt  DateTime @default(now())
+}
