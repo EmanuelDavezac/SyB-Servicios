@@ -1,13 +1,149 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model cliente {
+  id_cliente               Int                        @id @default(autoincrement())
+  nombre                   String                     @db.VarChar(50)
+  apellido                 String                     @db.VarChar(50)
+  cuit                     String?                    @db.VarChar(20)
+  calle                    String?                    @db.VarChar(100)
+  num_calle                Int?
+  telefono                 String?                    @db.VarChar(20)
+  email                    String?                    @db.VarChar(100)
+  estado                   Boolean?                   @default(true)
+  historial_notificaciones historial_notificaciones[]
+  orden_trabajo            orden_trabajo[]
+}
+
+model compra_insumo {
+  id_compra      Int              @id @default(autoincrement())
+  id_proveedor   Int?
+  fecha_compra   DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  costo_total    Decimal          @db.Decimal(10, 2)
+  descripcion    String?
+  proveedor      proveedor?       @relation(fields: [id_proveedor], references: [id_proveedor], onDelete: Restrict, onUpdate: NoAction)
+  detalle_compra detalle_compra[]
+}
+
+model detalle_compra {
+  id_detalle_compra Int            @id @default(autoincrement())
+  id_compra         Int?
+  id_insumo         Int?
+  cantidad          Int
+  precio_unitario   Decimal        @db.Decimal(10, 2)
+  compra_insumo     compra_insumo? @relation(fields: [id_compra], references: [id_compra], onDelete: Restrict, onUpdate: NoAction)
+  insumo            insumo?        @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict, onUpdate: NoAction)
+}
+
+model detalle_orden_insumo {
+  id_detalle_ins  Int            @id @default(autoincrement())
+  id_orden        Int?
+  id_insumo       Int?
+  cantidad_usada  Int
+  precio_aplicado Decimal        @db.Decimal(10, 2)
+  insumo          insumo?        @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict, onUpdate: NoAction)
+  orden_trabajo   orden_trabajo? @relation(fields: [id_orden], references: [id_orden], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model detalle_orden_servicio {
+  id_detalle_srv  Int            @id @default(autoincrement())
+  id_orden        Int?
+  id_servicio     Int?
+  cantidad        Int            @default(1)
+  precio_acordado Decimal        @db.Decimal(10, 2)
+  orden_trabajo   orden_trabajo? @relation(fields: [id_orden], references: [id_orden], onDelete: Cascade, onUpdate: NoAction)
+  servicio        servicio?      @relation(fields: [id_servicio], references: [id_servicio], onDelete: Restrict, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model factura {
+  id_factura               Int                        @id @default(autoincrement())
+  id_orden                 Int?
+  num_factura              String?                    @db.VarChar(50)
+  tipo                     String?                    @db.VarChar(20)
+  fecha_emision            DateTime                   @db.Date
+  fecha_vencimiento        DateTime?                  @db.Date
+  monto_total              Decimal                    @db.Decimal(10, 2)
+  saldo_pendiente          Decimal?                   @db.Decimal(10, 2)
+  estado_pago              String?                    @default("Impago") @db.VarChar(20)
+  descripcion              String?
+  orden_trabajo            orden_trabajo?             @relation(fields: [id_orden], references: [id_orden], onDelete: Restrict, onUpdate: NoAction)
+  historial_notificaciones historial_notificaciones[]
+  pagos_parciales          pagos_parciales[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model historial_notificaciones {
+  id_notificacion   Int      @id @default(autoincrement())
+  id_factura        Int?
+  id_cliente        Int?
+  tipo_notificacion String?  @db.VarChar(50)
+  fecha_creacion    DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  estado            String?  @db.VarChar(20)
+  descripcion       String?
+  cliente           cliente? @relation(fields: [id_cliente], references: [id_cliente], onDelete: Cascade, onUpdate: NoAction)
+  factura           factura? @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model insumo {
+  id_insumo            Int                    @id @default(autoincrement())
+  id_proveedor         Int?
+  nombre               String                 @db.VarChar(100)
+  descripcion          String?                @db.VarChar(255)
+  stock_actual         Int?                   @default(0)
+  stock_minimo         Int?                   @default(0)
+  precio_costo         Decimal                @db.Decimal(10, 2)
+  precio_venta         Decimal                @db.Decimal(10, 2)
+  estado               Boolean?               @default(true)
+  detalle_compra       detalle_compra[]
+  detalle_orden_insumo detalle_orden_insumo[]
+  proveedor            proveedor?             @relation(fields: [id_proveedor], references: [id_proveedor], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orden_trabajo {
+  id_orden               Int                      @id @default(autoincrement())
+  id_cliente             Int?
+  fecha_creacion         DateTime                 @default(dbgenerated("CURRENT_DATE")) @db.Date
+  estado_trabajo         String?                  @default("Pendiente") @db.VarChar(20)
+  notas_internas         String?
+  detalle_orden_insumo   detalle_orden_insumo[]
+  detalle_orden_servicio detalle_orden_servicio[]
+  factura                factura[]
+  cliente                cliente?                 @relation(fields: [id_cliente], references: [id_cliente], onDelete: Restrict, onUpdate: NoAction)
+}
+
+model pagos_parciales {
+  id_pago      Int      @id @default(autoincrement())
+  id_factura   Int?
+  monto_pagado Decimal  @db.Decimal(10, 2)
+  forma_pago   String?  @db.VarChar(50)
+  fecha_pago   DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  factura      factura? @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model proveedor {
+  id_proveedor     Int             @id @default(autoincrement())
+  razon_social     String          @db.VarChar(100)
+  cuit             String?         @unique @db.VarChar(20)
+  telefono         String?         @db.VarChar(20)
+  email            String?         @db.VarChar(100)
+  nombre_proveedor String?         @db.VarChar(100)
+  estado           Boolean?        @default(true)
+  compra_insumo    compra_insumo[]
+  insumo           insumo[]
+}
+
+model servicio {
+  id_servicio            Int                      @id @default(autoincrement())
+  nombre                 String                   @db.VarChar(100)
+  descripcion            String?                  @db.VarChar(255)
+  precio                 Decimal                  @db.Decimal(10, 2)
+  estado                 Boolean?                 @default(true)
+  detalle_orden_servicio detalle_orden_servicio[]
 }
