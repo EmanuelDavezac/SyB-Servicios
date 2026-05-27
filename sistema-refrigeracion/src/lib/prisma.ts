@@ -1,12 +1,22 @@
-// src/lib/prisma.ts (o lib/prisma.ts)
 import { PrismaClient } from '@prisma/client';
+import { PrismaNeon } from '@prisma/adapter-neon';
+import { neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+neonConfig.webSocketConstructor = ws;
 
-export const prisma =
-    globalForPrisma.prisma ||
-    new PrismaClient({
-        log: ['query'], // Opcional: te muestra en la terminal las consultas SQL que se ejecutan
-    });
+const globalForPrisma = global as unknown as { prisma: PrismaClient | undefined };
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+function getClient(): PrismaClient {
+    if (!globalForPrisma.prisma) {
+        const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
+        globalForPrisma.prisma = new PrismaClient({ adapter });
+    }
+    return globalForPrisma.prisma;
+}
+
+export const prisma = new Proxy({} as PrismaClient, {
+    get(_target, prop) {
+        return (getClient() as unknown as Record<string | symbol, unknown>)[prop];
+    },
+});

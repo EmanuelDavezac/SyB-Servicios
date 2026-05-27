@@ -4,7 +4,8 @@
       "Bash(Get-Content package.json)",
       "PowerShell(npm list *)",
       "WebFetch(domain:pris.ly)",
-      "WebFetch(domain:www.prisma.io)"
+      "WebFetch(domain:www.prisma.io)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const buf = fs.readFileSync\\('.env'\\); const hex = buf.slice\\(0,4\\).toString\\('hex'\\); console.log\\('Primeros bytes hex:', hex\\); const lines = buf.toString\\('utf8'\\).split\\('\\\\n'\\); lines.forEach\\(\\(l,i\\) => { if\\(l.includes\\('DATABASE'\\)\\) console.log\\('Linea', i, JSON.stringify\\(l\\)\\); }\\)\")"
     ]
   }
 }
