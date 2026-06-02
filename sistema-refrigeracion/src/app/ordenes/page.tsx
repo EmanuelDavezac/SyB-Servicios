@@ -1,5 +1,6 @@
 import { obtenerOrdenes, obtenerClientesActivos } from "@/actions/ordenes";
 import ModalOrden from "@/components/ModalOrden";
+import FiltrosOrdenes from "@/components/FiltrosOrdenes";
 
 // Colores por estado
 const ESTILOS_ESTADO: Record<string, string> = {
@@ -8,12 +9,31 @@ const ESTILOS_ESTADO: Record<string, string> = {
     "Finalizado":  "bg-green-100 text-green-800 border border-green-200",
 };
 
-export default async function OrdenesPage() {
+export default async function OrdenesPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string }> }) {
+    const params = await searchParams;
+
     // Traemos las órdenes y los clientes activos en paralelo
-    const [ordenes, clientes] = await Promise.all([
+    const [todasLasOrdenes, clientes] = await Promise.all([
         obtenerOrdenes(),
         obtenerClientesActivos(),
     ]);
+
+    let ordenes = todasLasOrdenes;
+
+    // Filtro por nombre o apellido del cliente
+    if (params.busqueda) {
+        const busqueda = params.busqueda.toLowerCase();
+        ordenes = ordenes.filter((orden) => {
+            const nombreCompleto = `${orden.cliente?.nombre || ""} ${orden.cliente?.apellido || ""}`.toLowerCase();
+            const apellidoNombre = `${orden.cliente?.apellido || ""} ${orden.cliente?.nombre || ""}`.toLowerCase();
+            return nombreCompleto.includes(busqueda) || apellidoNombre.includes(busqueda);
+        });
+    }
+
+    // Filtro por estado
+    if (params.estado) {
+        ordenes = ordenes.filter((orden) => (orden.estado_trabajo || "Pendiente") === params.estado);
+    }
 
     return (
         <div>
@@ -24,22 +44,7 @@ export default async function OrdenesPage() {
             </div>
 
             {/* Filtros */}
-            <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black">
-                <input
-                    type="text"
-                    placeholder="Buscar por Cliente..."
-                    className="border p-2 rounded w-1/3 outline-none focus:border-blue-500"
-                />
-                <select className="border p-2 rounded outline-none focus:border-blue-500">
-                    <option value="">Todos los Estados</option>
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="En proceso">En proceso</option>
-                    <option value="Finalizado">Finalizado</option>
-                </select>
-                <button className="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700 transition">
-                    Filtrar
-                </button>
-            </div>
+            <FiltrosOrdenes />
 
             {/* Tabla */}
             <div className="bg-white rounded shadow overflow-hidden">
