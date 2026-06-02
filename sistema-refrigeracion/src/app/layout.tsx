@@ -58,7 +58,7 @@ export default function RootLayout({
 
           {/* ÁREA DE CONTENIDO PRINCIPAL */}
           {/* 'children' es la página actual (ej: page.tsx o clientes/page.tsx) */}
-          <main className="flex-1 overflow-y-auto p-8 relative">
+          <main className="flex-1 overflow-y-auto p-8">
             {children}
           </main>
 
