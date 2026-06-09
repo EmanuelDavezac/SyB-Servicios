@@ -1,6 +1,7 @@
 import { obtenerOrdenes, obtenerClientesActivos } from "@/actions/ordenes";
 import ModalOrden from "@/components/ModalOrden";
 import FiltrosOrdenes from "@/components/FiltrosOrdenes";
+import Link from "next/link";
 
 // Colores por estado
 const ESTILOS_ESTADO: Record<string, string> = {
@@ -101,16 +102,45 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
-                                        <button className="text-blue-600 mr-2 hover:text-blue-800" title="Ver / Editar">
-                                            <i className="fas fa-edit"></i>
-                                        </button>
-                                        <button
-                                            className={`font-bold ${orden.estado_trabajo === "Finalizado" ? "text-green-600 hover:text-green-800" : "text-gray-300 cursor-not-allowed"}`}
-                                            title={orden.estado_trabajo === "Finalizado" ? "Generar Factura" : "La orden debe estar finalizada para facturar"}
-                                            disabled={orden.estado_trabajo !== "Finalizado"}
-                                        >
-                                            <i className="fas fa-file-invoice-dollar"></i>
-                                        </button>
+
+                                        {/* Botón Editar → abre ModalOrden en modo edición */}
+                                        <ModalOrden
+                                            clientes={clientes}
+                                            ordenInicial={{
+                                                id_orden: orden.id_orden,
+                                                id_cliente: orden.id_cliente,
+                                                estado_trabajo: orden.estado_trabajo ?? "Pendiente",
+                                                notas_internas: orden.notas_internas ?? null,
+                                            }}
+                                            trigger={
+                                                <button
+                                                    className="text-blue-600 mr-2 hover:text-blue-800"
+                                                    title="Editar orden"
+                                                >
+                                                    <i className="fas fa-edit" />
+                                                </button>
+                                            }
+                                        />
+
+                                        {/* Botón Facturar → solo habilitado si la orden está Finalizada */}
+                                        {orden.estado_trabajo === "Finalizado" ? (
+                                            <Link
+                                                href={`/facturacion?orden=${orden.id_orden}`}
+                                                title="Generar Factura"
+                                                className="text-green-600 hover:text-green-800 font-bold"
+                                            >
+                                                <i className="fas fa-file-invoice-dollar" />
+                                            </Link>
+                                        ) : (
+                                            <button
+                                                className="text-gray-300 cursor-not-allowed font-bold"
+                                                title="La orden debe estar finalizada para facturar"
+                                                disabled
+                                            >
+                                                <i className="fas fa-file-invoice-dollar" />
+                                            </button>
+                                        )}
+
                                     </td>
 
                                 </tr>

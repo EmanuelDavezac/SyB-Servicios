@@ -41,6 +41,12 @@ export default function RootLayout({
               <Link href="/insumos" className="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200">
                 <i className="fas fa-box-open mr-3 w-5 text-center"></i> Insumos
               </Link>
+              <Link href="/proveedores" className="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200">
+                <i className="fas fa-truck mr-3 w-5 text-center"></i> Proveedores
+              </Link>
+              <Link href="/servicios" className="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200">
+                <i className="fas fa-wrench mr-3 w-5 text-center"></i> Servicios
+              </Link>
               <Link href="/ordenes" className="flex items-center py-3 px-6 hover:bg-slate-700 transition duration-200">
                 <i className="fas fa-clipboard-list mr-3 w-5 text-center"></i> Órdenes
               </Link>

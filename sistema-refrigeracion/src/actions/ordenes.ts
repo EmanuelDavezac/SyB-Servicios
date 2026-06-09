@@ -72,3 +72,28 @@ export async function crearOrden(datos: {
         return { success: false, error: "No se pudo crear la orden" };
     }
 }
+
+// Edita una orden de trabajo existente
+export async function editarOrden(id_orden: number, datos: {
+    id_cliente: number;
+    estado_trabajo: string;
+    notas_internas?: string;
+}) {
+    try {
+        const ordenActualizada = await prisma.orden_trabajo.update({
+            where: { id_orden },
+            data: {
+                id_cliente: datos.id_cliente,
+                estado_trabajo: datos.estado_trabajo,
+                notas_internas: datos.notas_internas ?? null,
+            },
+        });
+
+        revalidatePath("/ordenes");
+        return { success: true, orden: ordenActualizada };
+
+    } catch (error) {
+        console.error("Error al editar la orden:", error);
+        return { success: false, error: "No se pudo actualizar la orden" };
+    }
+}
