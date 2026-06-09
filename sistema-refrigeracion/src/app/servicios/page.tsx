@@ -1,4 +1,5 @@
 import { obtenerServicios } from "@/actions/servicios";
+import ModalServicio from "@/components/ModalServicio";
 
 export default async function ServiciosPage() {
     const servicios = await obtenerServicios();
@@ -8,14 +9,7 @@ export default async function ServiciosPage() {
             {/* Encabezado */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Servicios</h2>
-                {/* Botón "Nuevo Servicio" — modal se agrega después */}
-                <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex items-center gap-2"
-                    disabled
-                    title="Próximamente"
-                >
-                    <i className="fas fa-plus" /> Nuevo Servicio
-                </button>
+                <ModalServicio />
             </div>
 
             {/* Tabla */}
@@ -39,10 +33,7 @@ export default async function ServiciosPage() {
                             </tr>
                         ) : (
                             servicios.map((srv) => (
-                                <tr
-                                    key={srv.id_servicio}
-                                    className={`border-b hover:bg-gray-50 ${!srv.estado ? "bg-gray-50 text-gray-400" : ""}`}
-                                >
+                                <tr key={srv.id_servicio} className={`border-b hover:bg-gray-50 ${!srv.estado ? "bg-gray-50 text-gray-400" : ""}`}>
                                     {/* Nombre */}
                                     <td className="p-4 font-bold text-gray-800">
                                         {srv.nombre}
@@ -69,20 +60,22 @@ export default async function ServiciosPage() {
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
-                                        <button
-                                            className="text-blue-500 hover:text-blue-700 mr-3"
-                                            title="Editar servicio (próximamente)"
-                                            disabled
-                                        >
-                                            <i className="fas fa-edit" />
-                                        </button>
-                                        <button
-                                            className="text-red-400 hover:text-red-600"
-                                            title="Dar de baja (próximamente)"
-                                            disabled
-                                        >
-                                            <i className="fas fa-toggle-off" />
-                                        </button>
+                                        <ModalServicio
+                                            servicioInicial={{
+                                                id_servicio: srv.id_servicio,
+                                                nombre: srv.nombre,
+                                                descripcion: srv.descripcion ?? null,
+                                                precio: Number(srv.precio),
+                                            }}
+                                            trigger={
+                                                <button
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Editar servicio"
+                                                >
+                                                    <i className="fas fa-edit" />
+                                                </button>
+                                            }
+                                        />
                                     </td>
                                 </tr>
                             ))

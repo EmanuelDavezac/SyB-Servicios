@@ -1,4 +1,5 @@
 import { obtenerProveedores } from "@/actions/proveedores";
+import ModalProveedor from "@/components/ModalProveedor";
 
 export default async function ProveedoresPage() {
     const proveedores = await obtenerProveedores();
@@ -8,14 +9,7 @@ export default async function ProveedoresPage() {
             {/* Encabezado */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Proveedores</h2>
-                {/* Botón "Nuevo Proveedor" — modal se agrega después */}
-                <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex items-center gap-2"
-                    disabled
-                    title="Próximamente"
-                >
-                    <i className="fas fa-plus" /> Nuevo Proveedor
-                </button>
+                <ModalProveedor />
             </div>
 
             {/* Tabla */}
@@ -82,20 +76,24 @@ export default async function ProveedoresPage() {
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
-                                        <button
-                                            className="text-blue-500 hover:text-blue-700 mr-3"
-                                            title="Editar proveedor (próximamente)"
-                                            disabled
-                                        >
-                                            <i className="fas fa-edit" />
-                                        </button>
-                                        <button
-                                            className="text-red-400 hover:text-red-600"
-                                            title="Dar de baja (próximamente)"
-                                            disabled
-                                        >
-                                            <i className="fas fa-toggle-off" />
-                                        </button>
+                                        <ModalProveedor
+                                            proveedorInicial={{
+                                                id_proveedor: prov.id_proveedor,
+                                                razon_social: prov.razon_social,
+                                                nombre_proveedor: prov.nombre_proveedor ?? null,
+                                                cuit: prov.cuit ?? null,
+                                                telefono: prov.telefono ?? null,
+                                                email: prov.email ?? null,
+                                            }}
+                                            trigger={
+                                                <button
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Editar proveedor"
+                                                >
+                                                    <i className="fas fa-edit" />
+                                                </button>
+                                            }
+                                        />
                                     </td>
                                 </tr>
                             ))
