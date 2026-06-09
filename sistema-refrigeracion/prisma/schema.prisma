@@ -146,4 +146,15 @@
     precio                 Decimal                  @db.Decimal(10, 2)
     estado                 Boolean?                 @default(true)
     detalle_orden_servicio detalle_orden_servicio[]
+    servicio_insumo        servicio_insumo[]
+  }
+
+model servicio_insumo {
+    id_servicio_ins  Int      @id @default(autoincrement())
+    id_servicio      Int
+    id_insumo        Int
+    cantidad         Int
+
+    servicio         servicio @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade)
+    insumo           insumo   @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict)
   }
