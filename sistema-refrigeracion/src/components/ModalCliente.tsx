@@ -35,7 +35,7 @@ export default function ModalCliente() {
     }
 
     const modal = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-[9999]">
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
                 <div className="flex justify-between items-center border-b pb-3 mb-4">
                     <h3 className="text-xl font-bold text-gray-800">Alta de Cliente</h3>

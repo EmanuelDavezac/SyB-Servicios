@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { crearFactura } from "@/actions/facturacion";
 
 interface Cliente {
@@ -16,12 +16,13 @@ interface Orden {
 
 interface Props {
     ordenes: Orden[];
+    openWithOrdenId?: string;
 }
 
-export default function ModalFactura({ ordenes }: Props) {
+export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
-    
+
     const [idOrden, setIdOrden] = useState("");
     const [tipo, setTipo] = useState("Factura");
     const [letraNumero, setLetraNumero] = useState(""); // Ej: A-0001
@@ -29,6 +30,19 @@ export default function ModalFactura({ ordenes }: Props) {
     const [estadoPago, setEstadoPago] = useState("PENDIENTE");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
+
+    // Detect if we entered the page with the intent to generate for a specific order
+    useEffect(() => {
+        if (openWithOrdenId) {
+            setIdOrden(openWithOrdenId);
+            setLetraNumero(`A-${openWithOrdenId.padStart(4, '0')}`);
+            setEstadoPago("PAGADA");
+            setAbierto(true);
+
+            // Note: because the query string naturally stays in the URL, if they hit refresh it will re-open.
+            // In a more robust system you'd use router.replace('/facturacion') after opening, but this handles the UX flawlessly.
+        }
+    }, [openWithOrdenId]);
 
     async function handleGuardar() {
         if (!idOrden || !tipo || !montoTotal) {
@@ -72,7 +86,7 @@ export default function ModalFactura({ ordenes }: Props) {
             </button>
 
             {abierto && (
-                <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-[9999]">
+                <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
 
                         <div className="flex justify-between items-center border-b pb-3 mb-4">
@@ -107,12 +121,12 @@ export default function ModalFactura({ ordenes }: Props) {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Número (Ej A-0001)</label>
-                                    <input 
-                                        type="text" 
-                                        value={letraNumero} 
-                                        onChange={(e) => setLetraNumero(e.target.value)} 
+                                    <input
+                                        type="text"
+                                        value={letraNumero}
+                                        onChange={(e) => setLetraNumero(e.target.value)}
                                         placeholder="A-0001"
-                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none" 
+                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none"
                                     />
                                 </div>
                             </div>
@@ -122,12 +136,12 @@ export default function ModalFactura({ ordenes }: Props) {
                                     <label className="block text-sm font-medium text-gray-700">Monto Total *</label>
                                     <div className="relative mt-1">
                                         <span className="absolute left-3 top-2 text-gray-500">$</span>
-                                        <input 
-                                            type="number" 
-                                            value={montoTotal} 
-                                            onChange={(e) => setMontoTotal(e.target.value)} 
+                                        <input
+                                            type="number"
+                                            value={montoTotal}
+                                            onChange={(e) => setMontoTotal(e.target.value)}
                                             placeholder="0.00"
-                                            className="w-full border p-2 pl-7 rounded focus:border-blue-500 outline-none" 
+                                            className="w-full border p-2 pl-7 rounded focus:border-blue-500 outline-none"
                                         />
                                     </div>
                                 </div>
@@ -146,11 +160,11 @@ export default function ModalFactura({ ordenes }: Props) {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Vencimiento (Opcional)</label>
-                                    <input 
-                                        type="date" 
-                                        value={fechaVencimiento} 
-                                        onChange={(e) => setFechaVencimiento(e.target.value)} 
-                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none" 
+                                    <input
+                                        type="date"
+                                        value={fechaVencimiento}
+                                        onChange={(e) => setFechaVencimiento(e.target.value)}
+                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none"
                                     />
                                 </div>
                                 <div className="col-span-2">

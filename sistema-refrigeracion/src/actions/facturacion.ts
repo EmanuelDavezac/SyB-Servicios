@@ -107,3 +107,30 @@ export async function eliminarFactura(id_factura: number) {
     return { success: false, error: "Error al eliminar la factura" };
   }
 }
+
+export async function getFacturaCompleta(id_factura: number) {
+  try {
+    const factura = await prisma.factura.findUnique({
+      where: { id_factura },
+      include: {
+        orden_trabajo: {
+          include: {
+            cliente: true,
+            detalle_orden_servicio: {
+              include: { servicio: true }
+            },
+            detalle_orden_insumo: {
+              include: { insumo: true }
+            },
+          },
+        },
+      },
+    });
+
+    if (!factura) return null;
+    return JSON.parse(JSON.stringify(factura));
+  } catch (error) {
+    console.error("Error fetching factura completa:", error);
+    return null;
+  }
+}

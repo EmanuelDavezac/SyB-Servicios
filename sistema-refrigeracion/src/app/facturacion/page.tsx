@@ -1,6 +1,7 @@
 import { getFacturas, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
 import FiltrosFacturacion from "@/components/FiltrosFacturacion";
 import ModalFactura from "@/components/ModalFactura";
+import BotonImprimirFactura from "@/components/BotonImprimirFactura";
 
 export default async function FacturacionPage({
     searchParams,
@@ -8,7 +9,9 @@ export default async function FacturacionPage({
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
     const params = await searchParams;
-    const filtroComprobante = typeof params.comprobante === "string" ? params.comprobante.toLowerCase() : "";
+    const ordenIdQuery = typeof params.orden === "string" ? params.orden : undefined;
+    const fechaInicioStr = typeof params.fechaInicio === "string" ? params.fechaInicio : "";
+    const fechaFinStr = typeof params.fechaFin === "string" ? params.fechaFin : "";
     const filtroCliente = typeof params.cliente === "string" ? params.cliente.toLowerCase() : "";
     const filtroEstado = typeof params.estado === "string" ? params.estado.toUpperCase() : "";
 
@@ -19,8 +22,16 @@ export default async function FacturacionPage({
     const facturas = facturasOriginales.filter((f: any) => {
         let coincide = true;
 
-        if (filtroComprobante) {
-            if (!f.num_factura?.toLowerCase().includes(filtroComprobante)) coincide = false;
+        if (fechaInicioStr) {
+            const fi = new Date(`${fechaInicioStr}T00:00:00`);
+            const emision = new Date(f.fecha_emision);
+            if (emision < fi) coincide = false;
+        }
+
+        if (fechaFinStr) {
+            const ff = new Date(`${fechaFinStr}T23:59:59.999`);
+            const emision = new Date(f.fecha_emision);
+            if (emision > ff) coincide = false;
         }
 
         if (filtroCliente) {
@@ -52,7 +63,7 @@ export default async function FacturacionPage({
         <div className="p-8 pb-20 font-sans max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Facturación</h1>
-                <ModalFactura ordenes={ordenesPendientes} />
+                <ModalFactura ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />
             </div>
 
             <FiltrosFacturacion />
@@ -114,7 +125,7 @@ export default async function FacturacionPage({
                                     </span>
                                 </div>
                                 <div className="text-right flex justify-end gap-3 text-lg opacity-70">
-                                    <button title="Imprimir" className="hover:text-blue-600">🖨️</button>
+                                    <BotonImprimirFactura idFactura={factura.id_factura} />
                                     <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
                                 </div>
                             </div>

@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SyB Servicios",
-  description: "Sistema de Gestión para Refrigeración",
+  description: "Sistema de Gestión",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
 
         <div className="flex h-screen overflow-hidden">
           {/* BARRA LATERAL (Extraída de tu HTML) */}
-          <aside className="w-64 bg-slate-800 text-white flex-shrink-0 flex flex-col z-10">
+          <aside className="w-64 bg-slate-800 text-white shrink-0 flex flex-col z-10">
             <div className="p-6">
               <h1 className="text-xl font-bold border-b border-slate-700 pb-4 text-sky-400">
                 SyB Servicios
@@ -57,9 +57,6 @@ export default function RootLayout({
                 <i className="fas fa-chart-pie mr-3 w-5 text-center"></i> Reportes
               </Link>
             </nav>
-            <div className="p-4 text-xs text-slate-500 border-t border-slate-700">
-              Itec - Prácticas Prof. I
-            </div>
           </aside>
 
           {/* ÁREA DE CONTENIDO PRINCIPAL */}

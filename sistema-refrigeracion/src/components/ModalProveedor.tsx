@@ -51,8 +51,8 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
         const datos = {
             razon_social: razonSocial.trim(),
             nombre_proveedor: nombreProveedor.trim() || undefined,
-            cuit: cuit.trim() || undefined,
-            telefono: telefono.trim() || undefined,
+            cuit: String(cuit).trim() || undefined,
+            telefono: String(telefono).trim() || undefined,
             email: email.trim() || undefined,
         };
 
@@ -73,7 +73,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-[9999]">
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
                 <div className="flex justify-between items-center border-b pb-3 mb-4">
                     <h3 className="text-xl font-bold text-gray-800">
@@ -99,15 +99,15 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">CUIT</label>
-                            <input type="text" value={cuit} onChange={(e) => setCuit(e.target.value)}
-                                placeholder="Ej: 30-12345678-9"
+                            <label className="block text-sm font-medium text-gray-700">CUIT (solo números)</label>
+                            <input type="text" value={cuit} onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
+                                placeholder="Ej: 30123456789"
                                 className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Teléfono</label>
-                            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)}
-                                placeholder="Ej: 351 123-4567"
+                            <label className="block text-sm font-medium text-gray-700">Teléfono (solo números)</label>
+                            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                placeholder="Ej: 3511234567"
                                 className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
                         </div>
                     </div>
