@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 
 export async function obtenerServicios() {
     try {
-        return await prisma.servicio.findMany({
+        const servicios = await prisma.servicio.findMany({
             orderBy: { nombre: "asc" },
         });
+        // JSON round-trip convierte Decimal → number plano (serializable para Client Components)
+        return JSON.parse(JSON.stringify(servicios));
     } catch (error) {
         console.error("Error al obtener servicios:", error);
         return [];

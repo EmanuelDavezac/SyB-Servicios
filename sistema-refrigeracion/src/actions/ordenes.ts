@@ -16,7 +16,7 @@ export async function obtenerOrdenes() {
                         nombre: true,
                         apellido: true,
                     },
-                },
+                }
             },
         });
 
@@ -95,5 +95,95 @@ export async function editarOrden(id_orden: number, datos: {
     } catch (error) {
         console.error("Error al editar la orden:", error);
         return { success: false, error: "No se pudo actualizar la orden" };
+    }
+}
+
+// Agrega un servicio existente a una orden (detalle_orden_servicio)
+export async function agregarServicioAOrden(datos: {
+    id_orden: number;
+    id_servicio: number;
+    cantidad: number;
+    precio_acordado: number;
+}) {
+    try {
+        await prisma.detalle_orden_servicio.create({
+            data: {
+                id_orden: datos.id_orden,
+                id_servicio: datos.id_servicio,
+                cantidad: datos.cantidad,
+                precio_acordado: datos.precio_acordado,
+            },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al agregar servicio a orden:", error);
+        return { success: false, error: "No se pudo agregar el servicio" };
+    }
+}
+
+// Crea un servicio nuevo y lo agrega a la orden al mismo tiempo
+export async function crearServicioYAgregarAOrden(datos: {
+    id_orden: number;
+    nombre: string;
+    descripcion?: string;
+    precio: number;
+    cantidad: number;
+}) {
+    try {
+        // Crear el servicio
+        const nuevoServicio = await prisma.servicio.create({
+            data: {
+                nombre: datos.nombre,
+                descripcion: datos.descripcion,
+                precio: datos.precio,
+            },
+        });
+
+        // Vincularlo a la orden
+        await prisma.detalle_orden_servicio.create({
+            data: {
+                id_orden: datos.id_orden,
+                id_servicio: nuevoServicio.id_servicio,
+                cantidad: datos.cantidad,
+                precio_acordado: datos.precio,
+            },
+        });
+
+        revalidatePath("/ordenes");
+        revalidatePath("/servicios");
+        return { success: true, servicio: nuevoServicio };
+    } catch (error) {
+        console.error("Error al crear servicio y agregar a orden:", error);
+        return { success: false, error: "No se pudo crear el servicio" };
+    }
+}
+
+// Elimina un detalle de servicio de una orden
+export async function quitarServicioDeOrden(id_detalle_srv: number) {
+    try {
+        await prisma.detalle_orden_servicio.delete({
+            where: { id_detalle_srv },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al quitar servicio de orden:", error);
+        return { success: false, error: "No se pudo quitar el servicio" };
+    }
+}
+
+// Obtiene los detalles de servicios de una orden
+export async function obtenerServiciosDeOrden(id_orden: number) {
+    try {
+        const detalles = await prisma.detalle_orden_servicio.findMany({
+            where: { id_orden },
+            include: { servicio: true },
+            orderBy: { id_detalle_srv: "asc" },
+        });
+        return JSON.parse(JSON.stringify(detalles));
+    } catch (error) {
+        console.error("Error al obtener servicios de orden:", error);
+        return [];
     }
 }
