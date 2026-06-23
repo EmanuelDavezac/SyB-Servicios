@@ -58,26 +58,66 @@ export async function crearFactura(data: {
   estado_pago: string;
   descripcion?: string;
   fecha_vencimiento?: Date;
+  insumos?: { id_insumo: number; cantidad: number }[];
 }) {
   try {
-    const nuevaFactura = await prisma.factura.create({
-      data: {
-        id_orden: data.id_orden,
-        num_factura: data.num_factura,
-        tipo: data.tipo,
-        fecha_emision: new Date(),
-        fecha_vencimiento: data.fecha_vencimiento,
-        monto_total: data.monto_total,
-        estado_pago: data.estado_pago,
-        descripcion: data.descripcion,
-      },
+    const nuevaFactura = await prisma.$transaction(async (tx) => {
+      // 1. Crear la factura
+      const factura = await tx.factura.create({
+        data: {
+          id_orden: data.id_orden,
+          num_factura: data.num_factura,
+          tipo: data.tipo,
+          fecha_emision: new Date(),
+          fecha_vencimiento: data.fecha_vencimiento,
+          monto_total: data.monto_total,
+          estado_pago: data.estado_pago,
+          descripcion: data.descripcion,
+        },
+      });
+
+      // 2. Procesar insumos y descontar stock
+      if (data.insumos && data.insumos.length > 0) {
+        for (const item of data.insumos) {
+          const insumo = await tx.insumo.findUnique({
+            where: { id_insumo: item.id_insumo },
+          });
+
+          if (!insumo) {
+            throw new Error(`Insumo con ID ${item.id_insumo} no encontrado`);
+          }
+
+          // Descontar stock
+          await tx.insumo.update({
+            where: { id_insumo: item.id_insumo },
+            data: {
+              stock_actual: {
+                decrement: item.cantidad,
+              },
+            },
+          });
+
+          // Registrar en el detalle de la orden
+          await tx.detalle_orden_insumo.create({
+            data: {
+              id_orden: data.id_orden,
+              id_insumo: item.id_insumo,
+              cantidad_usada: item.cantidad,
+              precio_aplicado: insumo.precio_venta,
+            },
+          });
+        }
+      }
+
+      return factura;
     });
 
     revalidatePath("/facturacion");
+    revalidatePath("/insumos");
     return { success: true, factura: JSON.parse(JSON.stringify(nuevaFactura)) };
   } catch (error) {
     console.error("Error creating factura:", error);
-    return { success: false, error: "Error al crear la factura" };
+    return { success: false, error: error instanceof Error ? error.message : "Error al crear la factura" };
   }
 }
 
