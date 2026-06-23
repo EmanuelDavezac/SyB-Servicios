@@ -104,3 +104,62 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         return { movimientos: [], totalIngresos: 0, totalEgresos: 0, balanceGeneral: 0 };
     }
 }
+
+export async function obtenerDatosDashboard() {
+    try {
+        // 1. Trabajos en Curso (Latest 5 orders not finished)
+        const ordenesEnCurso = await prisma.orden_trabajo.findMany({
+            where: {
+                estado_trabajo: {
+                    notIn: ["Finalizado", "Entregado", "Anulado"]
+                }
+            },
+            include: {
+                cliente: true
+            },
+            orderBy: {
+                fecha_creacion: "desc"
+            },
+            take: 5
+        });
+
+        // 2. Alertas de Stock Bajo (Insumos where stock_actual <= stock_minimo)
+        // Usamos queryRaw para comparar dos columnas directamente en la DB
+        const alertasStock = await prisma.$queryRaw<any[]>`
+            SELECT * FROM insumo 
+            WHERE stock_actual <= stock_minimo 
+            AND estado = true 
+            ORDER BY stock_actual ASC 
+            LIMIT 5
+        `;
+
+        // 3. Facturas por Vencer (Unpaid, ordered by due date)
+        const facturasPorVencer = await prisma.factura.findMany({
+            where: {
+                estado_pago: {
+                    in: ["IMPAGA", "PENDIENTE", "Impago", "Pendiente"]
+                }
+            },
+            include: {
+                orden_trabajo: {
+                    include: {
+                        cliente: true
+                    }
+                }
+            },
+            orderBy: {
+                fecha_vencimiento: "asc"
+            },
+            take: 5
+        });
+
+        return {
+            ordenesEnCurso: JSON.parse(JSON.stringify(ordenesEnCurso)),
+            alertasStock: JSON.parse(JSON.stringify(alertasStock)),
+            facturasPorVencer: JSON.parse(JSON.stringify(facturasPorVencer))
+        };
+    } catch (error) {
+        console.error("Error al obtener datos del dashboard:", error);
+        return { ordenesEnCurso: [], alertasStock: [], facturasPorVencer: [] };
+    }
+}

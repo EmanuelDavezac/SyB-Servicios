@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { crearFactura } from "@/actions/facturacion";
+import { obtenerInsumos } from "@/actions/insumos";
 
 interface Cliente {
     id_cliente: number;
@@ -12,6 +13,13 @@ interface Cliente {
 interface Orden {
     id_orden: number;
     cliente: Cliente | null;
+}
+
+interface Insumo {
+    id_insumo: number;
+    nombre: string;
+    stock_actual: number | null;
+    precio_venta: number;
 }
 
 interface Props {
@@ -31,6 +39,12 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
 
+    // Insumos logic
+    const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
+    const [insumosSeleccionados, setInsumosSeleccionados] = useState<{ id_insumo: number, nombre: string, cantidad: number }[]>([]);
+    const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
+    const [cantidadInsumo, setCantidadInsumo] = useState("1");
+
     // Detect if we entered the page with the intent to generate for a specific order
     useEffect(() => {
         if (openWithOrdenId) {
@@ -43,6 +57,33 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             // In a more robust system you'd use router.replace('/facturacion') after opening, but this handles the UX flawlessly.
         }
     }, [openWithOrdenId]);
+
+    useEffect(() => {
+        if (abierto) {
+            async function cargarInsumos() {
+                const data = await obtenerInsumos();
+                setInsumosDisponibles(data as Insumo[]);
+            }
+            cargarInsumos();
+        }
+    }, [abierto]);
+
+    function agregarInsumo() {
+        if (!idInsumoSeleccionado) return;
+        const insumo = insumosDisponibles.find(i => i.id_insumo === Number(idInsumoSeleccionado));
+        if (insumo) {
+            setInsumosSeleccionados(prev => [
+                ...prev,
+                { id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) }
+            ]);
+            setIdInsumoSeleccionado("");
+            setCantidadInsumo("1");
+        }
+    }
+
+    function quitarInsumo(index: number) {
+        setInsumosSeleccionados(prev => prev.filter((_, i) => i !== index));
+    }
 
     async function handleGuardar() {
         if (!idOrden || !tipo || !montoTotal) {
@@ -59,6 +100,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             estado_pago: estadoPago,
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
+            insumos: insumosSeleccionados.map(i => ({ id_insumo: i.id_insumo, cantidad: i.cantidad })),
         });
         setCargando(false);
 
@@ -71,6 +113,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             setEstadoPago("PENDIENTE");
             setFechaVencimiento("");
             setDescripcion("");
+            setInsumosSeleccionados([]);
         } else {
             alert(resultado.error || "Error al crear la factura.");
         }
@@ -170,6 +213,60 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 <div className="col-span-2">
                                     <label className="block text-sm font-medium text-gray-700">Descripción / Notas</label>
                                     <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none resize-none" />
+                                </div>
+
+                                {/* Selección de Insumos */}
+                                <div className="col-span-2 space-y-2 border-t pt-3 mt-1">
+                                    <label className="block text-sm font-medium text-gray-700">Insumos de Stock (se descontarán al guardar)</label>
+                                    <div className="flex space-x-2">
+                                        <select
+                                            value={idInsumoSeleccionado}
+                                            onChange={(e) => setIdInsumoSeleccionado(e.target.value)}
+                                            className="flex-1 border p-2 rounded focus:border-blue-500 outline-none"
+                                        >
+                                            <option value="">Seleccionar insumo...</option>
+                                            {insumosDisponibles.map(insumo => (
+                                                <option key={insumo.id_insumo} value={insumo.id_insumo}>
+                                                    {insumo.nombre} (Stock: {insumo.stock_actual ?? 0})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            value={cantidadInsumo}
+                                            onChange={(e) => setCantidadInsumo(e.target.value)}
+                                            className="w-20 border p-2 rounded focus:border-blue-500 outline-none"
+                                            min="1"
+                                            placeholder="Cant."
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={agregarInsumo}
+                                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+
+                                    {insumosSeleccionados.length > 0 && (
+                                        <div className="mt-3 bg-gray-50 rounded border p-2">
+                                            <ul className="space-y-2">
+                                                {insumosSeleccionados.map((item, index) => (
+                                                    <li key={index} className="flex justify-between items-center text-sm">
+                                                        <span className="font-medium text-gray-800">{item.nombre} x {item.cantidad}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => quitarInsumo(index)}
+                                                            className="text-red-500 hover:text-red-700 font-bold"
+                                                            title="Eliminar"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
