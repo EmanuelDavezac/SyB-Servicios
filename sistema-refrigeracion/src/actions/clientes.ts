@@ -24,14 +24,25 @@ export async function obtenerClientes() {
 // Next.js nos da esta herramienta para actualizar la pantalla automáticamente
 import { revalidatePath } from "next/cache";
 
-export async function crearCliente(datos: { nombre: string; apellido: string; cuit?: string; telefono?: string }) {
+export async function crearCliente(datos: {
+    nombre: string;
+    apellido: string;
+    cuit?: string;
+    telefono?: string;
+    email?: string;
+    calle?: string;
+    num_calle?: number;
+}) {
     try {
         const nuevoCliente = await prisma.cliente.create({
             data: {
                 nombre: datos.nombre,
                 apellido: datos.apellido,
-                cuit: datos.cuit,
-                telefono: datos.telefono,
+                cuit: datos.cuit || null,
+                telefono: datos.telefono || null,
+                email: datos.email || null,
+                calle: datos.calle || null,
+                num_calle: datos.num_calle ?? null,
             },
         });
 
@@ -43,4 +54,4 @@ export async function crearCliente(datos: { nombre: string; apellido: string; cu
         console.error("Error al crear cliente:", error);
         return { success: false, error: "No se pudo crear el cliente" };
     }
-}
+}
