@@ -129,100 +129,96 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             </button>
 
             {abierto && (
-                <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+                <div className="modal-backdrop overflow-y-auto">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 my-auto">
 
-                        <div className="flex justify-between items-center border-b pb-3 mb-4">
-                            <h3 className="text-xl font-bold text-gray-800">Nuevo Comprobante</h3>
-                            <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-red-500 text-2xl leading-none">
-                                &times;
+                        <div className="modal-header">
+                            <h3 className="text-xl font-bold">Nuevo Comprobante</h3>
+                            <button onClick={() => setAbierto(false)} className="text-white hover:text-white/80 transition">
+                                <i className="fas fa-times text-lg"></i>
                             </button>
                         </div>
 
-                        <div className="space-y-4 text-black">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Orden de Trabajo Terminada *</label>
-                                <select value={idOrden} onChange={(e) => setIdOrden(e.target.value)} className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none">
-                                    <option value="">Selecciona una orden...</option>
-                                    {ordenes.map((o) => (
-                                        <option key={o.id_orden} value={o.id_orden}>
-                                            Orden #{o.id_orden} - {o.cliente?.apellido}, {o.cliente?.nombre}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                        <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
+                            
+                            <section>
+                                <h4 className="section-title">DATOS DEL COMPROBANTE</h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Orden de Trabajo Terminada *</label>
+                                        <select value={idOrden} onChange={(e) => setIdOrden(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                                            <option value="">Selecciona una orden...</option>
+                                            {ordenes.map((o) => (
+                                                <option key={o.id_orden} value={o.id_orden}>
+                                                    Orden #{o.id_orden} - {o.cliente?.apellido}, {o.cliente?.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Tipo de Comprobante *</label>
-                                    <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none">
-                                        <option value="Factura">Factura</option>
-                                        <option value="Presupuesto">Presupuesto</option>
-                                        <option value="Remito">Remito</option>
-                                        <option value="Recibo">Recibo</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Número (Ej A-0001)</label>
-                                    <input
-                                        type="text"
-                                        value={letraNumero}
-                                        onChange={(e) => setLetraNumero(e.target.value)}
-                                        placeholder="A-0001"
-                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none"
-                                    />
-                                </div>
-                            </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Tipo *</label>
+                                            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                                                <option value="Factura">Factura</option>
+                                                <option value="Presupuesto">Presupuesto</option>
+                                                <option value="Remito">Remito</option>
+                                                <option value="Recibo">Recibo</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Número</label>
+                                            <input
+                                                type="text"
+                                                value={letraNumero}
+                                                onChange={(e) => setLetraNumero(e.target.value)}
+                                                placeholder="A-0001"
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Monto Total *</label>
-                                    <div className="relative mt-1">
-                                        <span className="absolute left-3 top-2 text-gray-500">$</span>
-                                        <input
-                                            type="number"
-                                            value={montoTotal}
-                                            onChange={(e) => setMontoTotal(e.target.value)}
-                                            placeholder="0.00"
-                                            className="w-full border p-2 pl-7 rounded focus:border-blue-500 outline-none"
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Monto Total *</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2 text-gray-400">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={montoTotal}
+                                                    onChange={(e) => setMontoTotal(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-7 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Estado Pago *</label>
+                                            <select value={estadoPago} onChange={(e) => setEstadoPago(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                                                <option value="PAGADA">PAGADA</option>
+                                                <option value="IMPAGA">IMPAGA</option>
+                                                <option value="PENDIENTE">PENDIENTE</option>
+                                                <option value="ENTREGADO">ENTREGADO</option>
+                                                <option value="ANULADA">ANULADA</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Descripción / Notas</label>
+                                        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white resize-none" placeholder="Notas adicionales..." />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Estado de Pago *</label>
-                                    <select value={estadoPago} onChange={(e) => setEstadoPago(e.target.value)} className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none">
-                                        <option value="PAGADA">PAGADA</option>
-                                        <option value="IMPAGA">IMPAGA</option>
-                                        <option value="PENDIENTE">PENDIENTE</option>
-                                        <option value="ENTREGADO">ENTREGADO</option>
-                                        <option value="ANULADA">ANULADA</option>
-                                    </select>
-                                </div>
-                            </div>
+                            </section>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Vencimiento (Opcional)</label>
-                                    <input
-                                        type="date"
-                                        value={fechaVencimiento}
-                                        onChange={(e) => setFechaVencimiento(e.target.value)}
-                                        className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none"
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700">Descripción / Notas</label>
-                                    <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none resize-none" />
-                                </div>
-
-                                {/* Selección de Insumos */}
-                                <div className="col-span-2 space-y-2 border-t pt-3 mt-1">
-                                    <label className="block text-sm font-medium text-gray-700">Insumos de Stock (se descontarán al guardar)</label>
-                                    <div className="flex space-x-2">
+                            <section>
+                                <h4 className="section-title">DETALLE DE INSUMOS</h4>
+                                <div className="space-y-4">
+                                    <div className="flex gap-2">
                                         <select
                                             value={idInsumoSeleccionado}
                                             onChange={(e) => setIdInsumoSeleccionado(e.target.value)}
-                                            className="flex-1 border p-2 rounded focus:border-blue-500 outline-none"
+                                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                                         >
                                             <option value="">Seleccionar insumo...</option>
                                             {insumosDisponibles.map(insumo => (
@@ -235,48 +231,44 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             type="number"
                                             value={cantidadInsumo}
                                             onChange={(e) => setCantidadInsumo(e.target.value)}
-                                            className="w-20 border p-2 rounded focus:border-blue-500 outline-none"
+                                            className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                                             min="1"
-                                            placeholder="Cant."
                                         />
                                         <button
                                             type="button"
                                             onClick={agregarInsumo}
-                                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-bold"
                                         >
                                             +
                                         </button>
                                     </div>
 
                                     {insumosSeleccionados.length > 0 && (
-                                        <div className="mt-3 bg-gray-50 rounded border p-2">
-                                            <ul className="space-y-2">
-                                                {insumosSeleccionados.map((item, index) => (
-                                                    <li key={index} className="flex justify-between items-center text-sm">
-                                                        <span className="font-medium text-gray-800">{item.nombre} x {item.cantidad}</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => quitarInsumo(index)}
-                                                            className="text-red-500 hover:text-red-700 font-bold"
-                                                            title="Eliminar"
-                                                        >
-                                                            &times;
-                                                        </button>
-                                                    </li>
-                                                ))}
-                                            </ul>
+                                        <div className="space-y-2">
+                                            {insumosSeleccionados.map((item, index) => (
+                                                <div key={index} className="flex justify-between items-center text-sm bg-gray-50 border border-gray-100 rounded-lg px-4 py-2">
+                                                    <span className="font-medium text-gray-700">{item.nombre} x {item.cantidad}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => quitarInsumo(index)}
+                                                        className="text-red-400 hover:text-red-600 transition"
+                                                    >
+                                                        <i className="fas fa-trash-alt text-xs"></i>
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
-                            </div>
+                            </section>
 
                         </div>
 
-                        <div className="mt-6 flex justify-end space-x-3">
-                            <button onClick={() => setAbierto(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50 font-medium">
+                        <div className="modal-footer">
+                            <button onClick={() => setAbierto(false)} className="btn-outline">
                                 Cancelar
                             </button>
-                            <button onClick={handleGuardar} disabled={cargando} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button onClick={handleGuardar} disabled={cargando} className="btn-primary">
                                 {cargando ? "Guardando..." : "Guardar Comprobante"}
                             </button>
                         </div>

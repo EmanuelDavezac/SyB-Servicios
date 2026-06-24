@@ -76,60 +76,71 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
             )}
 
             {isOpen && (
-                <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-8">
+                <div className="modal-backdrop overflow-y-auto">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 my-auto">
                         {/* ENCABEZADO */}
-                        <div className="flex justify-between items-center pb-4 mb-4">
-                            <h3 className="text-2xl font-bold text-slate-800">
+                        <div className="modal-header">
+                            <h3 className="text-xl font-bold">
                                 {esEdicion ? "Editar Insumo" : "Alta de Insumo"}
                             </h3>
-                            <button type="button" onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+                            <button type="button" onClick={() => setIsOpen(false)} className="text-white hover:text-white/80 transition">
+                                <i className="fas fa-times text-lg"></i>
+                            </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-6 text-black">
-                            {/* FILA 1 */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Insumo *</label>
-                                <input name="nombre" type="text" required defaultValue={insumoAEditar?.nombre || ""} className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
-                            </div>
+                        <form onSubmit={handleSubmit}>
+                            <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
+                                
+                                <section>
+                                    <h4 className="section-title">DATOS GENERALES</h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Insumo *</label>
+                                            <input name="nombre" type="text" required defaultValue={insumoAEditar?.nombre || ""} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" placeholder="Ej: Tubo de cobre 1/4" />
+                                        </div>
 
-                            {/* FILA 2 */}
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Unidad (ej. Metros, Kg)</label>
-                                    <input name="descripcion" type="text" defaultValue={insumoAEditar?.descripcion || ""} className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
-                                    <select name="id_proveedor" defaultValue={insumoAEditar?.id_proveedor || ""} className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none bg-white">
-                                        <option value="">Seleccionar...</option>
-                                        {proveedores.map((prov) => (
-                                            <option key={prov.id_proveedor} value={prov.id_proveedor}>
-                                                {prov.razon_social || prov.nombre_proveedor}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1">Unidad (ej. Metros, Kg)</label>
+                                                <input name="descripcion" type="text" defaultValue={insumoAEditar?.descripcion || ""} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" placeholder="Unidad..." />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1">Proveedor</label>
+                                                <select name="id_proveedor" defaultValue={insumoAEditar?.id_proveedor || ""} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
+                                                    <option value="">Seleccionar...</option>
+                                                    {proveedores.map((prov) => (
+                                                        <option key={prov.id_proveedor} value={prov.id_proveedor}>
+                                                            {prov.razon_social || prov.nombre_proveedor}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
 
-                            {/* FILA 3 */}
-                            <div className="grid grid-cols-2 gap-6 pb-2">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad Inicial *</label>
-                                    <input name="stock_actual" type="number" required defaultValue={insumoAEditar?.stock_actual ?? ""} className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-red-600 mb-1">Stock Mínimo (Alerta) *</label>
-                                    <input name="stock_minimo" type="number" required defaultValue={insumoAEditar?.stock_minimo ?? ""} className="w-full border border-red-300 p-2 rounded focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none" />
-                                </div>
+                                <section>
+                                    <h4 className="section-title">CONTROL DE STOCK</h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-1">Cantidad Inicial *</label>
+                                            <input name="stock_actual" type="number" required defaultValue={insumoAEditar?.stock_actual ?? ""} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-red-600 mb-1">Stock Mínimo (Alerta) *</label>
+                                            <input name="stock_minimo" type="number" required defaultValue={insumoAEditar?.stock_minimo ?? ""} className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-500 bg-white" />
+                                        </div>
+                                    </div>
+                                </section>
+
                             </div>
 
                             {/* BOTONERA */}
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button type="button" onClick={() => setIsOpen(false)} className="px-5 py-2.5 border border-gray-300 rounded text-slate-700 font-medium hover:bg-gray-50 transition">
+                            <div className="modal-footer">
+                                <button type="button" onClick={() => setIsOpen(false)} className="btn-outline">
                                     Cancelar
                                 </button>
-                                <button type="submit" disabled={loading} className="px-5 py-2.5 bg-[#0088cc] text-white rounded font-medium hover:bg-sky-700 disabled:bg-gray-400 transition">
+                                <button type="submit" disabled={loading} className="btn-primary">
                                     {loading ? "Guardando..." : "Guardar Insumo"}
                                 </button>
                             </div>

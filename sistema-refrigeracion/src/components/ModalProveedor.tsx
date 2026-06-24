@@ -73,59 +73,72 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">
+        <div className="modal-backdrop">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800">
+                <div className="modal-header">
+                    <h3 className="text-xl font-bold">
                         {modoEdicion ? "Editar Proveedor" : "Nuevo Proveedor"}
                     </h3>
-                    <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-red-500 text-2xl leading-none">&times;</button>
+                    <button onClick={() => setAbierto(false)} className="text-white hover:text-white/80 transition">
+                        <i className="fas fa-times text-lg"></i>
+                    </button>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Razón Social *</label>
-                        <input type="text" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)}
-                            placeholder="Ej: Distribuidora Frío Sur S.A."
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
+                    
+                    <section>
+                        <h4 className="section-title">DATOS DE LA EMPRESA</h4>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Razón Social *</label>
+                                <input type="text" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)}
+                                    placeholder="Ej: Distribuidora Frío Sur S.A."
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nombre de Contacto</label>
-                        <input type="text" value={nombreProveedor} onChange={(e) => setNombreProveedor(e.target.value)}
-                            placeholder="Ej: Juan García"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">CUIT (solo números)</label>
-                            <input type="text" value={cuit} onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
-                                placeholder="Ej: 30123456789"
-                                className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">CUIT / Identificación</label>
+                                <input type="text" value={cuit} onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="Ej: 30123456789"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Teléfono (solo números)</label>
-                            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
-                                placeholder="Ej: 3511234567"
-                                className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                        </div>
-                    </div>
+                    </section>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Ej: ventas@distribuidora.com"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                    <section>
+                        <h4 className="section-title">CONTACTO</h4>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de Contacto</label>
+                                <input type="text" value={nombreProveedor} onChange={(e) => setNombreProveedor(e.target.value)}
+                                    placeholder="Ej: Juan García"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>
+                                    <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="Ej: 3511234567"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="Ej: ventas@distribuidora.com"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div className="mt-6 flex justify-end space-x-3">
-                    <button onClick={() => setAbierto(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">
+                <div className="modal-footer">
+                    <button onClick={() => setAbierto(false)} className="btn-outline">
                         Cancelar
                     </button>
                     <button onClick={handleGuardar} disabled={!razonSocial.trim() || cargando}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        className="btn-primary">
                         {cargando ? "Guardando..." : modoEdicion ? "Guardar Cambios" : "Guardar Proveedor"}
                     </button>
                 </div>

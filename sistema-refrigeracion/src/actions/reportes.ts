@@ -163,3 +163,36 @@ export async function obtenerDatosDashboard() {
         return { ordenesEnCurso: [], alertasStock: [], facturasPorVencer: [] };
     }
 }
+
+export async function obtenerReporteServicios(mes: number, anio: number) {
+    try {
+        const fechaInicio = new Date(anio, mes - 1, 1);
+        const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
+
+        const ordenes = await prisma.orden_trabajo.findMany({
+            where: {
+                estado_trabajo: "Finalizado",
+                fecha_creacion: {
+                    gte: fechaInicio,
+                    lte: fechaFin,
+                }
+            },
+            include: {
+                cliente: true,
+                detalle_orden_servicio: {
+                    include: {
+                        servicio: true
+                    }
+                }
+            },
+            orderBy: {
+                fecha_creacion: "asc"
+            }
+        });
+
+        return JSON.parse(JSON.stringify(ordenes));
+    } catch (error) {
+        console.error("Error al obtener reporte de servicios:", error);
+        return [];
+    }
+}

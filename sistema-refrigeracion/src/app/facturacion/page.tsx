@@ -85,8 +85,8 @@ export default async function FacturacionPage({
                 ) : (
                     facturas.map((factura: any) => {
                         const cliente = factura.orden_trabajo?.cliente;
-                        const nombreCliente = cliente 
-                            ? `${cliente.nombre} ${cliente.apellido}` 
+                        const nombreCliente = cliente
+                            ? `${cliente.nombre} ${cliente.apellido}`
                             : (factura.descripcion || "Desconocido");
 
                         let badgeColor = "bg-gray-200 text-gray-800";

@@ -5,9 +5,9 @@ import Link from "next/link";
 
 // Colores por estado
 const ESTILOS_ESTADO: Record<string, string> = {
-    "Pendiente":   "bg-gray-100 text-gray-800",
-    "En proceso":  "bg-yellow-100 text-yellow-800 border border-yellow-200",
-    "Finalizado":  "bg-green-100 text-green-800 border border-green-200",
+    "Pendiente": "bg-gray-100 text-gray-800",
+    "En proceso": "bg-yellow-100 text-yellow-800 border border-yellow-200",
+    "Finalizado": "bg-green-100 text-green-800 border border-green-200",
 };
 
 export default async function OrdenesPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string }> }) {

@@ -63,48 +63,58 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-[9999]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">
+        <div className="modal-backdrop">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800">
+                
+                <div className="modal-header">
+                    <h3 className="text-xl font-bold">
                         {modoEdicion ? "Editar Servicio" : "Nuevo Servicio"}
                     </h3>
-                    <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-red-500 text-2xl leading-none">&times;</button>
+                    <button onClick={() => setAbierto(false)} className="text-white hover:text-white/80 transition">
+                        <i className="fas fa-times text-lg"></i>
+                    </button>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nombre *</label>
-                        <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
-                            placeholder="Ej: Carga de gas R410A"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
+                    
+                    <section>
+                        <h4 className="section-title">DATOS DEL SERVICIO</h4>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre *</label>
+                                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
+                                    placeholder="Ej: Carga de gas R410A"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Descripción</label>
-                        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
-                            rows={3} placeholder="Ej: Recarga del refrigerante con control de presiones..."
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none resize-none text-black" />
-                    </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Descripción</label>
+                                <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
+                                    rows={3} placeholder="Ej: Recarga del refrigerante con control de presiones..."
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white resize-none" />
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Precio *</label>
-                        <div className="mt-1 flex items-center">
-                            <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l text-gray-500 text-sm">$</span>
-                            <input type="number" min="0" step="0.01" value={precio}
-                                onChange={(e) => setPrecio(e.target.value)}
-                                placeholder="0.00"
-                                className="w-full border p-2 rounded-r focus:border-blue-500 outline-none text-black" />
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Precio Sugerido *</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2 text-gray-400">$</span>
+                                    <input type="number" min="0" step="0.01" value={precio}
+                                        onChange={(e) => setPrecio(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 pl-7 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
                 </div>
 
-                <div className="mt-6 flex justify-end space-x-3">
-                    <button onClick={() => setAbierto(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">
+                <div className="modal-footer">
+                    <button onClick={() => setAbierto(false)} className="btn-outline">
                         Cancelar
                     </button>
                     <button onClick={handleGuardar} disabled={!nombre.trim() || !precio || cargando}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        className="btn-primary">
                         {cargando ? "Guardando..." : modoEdicion ? "Guardar Cambios" : "Guardar Servicio"}
                     </button>
                 </div>
