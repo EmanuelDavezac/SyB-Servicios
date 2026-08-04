@@ -31,7 +31,8 @@ export async function getOrdenesPendientesFacturacion() {
     // Only fetch orders that are finished but don't have an invoice yet, or simply "Finalizada"
     const ordenes = await prisma.orden_trabajo.findMany({
       where: {
-        estado_trabajo: "Finalizado", // assuming "Finalizado" is the state
+        estado_trabajo: "Finalizado",
+        factura: { none: {} },   // ← excluye órdenes que ya tienen al menos una factura
       },
       include: {
         cliente: true,

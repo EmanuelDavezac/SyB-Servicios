@@ -1,5 +1,6 @@
 import { obtenerClientes } from "@/actions/clientes";
 import ModalCliente from "@/components/ModalCliente";
+import BotonEliminarCliente from "@/components/BotonEliminarCliente";
 
 export default async function ClientesPage() {
     // Traemos los clientes directamente de Neon usando la acción de Prisma
@@ -71,12 +72,15 @@ export default async function ClientesPage() {
                                         )}
                                     </td>
                                     <td className="p-4 text-center">
-                                        <button className="text-blue-600 mr-2 hover:text-blue-800" title="Editar">
-                                            <i className="fas fa-edit"></i>
-                                        </button>
-                                        <button className="text-red-600 hover:text-red-800" title="Dar de baja">
-                                            <i className="fas fa-trash"></i>
-                                        </button>
+                                        <div className="flex justify-center items-center gap-2">
+                                            <button className="text-blue-600 hover:text-blue-800 transition-colors" title="Editar">
+                                                <i className="fas fa-edit" />
+                                            </button>
+                                            <BotonEliminarCliente
+                                                idCliente={cliente.id_cliente}
+                                                nombreCliente={`${cliente.nombre} ${cliente.apellido}`}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))
