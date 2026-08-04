@@ -16,6 +16,7 @@ import {
 } from "@/actions/ordenes";
 import { obtenerServicios } from "@/actions/servicios";
 import { obtenerInsumos } from "@/actions/insumos";
+import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 /* ─── tipos ──────────────────────────────────────────────────── */
 interface Cliente {
@@ -146,6 +147,12 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [cantInsumo, setCantInsumo] = useState("1");
     const [agregandoInsumo, setAgregandoInsumo] = useState(false);
     const [errInsumo, setErrInsumo] = useState<string | null>(null);
+
+    /* ── Confirmaciones de quitar ── */
+    const [itemAConfirmarSrv, setItemAConfirmarSrv] = useState<DetalleServicio | ServicioPendiente | null>(null);
+    const [quitandoSrv, setQuitandoSrv] = useState(false);
+    const [itemAConfirmarInsumo, setItemAConfirmarInsumo] = useState<DetalleInsumo | InsumoPendiente | null>(null);
+    const [quitandoInsumo, setQuitandoInsumo] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -353,12 +360,19 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     /* ── Quitar servicio ── */
     async function handleQuitar(item: DetalleServicio | ServicioPendiente) {
         if ("id_detalle_srv" in item) {
-            if (!confirm("¿Quitar este servicio?")) return;
-            await quitarServicioDeOrden(item.id_detalle_srv);
-            setServiciosGuardados((p) => p.filter((s) => s.id_detalle_srv !== item.id_detalle_srv));
+            setItemAConfirmarSrv(item);
         } else {
             setServiciosPendientes((p) => p.filter((s) => s._tmpId !== item._tmpId));
         }
+    }
+
+    async function confirmarQuitarSrv() {
+        if (!itemAConfirmarSrv || !("id_detalle_srv" in itemAConfirmarSrv)) return;
+        setQuitandoSrv(true);
+        await quitarServicioDeOrden(itemAConfirmarSrv.id_detalle_srv);
+        setServiciosGuardados((p) => p.filter((s) => s.id_detalle_srv !== (itemAConfirmarSrv as DetalleServicio).id_detalle_srv));
+        setQuitandoSrv(false);
+        setItemAConfirmarSrv(null);
     }
 
     /* ── Agregar insumo ── */
@@ -395,12 +409,19 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     /* ── Quitar insumo ── */
     async function handleQuitarInsumo(item: DetalleInsumo | InsumoPendiente) {
         if ("id_detalle_ord_insumo" in item) {
-            if (!confirm("\u00bfQuitar este insumo?")) return;
-            await quitarInsumoDeOrden(item.id_detalle_ord_insumo);
-            setInsumosGuardados((p) => p.filter((i) => i.id_detalle_ord_insumo !== item.id_detalle_ord_insumo));
+            setItemAConfirmarInsumo(item);
         } else {
             setInsumosPendientes((p) => p.filter((i) => i._tmpId !== item._tmpId));
         }
+    }
+
+    async function confirmarQuitarInsumo() {
+        if (!itemAConfirmarInsumo || !("id_detalle_ord_insumo" in itemAConfirmarInsumo)) return;
+        setQuitandoInsumo(true);
+        await quitarInsumoDeOrden(itemAConfirmarInsumo.id_detalle_ord_insumo);
+        setInsumosGuardados((p) => p.filter((i) => i.id_detalle_ord_insumo !== (itemAConfirmarInsumo as DetalleInsumo).id_detalle_ord_insumo));
+        setQuitandoInsumo(false);
+        setItemAConfirmarInsumo(null);
     }
 
     /* ── Lista unificada para el render ── */
@@ -746,6 +767,28 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 </button>
             )}
             {abierto && mounted && createPortal(modalContent, document.body)}
+
+            {/* ── Confirmación quitar servicio ── */}
+            <ModalConfirmacion
+                isOpen={!!itemAConfirmarSrv && "id_detalle_srv" in (itemAConfirmarSrv ?? {})}
+                titulo="Quitar servicio"
+                mensaje="¿Querés quitar este servicio de la orden? El servicio seguirá disponible en el catálogo."
+                labelConfirmar="Quitar servicio"
+                procesando={quitandoSrv}
+                onConfirmar={confirmarQuitarSrv}
+                onCancelar={() => setItemAConfirmarSrv(null)}
+            />
+
+            {/* ── Confirmación quitar insumo ── */}
+            <ModalConfirmacion
+                isOpen={!!itemAConfirmarInsumo && "id_detalle_ord_insumo" in (itemAConfirmarInsumo ?? {})}
+                titulo="Quitar insumo"
+                mensaje="¿Querés quitar este insumo de la orden?"
+                labelConfirmar="Quitar insumo"
+                procesando={quitandoInsumo}
+                onConfirmar={confirmarQuitarInsumo}
+                onCancelar={() => setItemAConfirmarInsumo(null)}
+            />
         </>
     );
-}
+}

@@ -47,14 +47,14 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     /* Insumos */
     const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
     const [insumosSeleccionados, setInsumosSeleccionados] = useState<
-        { id_insumo: number; nombre: string; cantidad: number }[]
+        { _key: string; id_insumo: number; nombre: string; cantidad: number }[]
     >([]);
     const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
     const [cantidadInsumo, setCantidadInsumo] = useState("1");
 
     /* Insumos ya registrados en la orden (pre-cargados) */
     const [insumosDeOrden, setInsumosDeOrden] = useState<
-        { id_detalle_ord_insumo: number; cantidad_usada: number; insumo: { nombre: string } | null }[]
+        { id_detalle_ins?: number; id_detalle_ord_insumo?: number; cantidad_usada: number; insumo: { nombre: string } | null }[]
     >([]);
 
     /* Abrir con orden preseleccionada desde URL */
@@ -91,15 +91,15 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         if (insumo) {
             setInsumosSeleccionados((prev) => [
                 ...prev,
-                { id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) },
+                { _key: `${insumo.id_insumo}-${Date.now()}-${Math.random()}`, id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) },
             ]);
             setIdInsumoSeleccionado("");
             setCantidadInsumo("1");
         }
     }
 
-    function quitarInsumo(index: number) {
-        setInsumosSeleccionados((prev) => prev.filter((_, i) => i !== index));
+    function quitarInsumo(key: string) {
+        setInsumosSeleccionados((prev) => prev.filter((item) => item._key !== key));
     }
 
     function resetForm() {
@@ -201,8 +201,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         className={inputCls}
                                     >
                                         <option value="">Seleccioná una orden...</option>
-                                        {ordenes.map((o) => (
-                                            <option key={o.id_orden} value={o.id_orden}>
+                                        {ordenes.map((o, idx) => (
+                                            <option key={o.id_orden ?? `orden-opt-${idx}`} value={o.id_orden}>
                                                 Orden #{o.id_orden} — {o.cliente?.apellido}, {o.cliente?.nombre}
                                             </option>
                                         ))}
@@ -313,9 +313,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             <span>📦</span> Insumos registrados en la orden:
                                         </p>
                                         <div className="space-y-1">
-                                            {insumosDeOrden.map((d) => (
+                                            {insumosDeOrden.map((d, idx) => (
                                                 <div
-                                                    key={d.id_detalle_ord_insumo}
+                                                    key={d.id_detalle_ins ?? d.id_detalle_ord_insumo ?? `ord-ins-${idx}`}
                                                     className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-sm"
                                                 >
                                                     <span className="font-medium text-orange-900">
@@ -336,8 +336,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     >
                                         <option value="">+ Insumo adicional...</option>
-                                        {insumosDisponibles.map((insumo) => (
-                                            <option key={insumo.id_insumo} value={insumo.id_insumo}>
+                                        {insumosDisponibles.map((insumo, idx) => (
+                                            <option key={insumo.id_insumo ?? `insumo-opt-${idx}`} value={insumo.id_insumo}>
                                                 {insumo.nombre} (Stock: {insumo.stock_actual ?? 0})
                                             </option>
                                         ))}
@@ -361,9 +361,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
                                 {insumosSeleccionados.length > 0 && (
                                     <div className="mt-3 space-y-1">
-                                        {insumosSeleccionados.map((item, index) => (
+                                        {insumosSeleccionados.map((item) => (
                                             <div
-                                                key={index}
+                                                key={item._key}
                                                 className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm"
                                             >
                                                 <span className="font-medium text-blue-900">
@@ -372,7 +372,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                 </span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => quitarInsumo(index)}
+                                                    onClick={() => quitarInsumo(item._key)}
                                                     className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
                                                     title="Quitar"
                                                 >

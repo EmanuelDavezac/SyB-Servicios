@@ -54,4 +54,15 @@ export async function crearCliente(datos: {
         console.error("Error al crear cliente:", error);
         return { success: false, error: "No se pudo crear el cliente" };
     }
+}
+
+export async function eliminarCliente(id_cliente: number) {
+    try {
+        await prisma.cliente.delete({ where: { id_cliente } });
+        revalidatePath("/clientes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al eliminar cliente:", error);
+        return { success: false, error: "No se pudo eliminar el cliente. Puede tener órdenes asociadas." };
+    }
 }
