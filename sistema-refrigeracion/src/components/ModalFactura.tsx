@@ -47,7 +47,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     /* Insumos */
     const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
     const [insumosSeleccionados, setInsumosSeleccionados] = useState<
-        { id_insumo: number; nombre: string; cantidad: number }[]
+        { _key: string; id_insumo: number; nombre: string; cantidad: number }[]
     >([]);
     const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
     const [cantidadInsumo, setCantidadInsumo] = useState("1");
@@ -91,15 +91,15 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         if (insumo) {
             setInsumosSeleccionados((prev) => [
                 ...prev,
-                { id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) },
+                { _key: `${insumo.id_insumo}-${Date.now()}-${Math.random()}`, id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) },
             ]);
             setIdInsumoSeleccionado("");
             setCantidadInsumo("1");
         }
     }
 
-    function quitarInsumo(index: number) {
-        setInsumosSeleccionados((prev) => prev.filter((_, i) => i !== index));
+    function quitarInsumo(key: string) {
+        setInsumosSeleccionados((prev) => prev.filter((item) => item._key !== key));
     }
 
     function resetForm() {
@@ -361,9 +361,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
                                 {insumosSeleccionados.length > 0 && (
                                     <div className="mt-3 space-y-1">
-                                        {insumosSeleccionados.map((item, index) => (
+                                        {insumosSeleccionados.map((item) => (
                                             <div
-                                                key={index}
+                                                key={item._key}
                                                 className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm"
                                             >
                                                 <span className="font-medium text-blue-900">
@@ -372,7 +372,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                 </span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => quitarInsumo(index)}
+                                                    onClick={() => quitarInsumo(item._key)}
                                                     className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
                                                     title="Quitar"
                                                 >
