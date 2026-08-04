@@ -76,9 +76,33 @@ export async function crearFactura(data: {
         },
       });
 
-      // 2. Procesar insumos y descontar stock
+      // 2. Descontar stock de los insumos ya registrados en la ORDEN
+      //    (agregados desde ModalOrden durante el trabajo)
+      const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
+        where: { id_orden: data.id_orden },
+        include: { insumo: true },
+      });
+
+      for (const detalle of insumosDeOrden) {
+        if (detalle.id_insumo === null) continue; // id_insumo is nullable in schema; skip if missing
+        await tx.insumo.update({
+          where: { id_insumo: detalle.id_insumo },
+          data: {
+            stock_actual: {
+              decrement: detalle.cantidad_usada,
+            },
+          },
+        });
+      }
+
+      // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
+      //    Solo si NO están ya registrados en detalle_orden_insumo para evitar duplicados
+      const idsYaRegistrados = new Set(insumosDeOrden.map((d) => d.id_insumo));
+
       if (data.insumos && data.insumos.length > 0) {
         for (const item of data.insumos) {
+          if (idsYaRegistrados.has(item.id_insumo)) continue; // ya procesado arriba
+
           const insumo = await tx.insumo.findUnique({
             where: { id_insumo: item.id_insumo },
           });
@@ -114,6 +138,7 @@ export async function crearFactura(data: {
 
     revalidatePath("/facturacion");
     revalidatePath("/insumos");
+    revalidatePath("/ordenes");
     return { success: true, factura: JSON.parse(JSON.stringify(nuevaFactura)) };
   } catch (error) {
     console.error("Error creating factura:", error);

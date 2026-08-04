@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { crearFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
+import { obtenerInsumosDeOrden } from "@/actions/ordenes";
 
 interface Cliente {
     id_cliente: number;
@@ -51,6 +52,11 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
     const [cantidadInsumo, setCantidadInsumo] = useState("1");
 
+    /* Insumos ya registrados en la orden (pre-cargados) */
+    const [insumosDeOrden, setInsumosDeOrden] = useState<
+        { id_detalle_ord_insumo: number; cantidad_usada: number; insumo: { nombre: string } | null }[]
+    >([]);
+
     /* Abrir con orden preseleccionada desde URL */
     useEffect(() => {
         if (openWithOrdenId) {
@@ -67,6 +73,15 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             obtenerInsumos().then((data) => setInsumosDisponibles(data as Insumo[]));
         }
     }, [abierto]);
+
+    /* Cargar insumos de la orden al seleccionarla */
+    useEffect(() => {
+        if (idOrden) {
+            obtenerInsumosDeOrden(Number(idOrden)).then((data: any) => setInsumosDeOrden(data));
+        } else {
+            setInsumosDeOrden([]);
+        }
+    }, [idOrden]);
 
     function agregarInsumo() {
         if (!idInsumoSeleccionado) return;
@@ -96,6 +111,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
+        setInsumosDeOrden([]);
         setError(null);
     }
 
@@ -142,8 +158,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             </button>
 
             {abierto && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start pt-10 z-[9999] p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col text-gray-800 my-auto overflow-hidden">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col text-gray-800 overflow-hidden" style={{maxHeight: 'calc(100vh - 2rem)'}}>
 
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-2xl">
@@ -162,7 +178,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                         </div>
 
                         {/* Cuerpo */}
-                        <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[75vh]">
+                        <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{maxHeight: 'calc(100vh - 180px)'}}>
 
                             {error && (
                                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
@@ -290,13 +306,36 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </span>
                                 </h4>
 
+                                {/* Insumos pre-registrados en la orden */}
+                                {insumosDeOrden.length > 0 && (
+                                    <div className="mb-3">
+                                        <p className="text-xs font-semibold text-orange-600 mb-1.5 flex items-center gap-1">
+                                            <span>📦</span> Insumos registrados en la orden:
+                                        </p>
+                                        <div className="space-y-1">
+                                            {insumosDeOrden.map((d) => (
+                                                <div
+                                                    key={d.id_detalle_ord_insumo}
+                                                    className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-sm"
+                                                >
+                                                    <span className="font-medium text-orange-900">
+                                                        {d.insumo?.nombre ?? "Insumo"}
+                                                    </span>
+                                                    <span className="text-orange-600 text-xs font-semibold">x{d.cantidad_usada}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Selector para insumos adicionales */}
                                 <div className="flex gap-2">
                                     <select
                                         value={idInsumoSeleccionado}
                                         onChange={(e) => setIdInsumoSeleccionado(e.target.value)}
                                         className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     >
-                                        <option value="">Seleccionar insumo...</option>
+                                        <option value="">+ Insumo adicional...</option>
                                         {insumosDisponibles.map((insumo) => (
                                             <option key={insumo.id_insumo} value={insumo.id_insumo}>
                                                 {insumo.nombre} (Stock: {insumo.stock_actual ?? 0})

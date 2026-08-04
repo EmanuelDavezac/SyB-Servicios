@@ -62,50 +62,109 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
         }
     }
 
+    const inputCls =
+        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
+
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-[9999]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">
-                        {modoEdicion ? "Editar Servicio" : "Nuevo Servicio"}
-                    </h3>
-                    <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-red-500 text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 overflow-hidden">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-sky-600 to-sky-700 text-white rounded-t-2xl">
+                    <div>
+                        <h3 className="text-lg font-bold tracking-wide">
+                            {modoEdicion ? "Editar Servicio" : "Nuevo Servicio"}
+                        </h3>
+                        <p className="text-sky-100 text-xs mt-0.5">
+                            {modoEdicion ? "Modificá los datos del servicio." : "Completá los datos del nuevo servicio."}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setAbierto(false)}
+                        className="text-white/70 hover:text-white text-2xl leading-none transition"
+                    >
+                        &times;
+                    </button>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nombre *</label>
-                        <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
-                            placeholder="Ej: Carga de gas R410A"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                {/* Cuerpo */}
+                <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[70vh]">
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Descripción</label>
-                        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
-                            rows={3} placeholder="Ej: Recarga del refrigerante con control de presiones..."
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none resize-none text-black" />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Precio *</label>
-                        <div className="mt-1 flex items-center">
-                            <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l text-gray-500 text-sm">$</span>
-                            <input type="number" min="0" step="0.01" value={precio}
-                                onChange={(e) => setPrecio(e.target.value)}
-                                placeholder="0.00"
-                                className="w-full border p-2 rounded-r focus:border-blue-500 outline-none text-black" />
+                    {/* ── Datos del servicio ── */}
+                    <section>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                            Datos del servicio
+                        </h4>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre *</label>
+                                <input
+                                    type="text"
+                                    value={nombre}
+                                    onChange={(e) => setNombre(e.target.value)}
+                                    placeholder="Ej: Carga de gas R410A"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Descripción</label>
+                                <textarea
+                                    value={descripcion}
+                                    onChange={(e) => setDescripcion(e.target.value)}
+                                    rows={3}
+                                    placeholder="Ej: Recarga del refrigerante con control de presiones..."
+                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
+                    {/* ── Precio ── */}
+                    <section>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                            Precio
+                        </h4>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Precio *</label>
+                            <div className="flex items-center">
+                                <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l-lg text-gray-500 text-sm">$</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={precio}
+                                    onChange={(e) => setPrecio(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full border rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                                />
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div className="mt-6 flex justify-end space-x-3">
-                    <button onClick={() => setAbierto(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">
+                {/* Footer */}
+                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                    <button
+                        type="button"
+                        onClick={() => setAbierto(false)}
+                        className="px-5 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition"
+                    >
                         Cancelar
                     </button>
-                    <button onClick={handleGuardar} disabled={!nombre.trim() || !precio || cargando}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        {cargando ? "Guardando..." : modoEdicion ? "Guardar Cambios" : "Guardar Servicio"}
+                    <button
+                        onClick={handleGuardar}
+                        disabled={!nombre.trim() || !precio || cargando}
+                        className="px-5 py-2 text-sm bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {cargando ? (
+                            <span className="flex items-center gap-2">
+                                <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                                Guardando...
+                            </span>
+                        ) : (
+                            modoEdicion ? "Guardar Cambios" : "Guardar Servicio"
+                        )}
                     </button>
                 </div>
             </div>
@@ -117,7 +176,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
             {trigger ? (
                 <span onClick={handleAbrir} style={{ cursor: "pointer" }}>{trigger}</span>
             ) : (
-                <button onClick={handleAbrir} className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition">
+                <button onClick={handleAbrir} className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">
                     + Nuevo Servicio
                 </button>
             )}
