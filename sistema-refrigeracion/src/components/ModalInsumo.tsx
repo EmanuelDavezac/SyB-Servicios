@@ -13,6 +13,7 @@ type Insumo = {
     stock_minimo: number | null;
     precio_costo: any;
     precio_venta: any;
+    estado?: boolean;
 };
 
 type Proveedor = {
@@ -44,6 +45,9 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
         const proveedorValue = formData.get("id_proveedor");
         const id_proveedor = proveedorValue ? Number(proveedorValue) : undefined;
 
+        const estadoValue = formData.get("estado");
+        const estado = estadoValue === "true";
+
         // Como la base de datos EXIGE precios, los mandamos en 0 por defecto de forma invisible
         const precio_costo = insumoAEditar?.precio_costo ? Number(insumoAEditar.precio_costo) : 0;
         const precio_venta = insumoAEditar?.precio_venta ? Number(insumoAEditar.precio_venta) : 0;
@@ -51,11 +55,11 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
         let res;
         if (esEdicion && insumoAEditar) {
             res = await actualizarInsumo(insumoAEditar.id_insumo, {
-                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta
+                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta, estado
             });
         } else {
             res = await crearInsumo({
-                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta
+                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta, estado
             });
         }
 
@@ -176,6 +180,19 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                         </section>
                     </div>
 
+
+                    {/* NUEVO: SELECTOR DE ESTADO */}
+                    <div className="pb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Estado del Insumo</label>
+                        <select
+                            name="estado"
+                            defaultValue={insumoAEditar?.estado !== false ? "true" : "false"}
+                            className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none bg-white"
+                        >
+                            <option value="true">Activo (Visible)</option>
+                            <option value="false">Inactivo (Oculto/Dado de baja)</option>
+                        </select>
+                    </div>
                     {/* Footer */}
                     <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
                         <button

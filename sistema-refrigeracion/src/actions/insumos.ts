@@ -52,17 +52,19 @@ export async function crearInsumo(datos: {
     stock_minimo: number;
     precio_costo: number;
     precio_venta: number;
+    estado?: boolean; // <-- 1. AGREGAMOS ESTO ACÁ
 }) {
     try {
         const nuevoInsumo = await prisma.insumo.create({
             data: {
                 nombre: datos.nombre,
                 descripcion: datos.descripcion,
-                id_proveedor: datos.id_proveedor, // ID numérico del proveedor
+                id_proveedor: datos.id_proveedor,
                 stock_actual: Number(datos.stock_actual),
                 stock_minimo: Number(datos.stock_minimo),
                 precio_costo: Number(datos.precio_costo),
                 precio_venta: Number(datos.precio_venta),
+                estado: datos.estado, // <-- 2. Y LO AGREGAMOS ACÁ PARA QUE SE GUARDE EN LA BD
             },
         });
 
