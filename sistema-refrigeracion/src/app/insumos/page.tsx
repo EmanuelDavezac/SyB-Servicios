@@ -131,7 +131,7 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                                         <td className="p-4 text-center">
                                             <div className="flex justify-center items-center gap-2">
                                                 {/* Botón para editar insumo existente */}
-                                                <ModalInsumo insumoAEditar={insumo} proveedores={proveedores} />
+                                                <ModalInsumo insumoAEditar={insumo as any} proveedores={proveedores} />
 
                                                 {/* Botón para dar de baja */}
                                                 <BotonEliminarInsumo idInsumo={insumo.id_insumo} />

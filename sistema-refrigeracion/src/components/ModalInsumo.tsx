@@ -14,6 +14,7 @@ type Insumo = {
     precio_costo: any;
     precio_venta: any;
     estado?: boolean;
+    proveedor?: any;
 };
 
 type Proveedor = {
