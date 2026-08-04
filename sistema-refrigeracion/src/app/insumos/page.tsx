@@ -1,5 +1,6 @@
 import { obtenerInsumos, obtenerProveedores } from "@/actions/insumos";
 import ModalInsumo from "@/components/ModalInsumo";
+import ModalFacturaProveedor from "@/components/ModalFacturaProveedor";
 import BotonEliminarInsumo from "@/components/BotonEliminarInsumo";
 import FiltrosInsumos from "@/components/FiltrosInsumos";
 
@@ -42,8 +43,15 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
             {/* ENCABEZADO */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Control de Insumos</h2>
-                {/* Botón para crear nuevo insumo */}
-                <ModalInsumo proveedores={proveedores} />
+
+                {/* NUEVO: Contenedor que agrupa ambos botones */}
+                <div className="flex items-center gap-3">
+                    {/* Botón para registrar el gasto en Reportes y adjuntar la factura */}
+                    <ModalFacturaProveedor proveedores={proveedores} />
+
+                    {/* Botón original para crear nuevo insumo físico en stock */}
+                    <ModalInsumo proveedores={proveedores} />
+                </div>
             </div>
 
             {/* BUSCADOR DINÁMICO */}
