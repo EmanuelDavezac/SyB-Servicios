@@ -187,3 +187,59 @@ export async function obtenerServiciosDeOrden(id_orden: number) {
         return [];
     }
 }
+
+// ─── Insumos en la orden ──────────────────────────────────────────────────────
+// El stock NO se descuenta aquí; se descuenta al generar la factura (crearFactura).
+
+/** Agrega un insumo a la orden (solo registra cantidad usada, sin mover stock) */
+export async function agregarInsumoAOrden(datos: {
+    id_orden: number;
+    id_insumo: number;
+    cantidad: number;
+    precio_aplicado: number;
+}) {
+    try {
+        await prisma.detalle_orden_insumo.create({
+            data: {
+                id_orden: datos.id_orden,
+                id_insumo: datos.id_insumo,
+                cantidad_usada: datos.cantidad,
+                precio_aplicado: datos.precio_aplicado,
+            },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al agregar insumo a la orden:", error);
+        return { success: false, error: "No se pudo agregar el insumo" };
+    }
+}
+
+/** Quita un insumo de la orden */
+export async function quitarInsumoDeOrden(id_detalle_ord_insumo: number) {
+    try {
+        await prisma.detalle_orden_insumo.delete({
+            where: { id_detalle_ins: id_detalle_ord_insumo },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al quitar insumo de la orden:", error);
+        return { success: false, error: "No se pudo quitar el insumo" };
+    }
+}
+
+/** Obtiene todos los insumos registrados para una orden */
+export async function obtenerInsumosDeOrden(id_orden: number) {
+    try {
+        const detalles = await prisma.detalle_orden_insumo.findMany({
+            where: { id_orden },
+            include: { insumo: true },
+            orderBy: { id_detalle_ins: "asc" },
+        });
+        return JSON.parse(JSON.stringify(detalles));
+    } catch (error) {
+        console.error("Error al obtener insumos de la orden:", error);
+        return [];
+    }
+}

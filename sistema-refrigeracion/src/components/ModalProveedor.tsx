@@ -72,61 +72,126 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
         }
     }
 
+    const inputCls =
+        "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
+
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-60 flex justify-center items-center z-9999">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">
-                        {modoEdicion ? "Editar Proveedor" : "Nuevo Proveedor"}
-                    </h3>
-                    <button onClick={() => setAbierto(false)} className="text-gray-400 hover:text-red-500 text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 overflow-hidden">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-sky-600 to-sky-700 text-white rounded-t-2xl">
+                    <div>
+                        <h3 className="text-lg font-bold tracking-wide">
+                            {modoEdicion ? "Editar Proveedor" : "Nuevo Proveedor"}
+                        </h3>
+                        <p className="text-sky-100 text-xs mt-0.5">
+                            {modoEdicion ? "Modificá los datos del proveedor." : "Completá los datos del nuevo proveedor."}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setAbierto(false)}
+                        className="text-white/70 hover:text-white text-2xl leading-none transition"
+                    >
+                        &times;
+                    </button>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Razón Social *</label>
-                        <input type="text" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)}
-                            placeholder="Ej: Distribuidora Frío Sur S.A."
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                {/* Cuerpo */}
+                <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[70vh]">
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nombre de Contacto</label>
-                        <input type="text" value={nombreProveedor} onChange={(e) => setNombreProveedor(e.target.value)}
-                            placeholder="Ej: Juan García"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">CUIT (solo números)</label>
-                            <input type="text" value={cuit} onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
-                                placeholder="Ej: 30123456789"
-                                className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
+                    {/* ── Datos del proveedor ── */}
+                    <section>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                            Datos del proveedor
+                        </h4>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Razón Social *</label>
+                                <input
+                                    type="text"
+                                    value={razonSocial}
+                                    onChange={(e) => setRazonSocial(e.target.value)}
+                                    placeholder="Ej: Distribuidora Frío Sur S.A."
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de Contacto</label>
+                                <input
+                                    type="text"
+                                    value={nombreProveedor}
+                                    onChange={(e) => setNombreProveedor(e.target.value)}
+                                    placeholder="Ej: Juan García"
+                                    className={inputCls}
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Teléfono (solo números)</label>
-                            <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
-                                placeholder="Ej: 3511234567"
-                                className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                        </div>
-                    </div>
+                    </section>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Ej: ventas@distribuidora.com"
-                            className="mt-1 w-full border p-2 rounded focus:border-blue-500 outline-none text-black" />
-                    </div>
+                    {/* ── Contacto ── */}
+                    <section>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                            Contacto
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">CUIT (solo números)</label>
+                                <input
+                                    type="text"
+                                    value={cuit}
+                                    onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="Ej: 30123456789"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Teléfono (solo números)</label>
+                                <input
+                                    type="text"
+                                    value={telefono}
+                                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="Ej: 3511234567"
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="Ej: ventas@distribuidora.com"
+                                    className={inputCls}
+                                />
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div className="mt-6 flex justify-end space-x-3">
-                    <button onClick={() => setAbierto(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">
+                {/* Footer */}
+                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                    <button
+                        type="button"
+                        onClick={() => setAbierto(false)}
+                        className="px-5 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition"
+                    >
                         Cancelar
                     </button>
-                    <button onClick={handleGuardar} disabled={!razonSocial.trim() || cargando}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        {cargando ? "Guardando..." : modoEdicion ? "Guardar Cambios" : "Guardar Proveedor"}
+                    <button
+                        onClick={handleGuardar}
+                        disabled={!razonSocial.trim() || cargando}
+                        className="px-5 py-2 text-sm bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {cargando ? (
+                            <span className="flex items-center gap-2">
+                                <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                                Guardando...
+                            </span>
+                        ) : (
+                            modoEdicion ? "Guardar Cambios" : "Guardar Proveedor"
+                        )}
                     </button>
                 </div>
             </div>
@@ -138,7 +203,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
             {trigger ? (
                 <span onClick={handleAbrir} style={{ cursor: "pointer" }}>{trigger}</span>
             ) : (
-                <button onClick={handleAbrir} className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition">
+                <button onClick={handleAbrir} className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">
                     + Nuevo Proveedor
                 </button>
             )}

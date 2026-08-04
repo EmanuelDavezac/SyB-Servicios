@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import {
     crearOrden,
     editarOrden,
@@ -9,8 +10,12 @@ import {
     crearServicioYAgregarAOrden,
     quitarServicioDeOrden,
     obtenerServiciosDeOrden,
+    agregarInsumoAOrden,
+    quitarInsumoDeOrden,
+    obtenerInsumosDeOrden,
 } from "@/actions/ordenes";
 import { obtenerServicios } from "@/actions/servicios";
+import { obtenerInsumos } from "@/actions/insumos";
 
 /* ─── tipos ──────────────────────────────────────────────────── */
 interface Cliente {
@@ -40,6 +45,32 @@ type ServicioPendiente =
     | { _tmpId: string; tipo: "existente"; id_servicio: number; nombre: string; cantidad: number; precio_acordado: number }
     | { _tmpId: string; tipo: "nuevo"; nombre: string; descripcion?: string; precio: number; cantidad: number };
 
+/** Insumo del catálogo */
+interface InsumoCatalogo {
+    id_insumo: number;
+    nombre: string;
+    precio_venta: number | string;
+    stock_actual: number | null;
+}
+
+/** Insumo ya guardado en la BD (modo edición) */
+interface DetalleInsumo {
+    id_detalle_ord_insumo: number;
+    id_insumo: number;
+    cantidad_usada: number;
+    precio_aplicado: number | string;
+    insumo: { nombre: string } | null;
+}
+
+/** Insumo pendiente de guardar (modo nueva orden) */
+interface InsumoPendiente {
+    _tmpId: string;
+    id_insumo: number;
+    nombre: string;
+    cantidad: number;
+    precio_aplicado: number;
+}
+
 interface OrdenInicial {
     id_orden: number;
     id_cliente: number | null;
@@ -64,6 +95,7 @@ const tmpId = () => `tmp-${++tmpCounter}`;
 /* ─── componente ─────────────────────────────────────────────── */
 export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const modoEdicion = !!ordenInicial;
+    const router = useRouter();
 
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
@@ -105,6 +137,16 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [agregando, setAgregando] = useState(false);
     const [errSrv, setErrSrv] = useState<string | null>(null);
 
+    /* ── Insumos ── */
+    const [catalogoInsumos, setCatalogoInsumos] = useState<InsumoCatalogo[]>([]);
+    const [insumosGuardados, setInsumosGuardados] = useState<DetalleInsumo[]>([]);
+    const [insumosPendientes, setInsumosPendientes] = useState<InsumoPendiente[]>([]);
+    const [panelInsumoAbierto, setPanelInsumoAbierto] = useState(false);
+    const [insumoSeleccionado, setInsumoSeleccionado] = useState("");
+    const [cantInsumo, setCantInsumo] = useState("1");
+    const [agregandoInsumo, setAgregandoInsumo] = useState(false);
+    const [errInsumo, setErrInsumo] = useState<string | null>(null);
+
     useEffect(() => { setMounted(true); }, []);
 
     /* ── Abrir modal ── */
@@ -118,14 +160,20 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setServiciosPendientes([]);
         setAbierto(true);
 
-        const [cat, srvs] = await Promise.all([
+        const [cat, srvs, catInsumos, insumos] = await Promise.all([
             obtenerServicios(),
             modoEdicion && ordenInicial
                 ? obtenerServiciosDeOrden(ordenInicial.id_orden)
                 : Promise.resolve([]),
+            obtenerInsumos(),
+            modoEdicion && ordenInicial
+                ? obtenerInsumosDeOrden(ordenInicial.id_orden)
+                : Promise.resolve([]),
         ]);
         setCatalogo(cat as unknown as ServicioCatalogo[]);
         setServiciosGuardados(srvs as DetalleServicio[]);
+        setCatalogoInsumos(catInsumos as unknown as InsumoCatalogo[]);
+        setInsumosGuardados(insumos as DetalleInsumo[]);
     }
 
     function resetPanel() {
@@ -139,6 +187,13 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setNuevoPrecio("");
         setNuevaCant("1");
         setErrSrv(null);
+    }
+
+    function resetPanelInsumo() {
+        setPanelInsumoAbierto(false);
+        setInsumoSeleccionado("");
+        setCantInsumo("1");
+        setErrInsumo(null);
     }
 
     function handleSeleccionarSrv(idStr: string) {
@@ -160,7 +215,12 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 notas_internas: notasInternas || undefined,
             });
             setCargando(false);
-            if (res.success) setAbierto(false);
+            if (res.success) {
+                setAbierto(false);
+                if (estadoTrabajo === "Finalizado") {
+                    router.push(`/facturacion?orden=${ordenInicial.id_orden}`);
+                }
+            }
             else alert("Error al guardar los cambios. Intentá de nuevo.");
         } else {
             /* ── modo nueva: crear orden y luego guardar servicios pendientes ── */
@@ -198,14 +258,29 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 }
             }
 
+            /* guardar cada insumo pendiente (sin descontar stock) */
+            for (const ins of insumosPendientes) {
+                await agregarInsumoAOrden({
+                    id_orden,
+                    id_insumo: ins.id_insumo,
+                    cantidad: ins.cantidad,
+                    precio_aplicado: ins.precio_aplicado,
+                });
+            }
+
             setCargando(false);
             setIdCliente("");
             setEstadoTrabajo("Pendiente");
             setNotasInternas("");
             setServiciosPendientes([]);
+            setInsumosPendientes([]);
             setAbierto(false);
+            if (estadoTrabajo === "Finalizado") {
+                router.push(`/facturacion?orden=${id_orden}`);
+            }
         }
     }
+
 
     /* ── Agregar servicio existente ──
        En modo edición → guarda en BD al instante.
@@ -286,6 +361,48 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         }
     }
 
+    /* ── Agregar insumo ── */
+    async function handleAgregarInsumo() {
+        if (!insumoSeleccionado) { setErrInsumo("Seleccioná un insumo."); return; }
+        const cantidad = parseInt(cantInsumo) || 1;
+        if (cantidad <= 0) { setErrInsumo("La cantidad debe ser mayor a 0."); return; }
+
+        const ins = catalogoInsumos.find((i) => String(i.id_insumo) === insumoSeleccionado)!;
+        const precio = parseFloat(String(ins.precio_venta));
+
+        if (modoEdicion && ordenInicial) {
+            setAgregandoInsumo(true); setErrInsumo(null);
+            const res = await agregarInsumoAOrden({
+                id_orden: ordenInicial.id_orden,
+                id_insumo: ins.id_insumo,
+                cantidad,
+                precio_aplicado: precio,
+            });
+            if (res.success) {
+                setInsumosGuardados(await obtenerInsumosDeOrden(ordenInicial.id_orden));
+                resetPanelInsumo();
+            } else setErrInsumo(res.error || "Error al agregar.");
+            setAgregandoInsumo(false);
+        } else {
+            setInsumosPendientes((prev) => [
+                ...prev,
+                { _tmpId: tmpId(), id_insumo: ins.id_insumo, nombre: ins.nombre, cantidad, precio_aplicado: precio },
+            ]);
+            resetPanelInsumo();
+        }
+    }
+
+    /* ── Quitar insumo ── */
+    async function handleQuitarInsumo(item: DetalleInsumo | InsumoPendiente) {
+        if ("id_detalle_ord_insumo" in item) {
+            if (!confirm("\u00bfQuitar este insumo?")) return;
+            await quitarInsumoDeOrden(item.id_detalle_ord_insumo);
+            setInsumosGuardados((p) => p.filter((i) => i.id_detalle_ord_insumo !== item.id_detalle_ord_insumo));
+        } else {
+            setInsumosPendientes((p) => p.filter((i) => i._tmpId !== item._tmpId));
+        }
+    }
+
     /* ── Lista unificada para el render ── */
     const listaDisplay: { key: string; nombre: string; cantidad: number; precio: number | string; pendiente: boolean; item: DetalleServicio | ServicioPendiente }[] = [
         ...serviciosGuardados.map((d) => ({
@@ -301,6 +418,23 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: p.nombre,
             cantidad: p.cantidad,
             precio: p.tipo === "existente" ? p.precio_acordado : p.precio,
+            pendiente: true,
+            item: p,
+        })),
+    ];
+
+    const insumosDisplay: { key: string; nombre: string; cantidad: number; pendiente: boolean; item: DetalleInsumo | InsumoPendiente }[] = [
+        ...insumosGuardados.map((d) => ({
+            key: `gi-${d.id_detalle_ord_insumo}`,
+            nombre: d.insumo?.nombre || "Insumo",
+            cantidad: d.cantidad_usada,
+            pendiente: false,
+            item: d,
+        })),
+        ...insumosPendientes.map((p) => ({
+            key: p._tmpId,
+            nombre: p.nombre,
+            cantidad: p.cantidad,
             pendiente: true,
             item: p,
         })),
@@ -554,6 +688,102 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                         </button>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* ── Insumos utilizados ── */}
+                    <section>
+                        <div className="flex items-center justify-between mb-3 border-b pb-1">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-orange-600">
+                                Insumos Utilizados
+                                <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-orange-400">
+                                    (stock se descuenta al facturar)
+                                </span>
+                            </h4>
+                            <button
+                                onClick={() => setPanelInsumoAbierto((v) => !v)}
+                                className="text-xs bg-orange-50 text-orange-600 hover:bg-orange-100 font-semibold px-3 py-1 rounded-full transition"
+                            >
+                                {panelInsumoAbierto ? "✕ Cerrar" : "+ Agregar insumo"}
+                            </button>
+                        </div>
+
+                        {/* Lista insumos */}
+                        {insumosDisplay.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic mb-2">Sin insumos registrados.</p>
+                        ) : (
+                            <div className="space-y-1 mb-3">
+                                {insumosDisplay.map(({ key, nombre, cantidad, pendiente, item }) => (
+                                    <div
+                                        key={key}
+                                        className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                                            pendiente ? "bg-amber-50 border border-amber-200" : "bg-orange-50"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {pendiente && (
+                                                <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                    pendiente
+                                                </span>
+                                            )}
+                                            <span className={`font-medium ${pendiente ? "text-amber-900" : "text-orange-900"}`}>
+                                                {nombre}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-gray-600 text-xs">
+                                            <span>x{cantidad}</span>
+                                            <button
+                                                onClick={() => handleQuitarInsumo(item)}
+                                                className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
+                                                title="Quitar"
+                                            >
+                                                &times;
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Panel agregar insumo */}
+                        {panelInsumoAbierto && (
+                            <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+                                {errInsumo && (
+                                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5">{errInsumo}</p>
+                                )}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Insumo del stock</label>
+                                    <select
+                                        value={insumoSeleccionado}
+                                        onChange={(e) => setInsumoSeleccionado(e.target.value)}
+                                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                    >
+                                        <option value="">Seleccioná...</option>
+                                        {catalogoInsumos.map((ins) => (
+                                            <option key={ins.id_insumo} value={ins.id_insumo}>
+                                                {ins.nombre} — Stock: {ins.stock_actual ?? 0}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad utilizada</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={cantInsumo}
+                                        onChange={(e) => setCantInsumo(e.target.value)}
+                                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleAgregarInsumo}
+                                    disabled={agregandoInsumo || !insumoSeleccionado}
+                                    className="w-full py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {agregandoInsumo ? "Agregando..." : "Agregar insumo a la orden"}
+                                </button>
                             </div>
                         )}
                     </section>
