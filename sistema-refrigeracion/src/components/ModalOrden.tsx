@@ -442,33 +442,33 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     /* ── Modal content ── */
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start pt-10 z-[9999] p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 my-auto">
+        <div className="modal-backdrop overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 my-auto">
 
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b rounded-t-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                    <h3 className="text-lg font-bold tracking-wide">
+                <div className="modal-header">
+                    <h3 className="text-xl font-bold">
                         {modoEdicion
                             ? `Editar Orden #${String(ordenInicial!.id_orden).padStart(5, "0")}`
                             : "Nueva Orden de Trabajo"}
                     </h3>
-                    <button onClick={() => setAbierto(false)} className="text-white/70 hover:text-white text-2xl leading-none transition">
-                        &times;
+                    <button onClick={() => setAbierto(false)} className="text-white hover:text-white/80 text-2xl leading-none transition">
+                        <i className="fas fa-times text-lg"></i>
                     </button>
                 </div>
 
-                <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[75vh]">
+                <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
 
                     {/* ── Datos de la orden ── */}
                     <section>
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-3 border-b pb-1">Datos de la Orden</h4>
+                        <h4 className="section-title">DATOS DE LA ORDEN</h4>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Cliente *</label>
                                 <select
                                     value={idCliente}
                                     onChange={(e) => setIdCliente(e.target.value)}
-                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                 >
                                     <option value="">Seleccioná un cliente...</option>
                                     {clientes.map((c) => (
@@ -479,11 +479,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Estado</label>
                                 <select
                                     value={estadoTrabajo}
                                     onChange={(e) => setEstadoTrabajo(e.target.value)}
-                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                 >
                                     <option value="Pendiente">Pendiente</option>
                                     <option value="En proceso">En proceso</option>
@@ -491,70 +491,61 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Notas internas</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Notas internas</label>
                                 <textarea
                                     value={notasInternas}
                                     onChange={(e) => setNotasInternas(e.target.value)}
                                     rows={3}
                                     placeholder="Ej: El cliente pidió pasar los caños por el techo..."
-                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                                 />
                             </div>
                         </div>
                     </section>
 
-                    {/* ── Servicios (siempre visible) ── */}
+                    {/* ── Servicios ── */}
                     <section>
-                        <div className="flex items-center justify-between mb-3 border-b pb-1">
-                            <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600">
-                                Servicios
-                                {!modoEdicion && listaDisplay.length > 0 && (
-                                    <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-amber-600">
-                                        Se guardarán al crear la orden
-                                    </span>
-                                )}
-                            </h4>
+                        <div className="section-title">
+                            <span>SERVICIOS</span>
                             <button
                                 onClick={() => setPanelAbierto((v) => !v)}
-                                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-3 py-1 rounded-full transition"
+                                className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-3 py-1 rounded-full transition"
                             >
                                 {panelAbierto ? "✕ Cerrar" : "+ Agregar servicio"}
                             </button>
                         </div>
 
-                        {/* Lista */}
+                        {/* Contenido de servicios */}
                         {listaDisplay.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic mb-2">Sin servicios cargados todavía.</p>
+                            <p className="text-sm text-gray-400 italic py-2">Sin servicios cargados todavía.</p>
                         ) : (
-                            <div className="space-y-1 mb-3">
+                            <div className="space-y-2 mb-4">
                                 {listaDisplay.map(({ key, nombre, cantidad, precio, pendiente, item }) => (
                                     <div
                                         key={key}
-                                        className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                                            pendiente ? "bg-amber-50 border border-amber-200" : "bg-blue-50"
-                                        }`}
+                                        className="flex items-center justify-between rounded-lg px-4 py-2 text-sm border border-gray-100 bg-gray-50/50"
                                     >
                                         <div className="flex items-center gap-2">
                                             {pendiente && (
                                                 <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
-                                                    pendiente
+                                                    nuevo
                                                 </span>
                                             )}
-                                            <span className={`font-medium ${pendiente ? "text-amber-900" : "text-blue-900"}`}>
+                                            <span className="font-medium text-gray-700">
                                                 {nombre}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-gray-600 text-xs">
-                                            <span>x{cantidad}</span>
-                                            <span className={`font-semibold ${pendiente ? "text-amber-700" : "text-blue-700"}`}>
+                                        <div className="flex items-center gap-3 text-gray-500">
+                                            <span className="text-xs">x{cantidad}</span>
+                                            <span className="font-bold text-gray-800">
                                                 {fmtMoney(precio)}
                                             </span>
                                             <button
                                                 onClick={() => handleQuitar(item)}
-                                                className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
+                                                className="text-red-400 hover:text-red-600 transition"
                                                 title="Quitar"
                                             >
-                                                &times;
+                                                <i className="fas fa-trash-alt text-xs"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -562,130 +553,70 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             </div>
                         )}
 
-                        {/* Panel agregar */}
+                        {/* Panel agregar (simplificado para match captura) */}
                         {panelAbierto && (
-                            <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
-                                {/* Tabs */}
-                                <div className="flex gap-2 text-xs font-semibold">
+                            <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/30 space-y-4">
+                                <div className="flex gap-2 text-xs font-bold">
                                     <button
                                         onClick={() => setModoNuevo(false)}
-                                        className={`px-3 py-1.5 rounded-full transition ${!modoNuevo ? "bg-blue-600 text-white" : "bg-white border text-gray-500 hover:bg-gray-100"}`}
+                                        className={`px-4 py-1.5 rounded-full transition ${!modoNuevo ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"}`}
                                     >
                                         Seleccionar existente
                                     </button>
                                     <button
                                         onClick={() => setModoNuevo(true)}
-                                        className={`px-3 py-1.5 rounded-full transition ${modoNuevo ? "bg-blue-600 text-white" : "bg-white border text-gray-500 hover:bg-gray-100"}`}
+                                        className={`px-4 py-1.5 rounded-full transition ${modoNuevo ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"}`}
                                     >
-                                        Crear nuevo servicio
+                                        Crear nuevo
                                     </button>
                                 </div>
 
                                 {errSrv && (
-                                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5">{errSrv}</p>
+                                    <p className="text-xs text-red-600 font-bold">{errSrv}</p>
                                 )}
 
-                                {/* Seleccionar existente */}
-                                {!modoNuevo && (
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 mb-1">Servicio del catálogo</label>
+                                {!modoNuevo ? (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Servicio *</label>
                                             <select
                                                 value={srvSeleccionado}
                                                 onChange={(e) => handleSeleccionarSrv(e.target.value)}
-                                                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                                             >
                                                 <option value="">Seleccioná...</option>
                                                 {catalogo.map((s) => (
                                                     <option key={s.id_servicio} value={s.id_servicio}>
-                                                        {s.nombre} — {fmtMoney(s.precio)}
+                                                        {s.nombre} ({fmtMoney(s.precio)})
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                                                <input
-                                                    type="number" min="1"
-                                                    value={cantExistente}
-                                                    onChange={(e) => setCantExistente(e.target.value)}
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Precio acordado ($)</label>
-                                                <input
-                                                    type="number"
-                                                    value={precioExistente}
-                                                    onChange={(e) => setPrecioExistente(e.target.value)}
-                                                    placeholder="Precio"
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cant.</label>
+                                            <input type="number" value={cantExistente} onChange={(e) => setCantExistente(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
                                         </div>
-                                        <button
-                                            onClick={handleAgregarExistente}
-                                            disabled={agregando || !srvSeleccionado}
-                                            className="w-full py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {agregando ? "Agregando..." : "Agregar a la orden"}
-                                        </button>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio Unit.</label>
+                                            <input type="number" value={precioExistente} onChange={(e) => setPrecioExistente(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
+                                        </div>
+                                        <button onClick={handleAgregarExistente} className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700">Agregar Servicio</button>
                                     </div>
-                                )}
-
-                                {/* Crear nuevo */}
-                                {modoNuevo && (
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="col-span-2">
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del servicio *</label>
-                                                <input
-                                                    value={nuevoNombre}
-                                                    onChange={(e) => setNuevoNombre(e.target.value)}
-                                                    placeholder="Ej: Instalación split 3000 frigorías"
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Descripción (opcional)</label>
-                                                <input
-                                                    value={nuevaDesc}
-                                                    onChange={(e) => setNuevaDesc(e.target.value)}
-                                                    placeholder="Descripción breve..."
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Precio ($) *</label>
-                                                <input
-                                                    type="number"
-                                                    value={nuevoPrecio}
-                                                    onChange={(e) => setNuevoPrecio(e.target.value)}
-                                                    placeholder="0.00"
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
-                                                <input
-                                                    type="number" min="1"
-                                                    value={nuevaCant}
-                                                    onChange={(e) => setNuevaCant(e.target.value)}
-                                                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombre *</label>
+                                            <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Ej: Reparación de compresor" />
                                         </div>
-                                        <p className="text-[10px] text-gray-400 italic">
-                                            El nuevo servicio se agregará al catálogo y a esta orden al mismo tiempo.
-                                        </p>
-                                        <button
-                                            onClick={handleCrearNuevo}
-                                            disabled={agregando || !nuevoNombre.trim() || !nuevoPrecio}
-                                            className="w-full py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {agregando ? "Creando..." : "Agregar servicio"}
-                                        </button>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio *</label>
+                                            <input type="number" value={nuevoPrecio} onChange={(e) => setNuevoPrecio(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cant.</label>
+                                            <input type="number" value={nuevaCant} onChange={(e) => setNuevaCant(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
+                                        </div>
+                                        <button onClick={handleCrearNuevo} className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700">Crear y Agregar</button>
                                     </div>
                                 )}
                             </div>
@@ -789,24 +720,16 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                     </section>
                 </div>
 
-                {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
-                    <button
-                        onClick={() => setAbierto(false)}
-                        className="px-5 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition"
-                    >
+                <div className="modal-footer">
+                    <button onClick={() => setAbierto(false)} className="btn-outline">
                         Cancelar
                     </button>
                     <button
                         onClick={handleGuardar}
                         disabled={!idCliente || cargando}
-                        className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn-primary"
                     >
-                        {cargando
-                            ? "Guardando..."
-                            : modoEdicion
-                            ? "Guardar Cambios"
-                            : `Crear Orden${serviciosPendientes.length > 0 ? ` + ${serviciosPendientes.length} servicio${serviciosPendientes.length > 1 ? "s" : ""}` : ""}`}
+                        {cargando ? "Guardando..." : (modoEdicion ? "Guardar Cambios" : "Crear Orden")}
                     </button>
                 </div>
             </div>

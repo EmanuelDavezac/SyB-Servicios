@@ -1,8 +1,37 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary-blue: #2563eb;
+  --color-dark-slate: #0f172a;
+}
+
 body {
-  background-color: #f9fafb;
-  /* Un gris muy clarito de fondo, ideal para paneles de administración */
-  color: #111827;
-  /* Texto casi negro para que se lea perfecto */
+  background-color: #f1f5f9;
+  color: #1e293b;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Custom modal backdrop for glassmorphism */
+.modal-backdrop {
+  @apply fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-[9999] p-4;
+}
+
+.modal-header {
+  @apply flex items-center justify-between px-6 py-4 bg-blue-600 text-white rounded-t-xl;
+}
+
+.section-title {
+  @apply text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-3 border-b border-blue-100 pb-1 w-full flex justify-between items-center;
+}
+
+.modal-footer {
+  @apply flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl;
+}
+
+.btn-primary {
+  @apply px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-outline {
+  @apply px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition;
 }

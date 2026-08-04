@@ -159,7 +159,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
             {abierto && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col text-gray-800 overflow-hidden" style={{maxHeight: 'calc(100vh - 2rem)'}}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col text-gray-800 overflow-hidden" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
 
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-2xl">
@@ -178,7 +178,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                         </div>
 
                         {/* Cuerpo */}
-                        <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{maxHeight: 'calc(100vh - 180px)'}}>
+                        <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
 
                             {error && (
                                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
