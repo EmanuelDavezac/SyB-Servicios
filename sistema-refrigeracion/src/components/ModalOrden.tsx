@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import {
     crearOrden,
     editarOrden,
@@ -96,7 +95,6 @@ const tmpId = () => `tmp-${++tmpCounter}`;
 /* ─── componente ─────────────────────────────────────────────── */
 export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const modoEdicion = !!ordenInicial;
-    const router = useRouter();
 
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
@@ -224,9 +222,6 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             setCargando(false);
             if (res.success) {
                 setAbierto(false);
-                if (estadoTrabajo === "Finalizado") {
-                    router.push(`/facturacion?orden=${ordenInicial.id_orden}`);
-                }
             }
             else alert("Error al guardar los cambios. Intentá de nuevo.");
         } else {
@@ -282,9 +277,6 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             setServiciosPendientes([]);
             setInsumosPendientes([]);
             setAbierto(false);
-            if (estadoTrabajo === "Finalizado") {
-                router.push(`/facturacion?orden=${id_orden}`);
-            }
         }
     }
 
@@ -378,7 +370,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     /* ── Agregar insumo ── */
     async function handleAgregarInsumo() {
         if (!insumoSeleccionado) { setErrInsumo("Seleccioná un insumo."); return; }
-        const cantidad = parseInt(cantInsumo) || 1;
+        const cantidad = parseFloat(cantInsumo) || 0;
         if (cantidad <= 0) { setErrInsumo("La cantidad debe ser mayor a 0."); return; }
 
         const ins = catalogoInsumos.find((i) => String(i.id_insumo) === insumoSeleccionado)!;
@@ -444,11 +436,12 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         })),
     ];
 
-    const insumosDisplay: { key: string; nombre: string; cantidad: number; pendiente: boolean; item: DetalleInsumo | InsumoPendiente }[] = [
+    const insumosDisplay: { key: string; nombre: string; cantidad: number; precio: number; pendiente: boolean; item: DetalleInsumo | InsumoPendiente }[] = [
         ...insumosGuardados.map((d) => ({
             key: `gi-${d.id_detalle_ord_insumo}`,
             nombre: d.insumo?.nombre || "Insumo",
             cantidad: d.cantidad_usada,
+            precio: parseFloat(String(d.precio_aplicado)),
             pendiente: false,
             item: d,
         })),
@@ -456,6 +449,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             key: p._tmpId,
             nombre: p.nombre,
             cantidad: p.cantidad,
+            precio: p.precio_aplicado,
             pendiente: true,
             item: p,
         })),
@@ -666,7 +660,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             <p className="text-xs text-gray-400 italic mb-2">Sin insumos registrados.</p>
                         ) : (
                             <div className="space-y-1 mb-3">
-                                {insumosDisplay.map(({ key, nombre, cantidad, pendiente, item }) => (
+                                {insumosDisplay.map(({ key, nombre, cantidad, precio, pendiente, item }) => (
                                     <div
                                         key={key}
                                         className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
@@ -685,6 +679,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                         </div>
                                         <div className="flex items-center gap-3 text-gray-600 text-xs">
                                             <span>x{cantidad}</span>
+                                            <span className="font-bold text-gray-800">{fmtMoney(precio * cantidad)}</span>
                                             <button
                                                 onClick={() => handleQuitarInsumo(item)}
                                                 className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
@@ -720,10 +715,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad utilizada</label>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad utilizada (ej. 0.5 para medio metro/kilo)</label>
                                     <input
                                         type="number"
-                                        min="1"
+                                        min="0.001"
+                                        step="0.001"
                                         value={cantInsumo}
                                         onChange={(e) => setCantInsumo(e.target.value)}
                                         className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"

@@ -1,10 +1,9 @@
 import { obtenerInsumos, obtenerProveedores } from "@/actions/insumos";
 import ModalInsumo from "@/components/ModalInsumo";
-import ModalFacturaProveedor from "@/components/ModalFacturaProveedor";
 import BotonEliminarInsumo from "@/components/BotonEliminarInsumo";
 import FiltrosInsumos from "@/components/FiltrosInsumos";
 
-export default async function InsumosPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string; proveedor?: string }> }) {
+export default async function InsumosPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string; proveedor?: string; stockBajo?: string }> }) {
     const params = await searchParams;
 
     // Traemos los insumos y proveedores desde la base de datos
@@ -38,20 +37,18 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
         insumos = insumos.filter((i) => i.estado === false);
     }
 
+    // Filtro por stock bajo (stock actual <= stock mínimo)
+    if (params.stockBajo === "1") {
+        insumos = insumos.filter((i) => (i.stock_actual ?? 0) <= (i.stock_minimo ?? 0));
+    }
+
     return (
         <div>
             {/* ENCABEZADO */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-gray-800">Control de Insumos</h2>
 
-                {/* NUEVO: Contenedor que agrupa ambos botones */}
-                <div className="flex items-center gap-3">
-                    {/* Botón para registrar el gasto en Reportes y adjuntar la factura */}
-                    <ModalFacturaProveedor proveedores={proveedores} />
-
-                    {/* Botón original para crear nuevo insumo físico en stock */}
-                    <ModalInsumo proveedores={proveedores} />
-                </div>
+                <ModalInsumo proveedores={proveedores} />
             </div>
 
             {/* BUSCADOR DINÁMICO */}
@@ -64,6 +61,7 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                         <tr className="text-gray-700 font-semibold">
                             <th className="p-4">Nombre / Descripción</th>
                             <th className="p-4">Proveedor</th>
+                            <th className="p-4">Precio (por unidad)</th>
                             <th className="p-4">Stock vs Mínimo</th>
                             <th className="p-4 text-center">Estado</th>
                             <th className="p-4 text-center">Acciones</th>
@@ -72,7 +70,7 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                     <tbody className="text-black">
                         {insumos.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="p-8 text-center text-gray-500 bg-gray-50">
+                                <td colSpan={6} className="p-8 text-center text-gray-500 bg-gray-50">
                                     No hay insumos cargados. ¡Hacé clic en "+ Nuevo Insumo" para empezar!
                                 </td>
                             </tr>
@@ -104,6 +102,16 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                                         {/* PROVEEDOR */}
                                         <td className="p-4 text-gray-600">
                                             {insumo.proveedor?.razon_social || insumo.proveedor?.nombre_proveedor || "Sin asignar"}
+                                        </td>
+
+                                        {/* PRECIO POR UNIDAD */}
+                                        <td className="p-4 text-gray-700">
+                                            <div className="font-semibold">
+                                                {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(insumo.precio_venta)}
+                                                <span className="text-gray-400 text-xs font-normal ml-1">
+                                                    / {insumo.descripcion || "unidad"}
+                                                </span>
+                                            </div>
                                         </td>
 
                                         {/* BARRITA DE STOCK DINÁMICA */}

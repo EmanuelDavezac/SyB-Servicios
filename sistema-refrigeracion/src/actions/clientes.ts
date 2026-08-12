@@ -32,6 +32,7 @@ export async function crearCliente(datos: {
     email?: string;
     calle?: string;
     num_calle?: number;
+    localidad?: string;
 }) {
     try {
         const nuevoCliente = await prisma.cliente.create({
@@ -43,6 +44,7 @@ export async function crearCliente(datos: {
                 email: datos.email || null,
                 calle: datos.calle || null,
                 num_calle: datos.num_calle ?? null,
+                localidad: datos.localidad || null,
             },
         });
 

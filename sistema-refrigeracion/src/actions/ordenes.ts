@@ -152,7 +152,7 @@ export async function crearServicioYAgregarAOrden(datos: {
 
         revalidatePath("/ordenes");
         revalidatePath("/servicios");
-        return { success: true, servicio: nuevoServicio };
+        return { success: true, servicio: JSON.parse(JSON.stringify(nuevoServicio)) };
     } catch (error) {
         console.error("Error al crear servicio y agregar a orden:", error);
         return { success: false, error: "No se pudo crear el servicio" };
@@ -237,7 +237,11 @@ export async function obtenerInsumosDeOrden(id_orden: number) {
             include: { insumo: true },
             orderBy: { id_detalle_ins: "asc" },
         });
-        return JSON.parse(JSON.stringify(detalles));
+        const detallesJson = JSON.parse(JSON.stringify(detalles));
+        return detallesJson.map((d: { id_detalle_ins: number }) => ({
+            ...d,
+            id_detalle_ord_insumo: d.id_detalle_ins,
+        }));
     } catch (error) {
         console.error("Error al obtener insumos de la orden:", error);
         return [];

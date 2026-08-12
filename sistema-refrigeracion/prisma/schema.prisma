@@ -13,6 +13,7 @@ model cliente {
   cuit                     String?                    @db.VarChar(20)
   calle                    String?                    @db.VarChar(100)
   num_calle                Int?
+  localidad                String?                    @db.VarChar(100)
   telefono                 String?                    @db.VarChar(20)
   email                    String?                    @db.VarChar(100)
   estado                   Boolean?                   @default(true)
@@ -47,7 +48,7 @@ model detalle_orden_insumo {
   id_detalle_ins  Int            @id @default(autoincrement())
   id_orden        Int?
   id_insumo       Int?
-  cantidad_usada  Int
+  cantidad_usada  Decimal        @db.Decimal(10, 3)
   precio_aplicado Decimal        @db.Decimal(10, 2)
   insumo          insumo?        @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict, onUpdate: NoAction)
   orden_trabajo   orden_trabajo? @relation(fields: [id_orden], references: [id_orden], onDelete: Cascade, onUpdate: NoAction)
@@ -102,8 +103,8 @@ model insumo {
   id_proveedor         Int?
   nombre               String                 @db.VarChar(100)
   descripcion          String?                @db.VarChar(255)
-  stock_actual         Int?                   @default(0)
-  stock_minimo         Int?                   @default(0)
+  stock_actual         Decimal?               @default(0) @db.Decimal(10, 3)
+  stock_minimo         Decimal?               @default(0) @db.Decimal(10, 3)
   precio_costo         Decimal                @db.Decimal(10, 2)
   precio_venta         Decimal                @db.Decimal(10, 2)
   estado               Boolean?               @default(true)

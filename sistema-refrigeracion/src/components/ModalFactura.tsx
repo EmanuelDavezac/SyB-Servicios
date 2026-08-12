@@ -83,6 +83,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         }
     }, [idOrden]);
 
+    /* Orden seleccionada — se usa para autocompletar cliente y N° de orden */
+    const ordenSeleccionada = ordenes.find((o) => String(o.id_orden) === idOrden);
+
     function agregarInsumo() {
         if (!idInsumoSeleccionado) return;
         const insumo = insumosDisponibles.find(
@@ -208,6 +211,20 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         ))}
                                     </select>
                                 </div>
+
+                                {/* Autocompletado: cliente y N° de orden */}
+                                {ordenSeleccionada && (
+                                    <div className="mt-3 flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs">
+                                        <span className="text-blue-800 font-semibold">
+                                            Cliente: {ordenSeleccionada.cliente
+                                                ? `${ordenSeleccionada.cliente.apellido}, ${ordenSeleccionada.cliente.nombre}`
+                                                : "Sin cliente asignado"}
+                                        </span>
+                                        <span className="text-blue-600 font-bold">
+                                            N° Orden: #{String(ordenSeleccionada.id_orden).padStart(5, "0")}
+                                        </span>
+                                    </div>
+                                )}
                             </section>
 
                             {/* ── Comprobante ── */}
@@ -347,7 +364,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         value={cantidadInsumo}
                                         onChange={(e) => setCantidadInsumo(e.target.value)}
                                         className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                        min="1"
+                                        min="0.001"
+                                        step="0.001"
                                         placeholder="Cant."
                                     />
                                     <button

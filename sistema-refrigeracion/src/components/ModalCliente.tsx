@@ -18,6 +18,7 @@ export default function ModalCliente() {
     const [email, setEmail] = useState("");
     const [calle, setCalle] = useState("");
     const [numCalle, setNumCalle] = useState("");
+    const [localidad, setLocalidad] = useState("");
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -30,6 +31,7 @@ export default function ModalCliente() {
         setEmail("");
         setCalle("");
         setNumCalle("");
+        setLocalidad("");
         setError(null);
         setIsOpen(true);
     }
@@ -52,6 +54,7 @@ export default function ModalCliente() {
             email: email.trim() || undefined,
             calle: calle.trim() || undefined,
             num_calle: numCalle ? parseInt(numCalle) : undefined,
+            localidad: localidad.trim() || undefined,
         });
 
         setLoading(false);
@@ -172,6 +175,16 @@ export default function ModalCliente() {
                                         value={numCalle}
                                         onChange={(e) => setNumCalle(e.target.value)}
                                         placeholder="1234"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                    />
+                                </div>
+                                <div className="col-span-3">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Localidad</label>
+                                    <input
+                                        type="text"
+                                        value={localidad}
+                                        onChange={(e) => setLocalidad(e.target.value)}
+                                        placeholder="Ej: Recreo, Santa Fe"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
                                 </div>

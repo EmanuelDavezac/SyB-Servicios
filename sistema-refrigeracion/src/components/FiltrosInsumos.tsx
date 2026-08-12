@@ -16,13 +16,15 @@ export default function FiltrosInsumos({ proveedores }: { proveedores: Proveedor
     const busqueda = searchParams.get("busqueda") || "";
     const estado = searchParams.get("estado") || "";
     const proveedor = searchParams.get("proveedor") || "";
+    const stockBajo = searchParams.get("stockBajo") || "";
 
-    function navegar(nuevos: { busqueda?: string; estado?: string; proveedor?: string }) {
-        const valores = { busqueda, estado, proveedor, ...nuevos };
+    function navegar(nuevos: { busqueda?: string; estado?: string; proveedor?: string; stockBajo?: string }) {
+        const valores = { busqueda, estado, proveedor, stockBajo, ...nuevos };
         const params = new URLSearchParams();
         if (valores.busqueda?.trim()) params.set("busqueda", valores.busqueda.trim());
         if (valores.estado) params.set("estado", valores.estado);
         if (valores.proveedor) params.set("proveedor", valores.proveedor);
+        if (valores.stockBajo) params.set("stockBajo", valores.stockBajo);
         router.push(`/insumos?${params.toString()}`);
     }
 
@@ -56,6 +58,15 @@ export default function FiltrosInsumos({ proveedores }: { proveedores: Proveedor
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo</option>
             </select>
+            <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                <input
+                    type="checkbox"
+                    checked={stockBajo === "1"}
+                    onChange={(e) => navegar({ stockBajo: e.target.checked ? "1" : "" })}
+                    className="accent-orange-500"
+                />
+                Solo stock bajo
+            </label>
         </div>
     );
 }

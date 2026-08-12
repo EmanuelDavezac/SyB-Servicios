@@ -23,16 +23,14 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             ? `${cliente.nombre} ${cliente.apellido}`
             : "Sin cliente asignado";
         const cuitCliente = cliente?.cuit || "—";
-        const telCliente = cliente?.telefono || "—";
-        const emailCliente = cliente?.email || "—";
         const direccionCliente = cliente?.calle
             ? `${cliente.calle} ${cliente.num_calle || ""}`
             : "—";
+        const localidadCliente = cliente?.localidad || "—";
 
         const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR");
-        const fechaVenc = factura.fecha_vencimiento
-            ? new Date(factura.fecha_vencimiento).toLocaleDateString("es-AR")
-            : "—";
+
+        const numeroInforme = `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
 
         const formatMoney = (n: number) =>
             new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
@@ -42,17 +40,14 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         let totalServicios = 0;
         for (const ds of servicios) {
             const nombre = ds.servicio?.nombre || "Servicio";
-            const codigo = ds.servicio?.id_servicio || "—";
             const cant = ds.cantidad || 1;
             const precio = parseFloat(ds.precio_acordado);
             const subtotal = cant * precio;
             totalServicios += subtotal;
             serviciosHTML += `
                 <tr>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${codigo}</td>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right;">${formatMoney(precio)}</td>
+                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
@@ -62,17 +57,14 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         let totalInsumos = 0;
         for (const di of insumos) {
             const nombre = di.insumo?.nombre || "Insumo";
-            const codigo = di.insumo?.id_insumo || "—";
             const cant = di.cantidad_usada || 1;
             const precio = parseFloat(di.precio_aplicado);
             const subtotal = cant * precio;
             totalInsumos += subtotal;
             insumosHTML += `
                 <tr>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${codigo}</td>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right;">${formatMoney(precio)}</td>
+                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
@@ -84,7 +76,7 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Comprobante ${factura.num_factura || factura.id_factura}</title>
+    <title>Informe Técnico ${numeroInforme}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -96,119 +88,111 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             line-height: 1.4;
         }
         .factura-container {
-            border: 2px solid #000;
+            border: 1.5px solid #000;
             width: 100%;
             max-width: 750px;
             margin: 0 auto;
+        }
+        .original-tag {
+            text-align: center;
+            font-weight: 700;
+            font-size: 12px;
+            border-bottom: 1.5px solid #000;
+            padding: 3px 0;
         }
 
         /* ===== HEADER ===== */
         .header-row {
             display: flex;
             border-bottom: 2px solid #000;
-            position: relative;
         }
         .header-left {
-            width: 50%;
-            padding: 15px 20px;
-            border-right: 1px solid #000;
+            width: 42%;
+            padding: 12px 16px;
+            border-right: 1.5px solid #000;
+            text-align: center;
         }
         .header-left .empresa-nombre {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 10px;
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 6px;
         }
         .header-left .empresa-datos {
-            font-size: 10px;
-            color: #333;
+            font-size: 9.5px;
+            color: #222;
             line-height: 1.5;
-            text-align: center;
         }
         .header-left .empresa-tipo {
             font-weight: 700;
-            font-size: 11px;
+            font-size: 10.5px;
             margin-top: 4px;
         }
-        .header-right {
-            width: 50%;
-            padding: 15px 20px;
-            border-left: 1px solid #000;
+        .header-mid {
+            width: 18%;
+            border-right: 1.5px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
         }
-        .header-right .factura-titulo {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: 2px;
-        }
-        .header-right .factura-numero {
-            font-size: 14px;
-            font-weight: 700;
-            margin: 4px 0;
-        }
-        .header-right .factura-fecha {
-            font-size: 11px;
-            margin: 2px 0;
-        }
-        /* Letra central */
         .letra-box {
-            position: absolute;
-            left: 50%;
-            top: 8px;
-            transform: translateX(-50%);
-            width: 56px;
-            height: 56px;
+            width: 54px;
+            height: 54px;
             border: 2px solid #000;
-            background: #fff;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 10;
         }
         .letra-box .letra {
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 900;
             line-height: 1;
         }
         .letra-box .cod {
-            font-size: 7px;
-            font-weight: 700;
-            margin-top: 1px;
-        }
-        .letra-box .original {
             font-size: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-weight: 700;
+            text-align: center;
+            margin-top: 2px;
+            line-height: 1.1;
+        }
+        .header-right {
+            width: 40%;
+            padding: 12px 16px;
+        }
+        .header-right .factura-titulo {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .header-right .factura-numero {
+            font-size: 11px;
+            font-weight: 700;
+            margin: 2px 0;
+        }
+        .header-right .factura-fecha {
+            font-size: 11px;
+            font-weight: 700;
+            margin: 6px 0 2px;
         }
 
         /* ===== DATOS EMISOR EXTRA ===== */
         .datos-emisor {
-            display: flex;
             border-bottom: 2px solid #000;
             font-size: 10px;
-        }
-        .datos-emisor .col {
-            width: 50%;
-            padding: 6px 20px;
-        }
-        .datos-emisor .col:first-child {
-            border-right: 1px solid #000;
-        }
-        .datos-emisor .col:last-child {
-            border-left: 1px solid #000;
+            padding: 5px 16px;
         }
         .datos-emisor p { margin: 1px 0; }
+        .datos-emisor .label { display: inline-block; width: 150px; }
 
         /* ===== DATOS CLIENTE ===== */
         .datos-cliente {
             border-bottom: 2px solid #000;
-            padding: 8px 20px;
+            padding: 6px 16px;
             font-size: 10.5px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1px 20px;
         }
-        .datos-cliente p { margin: 1px 0; }
-        .datos-cliente .span-full { grid-column: 1 / -1; }
+        .datos-cliente p { margin: 2px 0; }
+        .datos-cliente .fila { display: flex; justify-content: space-between; gap: 20px; }
 
         /* ===== TABLA ITEMS ===== */
         .items-table {
@@ -218,7 +202,6 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         .items-table thead th {
             background: #f0f0f0;
             border-bottom: 2px solid #000;
-            border-top: none;
             padding: 6px 10px;
             font-size: 10px;
             font-weight: 700;
@@ -244,7 +227,7 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             letter-spacing: 0.5px;
         }
         .items-body-spacer {
-            height: 120px;
+            height: 100px;
         }
 
         /* ===== TOTALS ===== */
@@ -272,105 +255,97 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             border-bottom: none;
         }
 
+        /* ===== FIRMA TECNICO ===== */
+        .firma-section {
+            border-top: 2px solid #000;
+            padding: 14px 16px 40px;
+            font-size: 10.5px;
+        }
+        .firma-section p { margin: 1px 0; }
+
         /* ===== FOOTER ===== */
         .footer-section {
-            border-top: 2px solid #000;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .footer-disclaimer {
-            font-size: 10px;
-            color: #555;
-            font-style: italic;
+            border-top: 1.5px solid #000;
+            padding: 6px 16px;
+            font-size: 9.5px;
             text-align: center;
-            flex: 1;
-        }
-        .footer-disclaimer strong {
-            color: #c0392b;
-            font-style: normal;
-            font-size: 11px;
         }
 
         @media print {
             body { padding: 5px 10px; }
-            .factura-container { border-width: 1.5px; max-width: 100%; }
+            .factura-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
 </head>
 <body>
     <div class="factura-container">
 
+        <div class="original-tag">ORIGINAL</div>
+
         <!-- HEADER ROW -->
         <div class="header-row">
-            <div class="header-left" style="text-align: center;">
-                <div class="empresa-nombre">SyB Servicios</div>
+            <div class="header-left">
+                <div class="empresa-nombre">S&amp;B Servicios</div>
                 <div class="empresa-datos">
-                    Servicios de Refrigeración y Climatización<br>
-                    Córdoba, Argentina<br>
-                    Tel: (351) XXX-XXXX<br>
+                    CAVOUR 1613 – ESPERANZA - SANTA FE – C.P. 3080<br>
+                    TEL.: 03496 – 15546618 / 15506054<br>
+                    E-MAIL: sybservicios@hotmail.com
+                </div>
+                <div class="empresa-tipo">I.V.A.: RESPONSABLE INSCRIPTO</div>
+            </div>
+
+            <div class="header-mid">
+                <div class="letra-box">
+                    <div class="letra">X</div>
+                    <div class="cod">NO VALIDO<br>COMO<br>FACTURA</div>
                 </div>
             </div>
 
-            <!-- LETRA CENTRAL -->
-            <div class="letra-box">
-                <div class="letra">X</div>
-                <div class="cod">DOC. INT.</div>
-            </div>
-
             <div class="header-right">
-                <div class="factura-titulo">${factura.tipo?.toUpperCase() || "COMPROBANTE"}</div>
-                <div class="factura-numero">${factura.num_factura || `N° ${String(factura.id_factura).padStart(8, '0')}`}</div>
-                <div class="factura-fecha"><strong>Fecha de Emisión:</strong> ${fechaEmision}</div>
-                ${factura.fecha_vencimiento ? `<div class="factura-fecha"><strong>Vencimiento:</strong> ${fechaVenc}</div>` : ''}
+                <div class="factura-titulo">INFORME TECNICO DE SERVICIO</div>
+                <div class="factura-numero">N° ${numeroInforme}</div>
+                <div class="factura-fecha">FECHA: ${fechaEmision}</div>
             </div>
         </div>
 
         <!-- DATOS EMISOR EXTRAS -->
         <div class="datos-emisor">
-            <div class="col">
-                <p><strong>Orden de Trabajo:</strong> #${String(factura.orden_trabajo?.id_orden || 0).padStart(5, '0')}</p>
-                <p><strong>Estado de Pago:</strong> ${factura.estado_pago}</p>
-            </div>
-            <div class="col">
-                <p><strong>Tipo:</strong> ${factura.tipo || 'Comprobante Interno'}</p>
-                ${factura.descripcion ? `<p><strong>Nota:</strong> ${factura.descripcion}</p>` : ''}
-            </div>
+            <p><span class="label">CUIT N°:</span> 30 – 71659775 – 6</p>
+            <p><span class="label">INGR. BRUTOS:</span> 051 – 720706 – 0</p>
+            <p><span class="label">DER. REG. E INSP:</span> 12127</p>
+            <p><span class="label">INICIO DE ACTIVIDADES:</span> 01/09/2019</p>
         </div>
 
         <!-- DATOS CLIENTE -->
         <div class="datos-cliente">
-            <p><strong>Razón Social:</strong> ${nombreCliente}</p>
-            <p><strong>CUIT:</strong> ${cuitCliente}</p>
-            <p><strong>Domicilio:</strong> ${direccionCliente}</p>
-            <p><strong>Teléfono:</strong> ${telCliente}</p>
-            <p><strong>Email:</strong> ${emailCliente}</p>
-            <p>&nbsp;</p>
+            <p><strong>SR./ES.:</strong> ${nombreCliente}</p>
+            <div class="fila">
+                <p><strong>DOMICILIO:</strong> ${direccionCliente}</p>
+                <p><strong>LOCALIDAD:</strong> ${localidadCliente}</p>
+            </div>
+            <p><strong>CUIT N°:</strong> ${cuitCliente}</p>
         </div>
 
         <!-- TABLA DE ITEMS -->
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 60px;">Código</th>
-                    <th>Descripción</th>
-                    <th class="center" style="width: 70px;">Cantidad</th>
-                    <th class="right" style="width: 100px;">P. Unitario</th>
-                    <th class="right" style="width: 110px;">Importe</th>
+                    <th class="center" style="width: 70px;">CANT.</th>
+                    <th>DESCRIPCION</th>
+                    <th class="right" style="width: 120px;">PRECIO</th>
                 </tr>
             </thead>
             <tbody>
                 ${servicios.length > 0 ? `
-                    <tr class="section-separator"><td colspan="5">— Servicios Prestados —</td></tr>
+                    <tr class="section-separator"><td colspan="3">— Servicios Prestados —</td></tr>
                     ${serviciosHTML}
                 ` : ''}
                 ${insumos.length > 0 ? `
-                    <tr class="section-separator"><td colspan="5">— Insumos Utilizados —</td></tr>
+                    <tr class="section-separator"><td colspan="3">— Insumos Utilizados —</td></tr>
                     ${insumosHTML}
                 ` : ''}
-                ${servicios.length === 0 && insumos.length === 0 ? '<tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>' : ''}
-                <tr><td colspan="5" class="items-body-spacer"></td></tr>
+                ${servicios.length === 0 && insumos.length === 0 ? '<tr><td colspan="3" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>' : ''}
+                <tr><td colspan="3" class="items-body-spacer"></td></tr>
             </tbody>
         </table>
 
@@ -383,12 +358,16 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             </div>
         </div>
 
+        <!-- FIRMA TECNICO -->
+        <div class="firma-section">
+            <p>HERNAN BRUNAS</p>
+            <p>TEC. EN REFRIGERACION</p>
+            <p>S&amp;B SERVICIOS SRL</p>
+        </div>
+
         <!-- FOOTER -->
         <div class="footer-section">
-            <div class="footer-disclaimer">
-                <strong>⚠ DOCUMENTO NO VÁLIDO COMO FACTURA</strong><br>
-                Comprobante de uso interno — Solo para control de gestión de SyB Servicios
-            </div>
+            TEL.: 03496 – 15546618 / 15506054&nbsp;&nbsp;&nbsp;E-MAIL: sybservicios@hotmail.com
         </div>
 
     </div>

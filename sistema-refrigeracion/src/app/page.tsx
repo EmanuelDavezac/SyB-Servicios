@@ -49,7 +49,7 @@ export default async function DashboardPage() {
               <p className="text-gray-400 text-sm">No hay trabajos pendientes.</p>
             )}
           </ul>
-          <Link href="/ordenes" className="block w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-semibold text-right">
+          <Link href="/ordenes?estado=En proceso" className="block w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-semibold text-right">
             Ver todas las órdenes &rarr;
           </Link>
         </div>
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
               <p className="text-gray-400 text-sm">Todo el stock está al día.</p>
             )}
           </ul>
-          <Link href="/insumos" className="block w-full mt-4 text-sm text-orange-600 hover:text-orange-800 font-semibold text-right">
+          <Link href="/insumos?stockBajo=1" className="block w-full mt-4 text-sm text-orange-600 hover:text-orange-800 font-semibold text-right">
             Revisar inventario &rarr;
           </Link>
         </div>
