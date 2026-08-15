@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
 
 export async function getFacturas() {
   try {
@@ -56,13 +57,24 @@ export async function crearFactura(data: {
   num_factura: string;
   tipo: string;
   monto_total: number;
-  estado_pago: string;
   descripcion?: string;
   fecha_vencimiento?: Date;
   insumos?: { id_insumo: number; cantidad: number }[];
 }) {
   try {
     const nuevaFactura = await prisma.$transaction(async (tx) => {
+      // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
+      //    setea el id directo desde la URL, sin validar si ya está facturada)
+      const facturaExistente = await tx.factura.findFirst({
+        where: {
+          id_orden: data.id_orden,
+          estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+        },
+      });
+      if (facturaExistente) {
+        throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
+      }
+
       // 1. Crear la factura
       const factura = await tx.factura.create({
         data: {
@@ -72,7 +84,8 @@ export async function crearFactura(data: {
           fecha_emision: new Date(),
           fecha_vencimiento: data.fecha_vencimiento,
           monto_total: data.monto_total,
-          estado_pago: data.estado_pago,
+          saldo_pendiente: data.monto_total,
+          estado_pago: ESTADOS_FACTURA.IMPAGA,
           descripcion: data.descripcion,
         },
       });
@@ -144,33 +157,6 @@ export async function crearFactura(data: {
   } catch (error) {
     console.error("Error creating factura:", error);
     return { success: false, error: error instanceof Error ? error.message : "Error al crear la factura" };
-  }
-}
-
-export async function actualizarEstadoFactura(id_factura: number, estado_pago: string) {
-  try {
-    await prisma.factura.update({
-      where: { id_factura },
-      data: { estado_pago },
-    });
-    revalidatePath("/facturacion");
-    return { success: true };
-  } catch (error) {
-    console.error("Error updating estado de factura:", error);
-    return { success: false, error: "Error al actualizar estado" };
-  }
-}
-
-export async function eliminarFactura(id_factura: number) {
-  try {
-    await prisma.factura.delete({
-      where: { id_factura },
-    });
-    revalidatePath("/facturacion");
-    return { success: true };
-  } catch (error) {
-    console.error("Error deleting factura:", error);
-    return { success: false, error: "Error al eliminar la factura" };
   }
 }
 

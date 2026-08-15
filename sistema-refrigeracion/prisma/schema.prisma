@@ -13,12 +13,13 @@ model cliente {
   cuit                     String?                    @db.VarChar(20)
   calle                    String?                    @db.VarChar(100)
   num_calle                Int?
-  localidad                String?                    @db.VarChar(100)
   telefono                 String?                    @db.VarChar(20)
   email                    String?                    @db.VarChar(100)
   estado                   Boolean?                   @default(true)
+  localidad                String?                    @db.VarChar(100)
   historial_notificaciones historial_notificaciones[]
   orden_trabajo            orden_trabajo[]
+  recibo                   recibo[]
 }
 
 model compra_insumo {
@@ -73,8 +74,8 @@ model factura {
   fecha_emision            DateTime                   @db.Date
   fecha_vencimiento        DateTime?                  @db.Date
   monto_total              Decimal                    @db.Decimal(10, 2)
-  saldo_pendiente          Decimal?                   @db.Decimal(10, 2)
-  estado_pago              String?                    @default("Impago") @db.VarChar(20)
+  saldo_pendiente          Decimal                    @db.Decimal(10, 2)
+  estado_pago              String                     @default("IMPAGA") @db.VarChar(20)
   descripcion              String?
   orden_trabajo            orden_trabajo?             @relation(fields: [id_orden], references: [id_orden], onDelete: Restrict, onUpdate: NoAction)
   historial_notificaciones historial_notificaciones[]
@@ -132,12 +133,15 @@ model orden_trabajo {
 }
 
 model pagos_parciales {
-  id_pago      Int      @id @default(autoincrement())
-  id_factura   Int?
-  monto_pagado Decimal  @db.Decimal(10, 2)
-  forma_pago   String?  @db.VarChar(50)
-  fecha_pago   DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
-  factura      factura? @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+  id_pago      Int     @id @default(autoincrement())
+  id_factura   Int
+  monto_pagado Decimal @db.Decimal(10, 2)
+  id_recibo    Int
+  recibo       recibo  @relation(fields: [id_recibo], references: [id_recibo], onDelete: Cascade, onUpdate: NoAction, map: "fk_pagos_parciales_recibo")
+  factura      factura @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_factura], map: "idx_pagos_parciales_id_factura")
+  @@index([id_recibo], map: "idx_pagos_parciales_id_recibo")
 }
 
 model proveedor {
@@ -163,11 +167,40 @@ model servicio {
 }
 
 model servicio_insumo {
-  id_servicio_ins Int @id @default(autoincrement())
+  id_servicio_ins Int      @id @default(autoincrement())
   id_servicio     Int
   id_insumo       Int
   cantidad        Int
+  insumo          insumo   @relation(fields: [id_insumo], references: [id_insumo])
+  servicio        servicio @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade)
+}
 
-  servicio servicio @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade)
-  insumo   insumo   @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict)
+model playing_with_neon {
+  id    Int    @id @default(autoincrement())
+  name  String
+  value Float? @db.Real
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recibo {
+  id_recibo       Int               @id @default(autoincrement())
+  id_cliente      Int
+  fecha_pago      DateTime          @default(dbgenerated("CURRENT_DATE")) @db.Date
+  monto_total     Decimal           @db.Decimal(10, 2)
+  forma_pago      String?           @db.VarChar(50)
+  observacion     String?
+  pagos_parciales pagos_parciales[]
+  cliente         cliente           @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
+
+  @@index([fecha_pago], map: "idx_recibo_fecha_pago")
+  @@index([id_cliente], map: "idx_recibo_id_cliente")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
 }

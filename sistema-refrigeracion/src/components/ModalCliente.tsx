@@ -2,9 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { crearCliente } from "@/actions/clientes";
+import { crearCliente, actualizarCliente } from "@/actions/clientes";
 
-export default function ModalCliente() {
+interface ClienteExistente {
+    id_cliente: number;
+    nombre: string;
+    apellido: string;
+    cuit: string | null;
+    telefono: string | null;
+    email: string | null;
+    calle: string | null;
+    num_calle: number | null;
+    localidad: string | null;
+}
+
+interface Props {
+    cliente?: ClienteExistente;
+}
+
+export default function ModalCliente({ cliente }: Props) {
+    const esEdicion = !!cliente;
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -23,15 +40,15 @@ export default function ModalCliente() {
     useEffect(() => { setMounted(true); }, []);
 
     function handleAbrir() {
-        /* resetear el form cada vez que se abre */
-        setNombre("");
-        setApellido("");
-        setCuit("");
-        setTelefono("");
-        setEmail("");
-        setCalle("");
-        setNumCalle("");
-        setLocalidad("");
+        /* precargar datos del cliente si es edición, resetear si es alta */
+        setNombre(cliente?.nombre ?? "");
+        setApellido(cliente?.apellido ?? "");
+        setCuit(cliente?.cuit ?? "");
+        setTelefono(cliente?.telefono ?? "");
+        setEmail(cliente?.email ?? "");
+        setCalle(cliente?.calle ?? "");
+        setNumCalle(cliente?.num_calle != null ? String(cliente.num_calle) : "");
+        setLocalidad(cliente?.localidad ?? "");
         setError(null);
         setIsOpen(true);
     }
@@ -46,7 +63,7 @@ export default function ModalCliente() {
         setLoading(true);
         setError(null);
 
-        const res = await crearCliente({
+        const datos = {
             nombre: nombre.trim(),
             apellido: apellido.trim(),
             cuit: cuit.trim() || undefined,
@@ -55,7 +72,11 @@ export default function ModalCliente() {
             calle: calle.trim() || undefined,
             num_calle: numCalle ? parseInt(numCalle) : undefined,
             localidad: localidad.trim() || undefined,
-        });
+        };
+
+        const res = esEdicion
+            ? await actualizarCliente(cliente.id_cliente, datos)
+            : await crearCliente(datos);
 
         setLoading(false);
 
@@ -75,7 +96,7 @@ export default function ModalCliente() {
 
                 {/* Header */}
                 <div className="modal-header">
-                    <h3 className="text-xl font-bold">Alta de Cliente</h3>
+                    <h3 className="text-xl font-bold">{esEdicion ? "Editar Cliente" : "Alta de Cliente"}</h3>
                     <button
                         type="button"
                         onClick={() => setIsOpen(false)}
@@ -211,6 +232,8 @@ export default function ModalCliente() {
                                     <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
                                     Guardando...
                                 </span>
+                            ) : esEdicion ? (
+                                "Guardar Cambios"
                             ) : (
                                 "Guardar Cliente"
                             )}
@@ -223,12 +246,22 @@ export default function ModalCliente() {
 
     return (
         <>
-            <button
-                onClick={handleAbrir}
-                className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition"
-            >
-                + Nuevo Cliente
-            </button>
+            {esEdicion ? (
+                <button
+                    onClick={handleAbrir}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Editar"
+                >
+                    <i className="fas fa-edit" />
+                </button>
+            ) : (
+                <button
+                    onClick={handleAbrir}
+                    className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition"
+                >
+                    + Nuevo Cliente
+                </button>
+            )}
             {isOpen && mounted && createPortal(modal, document.body)}
         </>
     );

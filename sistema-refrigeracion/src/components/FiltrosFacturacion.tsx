@@ -12,11 +12,13 @@ export default function FiltrosFacturacion() {
     const inicialFechaFin = searchParams.get("fechaFin") || "";
     const inicialCliente = searchParams.get("cliente") || "";
     const inicialEstado = searchParams.get("estado") || "";
+    const inicialConSaldo = searchParams.get("conSaldo") === "1";
 
     const [fechaInicio, setFechaInicio] = useState(inicialFechaInicio);
     const [fechaFin, setFechaFin] = useState(inicialFechaFin);
     const [cliente, setCliente] = useState(inicialCliente);
     const [estado, setEstado] = useState(inicialEstado);
+    const [conSaldo, setConSaldo] = useState(inicialConSaldo);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -25,16 +27,17 @@ export default function FiltrosFacturacion() {
             if (fechaFin) params.set("fechaFin", fechaFin);
             if (cliente.trim()) params.set("cliente", cliente.trim());
             if (estado) params.set("estado", estado);
-            
+            if (conSaldo) params.set("conSaldo", "1");
+
             const newQueryString = params.toString();
-            
+
             if (newQueryString !== searchParams.toString()) {
                 router.push(`/facturacion?${newQueryString}`);
             }
-        }, 400); 
+        }, 400);
 
         return () => clearTimeout(timer);
-    }, [fechaInicio, fechaFin, cliente, estado, router, searchParams]);
+    }, [fechaInicio, fechaFin, cliente, estado, conSaldo, router, searchParams]);
 
     return (
         <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black items-center">
@@ -68,20 +71,30 @@ export default function FiltrosFacturacion() {
                 className="border p-2 rounded w-1/4 outline-none focus:border-blue-500"
             >
                 <option value="">Todos los Estados</option>
-                <option value="Pendiente">PENDIENTE</option>
-                <option value="Pagada">PAGADA</option>
-                <option value="Impaga">IMPAGA</option>
-                <option value="Entregado">ENTREGADO</option>
-                <option value="Anulada">ANULADA</option>
+                <option value="IMPAGA">IMPAGA</option>
+                <option value="PARCIAL">PARCIAL</option>
+                <option value="PAGADA">PAGADA</option>
+                <option value="ANULADA">ANULADA</option>
             </select>
 
-            {(fechaInicio || fechaFin || cliente || estado) && (
+            <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
+                <input
+                    type="checkbox"
+                    checked={conSaldo}
+                    onChange={(e) => setConSaldo(e.target.checked)}
+                    className="accent-blue-600"
+                />
+                Solo con saldo
+            </label>
+
+            {(fechaInicio || fechaFin || cliente || estado || conSaldo) && (
                 <button
                     onClick={() => {
                         setFechaInicio("");
                         setFechaFin("");
                         setCliente("");
                         setEstado("");
+                        setConSaldo(false);
                     }}
                     className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded hover:bg-red-100 transition text-sm flex items-center gap-2"
                     title="Limpiar todos los filtros"

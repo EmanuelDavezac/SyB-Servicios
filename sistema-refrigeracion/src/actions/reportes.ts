@@ -16,28 +16,36 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        // 1. Obtener Ingresos (Facturas)
-        const facturas = await prisma.factura.findMany({
+        // 1. Obtener Ingresos (criterio de caja: recibos cobrados en el mes, no facturas emitidas)
+        const recibos = await prisma.recibo.findMany({
+            where: {
+                fecha_pago: {
+                    gte: fechaInicio,
+                    lte: fechaFin,
+                },
+            },
+            include: {
+                cliente: true,
+                pagos_parciales: {
+                    include: { factura: true },
+                },
+            },
+            orderBy: { fecha_pago: 'asc' }
+        });
+
+        // 2. Total facturado del mes (por fecha de emisión, informativo, no es el ingreso de caja)
+        const facturasDelMes = await prisma.factura.findMany({
             where: {
                 fecha_emision: {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
-                estado_pago: {
-                    in: ["PAGADA", "Pagada", "pagada"]
-                }
+                estado_pago: { not: "ANULADA" },
             },
-            include: {
-                orden_trabajo: {
-                    include: {
-                        cliente: true
-                    }
-                }
-            },
-            orderBy: { fecha_emision: 'asc' }
         });
+        const totalFacturado = facturasDelMes.reduce((acc, f) => acc + Number(f.monto_total), 0);
 
-        // 2. Obtener Egresos (Compras de Insumos)
+        // 3. Obtener Egresos (Compras de Insumos)
         const compras = await prisma.compra_insumo.findMany({
             where: {
                 fecha_compra: {
@@ -55,18 +63,20 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         let totalIngresos = 0;
         let totalEgresos = 0;
 
-        for (const f of facturas) {
-            const monto = Number(f.monto_total);
+        for (const r of recibos) {
+            const monto = Number(r.monto_total);
             totalIngresos += monto;
-            const clienteNombre = f.orden_trabajo?.cliente ? `${f.orden_trabajo.cliente.nombre} ${f.orden_trabajo.cliente.apellido}` : "Sin Cliente";
-            const desc = f.descripcion ? ` - ${f.descripcion}` : "";
-            
+            const clienteNombre = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Sin Cliente";
+            const facturasImputadas = r.pagos_parciales
+                .map((p) => p.factura?.num_factura || `#${p.id_factura}`)
+                .join(", ");
+
             movimientos.push({
-                id: `fac-${f.id_factura}`,
-                fecha: f.fecha_emision.toISOString(),
-                comprobante: f.num_factura ? `Factura ${f.num_factura}` : `Factura #${f.id_factura}`,
+                id: `rec-${r.id_recibo}`,
+                fecha: r.fecha_pago.toISOString(),
+                comprobante: `Recibo #${r.id_recibo} (${facturasImputadas})`,
                 tipo_comprobante: "Ingreso",
-                entidad: `${clienteNombre}${desc}`,
+                entidad: `${clienteNombre}${r.observacion ? ` - ${r.observacion}` : ""}`,
                 monto: monto,
             });
         }
@@ -96,12 +106,13 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
             movimientos,
             totalIngresos,
             totalEgresos,
-            balanceGeneral
+            balanceGeneral,
+            totalFacturado,
         };
 
     } catch (error) {
         console.error("Error al obtener reporte mensual:", error);
-        return { movimientos: [], totalIngresos: 0, totalEgresos: 0, balanceGeneral: 0 };
+        return { movimientos: [], totalIngresos: 0, totalEgresos: 0, balanceGeneral: 0, totalFacturado: 0 };
     }
 }
 
@@ -133,11 +144,11 @@ export async function obtenerDatosDashboard() {
             LIMIT 5
         `;
 
-        // 3. Facturas por Vencer (Unpaid, ordered by due date)
+        // 3. Facturas por Vencer (Impagas o parciales, ordenadas por vencimiento)
         const facturasPorVencer = await prisma.factura.findMany({
             where: {
                 estado_pago: {
-                    in: ["IMPAGA", "PENDIENTE", "Impago", "Pendiente"]
+                    in: ["IMPAGA", "PARCIAL"]
                 }
             },
             include: {
@@ -153,14 +164,56 @@ export async function obtenerDatosDashboard() {
             take: 5
         });
 
+        // 4. Cuentas por cobrar (total y top clientes con deuda)
+        const facturasConSaldo = await prisma.factura.findMany({
+            where: {
+                estado_pago: { in: ["IMPAGA", "PARCIAL"] }
+            },
+            include: {
+                orden_trabajo: { include: { cliente: true } }
+            }
+        });
+
+        const deudaPorCliente = new Map<number, { id_cliente: number; nombre: string; apellido: string; saldo: number }>();
+        let totalCuentasPorCobrar = 0;
+        for (const f of facturasConSaldo) {
+            const saldo = Number(f.saldo_pendiente);
+            totalCuentasPorCobrar += saldo;
+            const cliente = f.orden_trabajo?.cliente;
+            if (!cliente) continue;
+            const actual = deudaPorCliente.get(cliente.id_cliente);
+            if (actual) {
+                actual.saldo += saldo;
+            } else {
+                deudaPorCliente.set(cliente.id_cliente, {
+                    id_cliente: cliente.id_cliente,
+                    nombre: cliente.nombre,
+                    apellido: cliente.apellido,
+                    saldo,
+                });
+            }
+        }
+        const topClientesConDeuda = Array.from(deudaPorCliente.values())
+            .sort((a, b) => b.saldo - a.saldo)
+            .slice(0, 5);
+
         return {
             ordenesEnCurso: JSON.parse(JSON.stringify(ordenesEnCurso)),
             alertasStock: JSON.parse(JSON.stringify(alertasStock)),
-            facturasPorVencer: JSON.parse(JSON.stringify(facturasPorVencer))
+            facturasPorVencer: JSON.parse(JSON.stringify(facturasPorVencer)),
+            cuentasPorCobrar: {
+                total: totalCuentasPorCobrar,
+                topClientes: topClientesConDeuda,
+            },
         };
     } catch (error) {
         console.error("Error al obtener datos del dashboard:", error);
-        return { ordenesEnCurso: [], alertasStock: [], facturasPorVencer: [] };
+        return {
+            ordenesEnCurso: [],
+            alertasStock: [],
+            facturasPorVencer: [],
+            cuentasPorCobrar: { total: 0, topClientes: [] },
+        };
     }
 }
 

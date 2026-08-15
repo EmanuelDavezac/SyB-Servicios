@@ -40,7 +40,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [tipo, setTipo] = useState("Factura");
     const [letraNumero, setLetraNumero] = useState("");
     const [montoTotal, setMontoTotal] = useState("");
-    const [estadoPago, setEstadoPago] = useState("PENDIENTE");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
 
@@ -62,7 +61,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         if (openWithOrdenId) {
             setIdOrden(openWithOrdenId);
             setLetraNumero(`A-${openWithOrdenId.padStart(4, "0")}`);
-            setEstadoPago("PAGADA");
             setAbierto(true);
         }
     }, [openWithOrdenId]);
@@ -110,7 +108,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setTipo("Factura");
         setLetraNumero("");
         setMontoTotal("");
-        setEstadoPago("PENDIENTE");
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
@@ -132,7 +129,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             tipo,
             num_factura: `${tipo} ${letraNumero}`.trim(),
             monto_total: parseFloat(montoTotal),
-            estado_pago: estadoPago,
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
             insumos: insumosSeleccionados.map((i) => ({
@@ -272,22 +268,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                 className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                             />
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Estado de Pago *
-                                        </label>
-                                        <select
-                                            value={estadoPago}
-                                            onChange={(e) => setEstadoPago(e.target.value)}
-                                            className={inputCls}
-                                        >
-                                            <option value="PAGADA">PAGADA</option>
-                                            <option value="IMPAGA">IMPAGA</option>
-                                            <option value="PENDIENTE">PENDIENTE</option>
-                                            <option value="ENTREGADO">ENTREGADO</option>
-                                            <option value="ANULADA">ANULADA</option>
-                                        </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">

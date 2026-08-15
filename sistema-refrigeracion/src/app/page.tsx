@@ -2,7 +2,10 @@ import Link from "next/link";
 import { obtenerDatosDashboard } from "@/actions/reportes";
 
 export default async function DashboardPage() {
-  const { ordenesEnCurso, alertasStock, facturasPorVencer } = await obtenerDatosDashboard();
+  const { ordenesEnCurso, alertasStock, facturasPorVencer, cuentasPorCobrar } = await obtenerDatosDashboard();
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
 
   const getDiasFaltantes = (fecha: string) => {
     const fv = new Date(fecha);
@@ -25,7 +28,7 @@ export default async function DashboardPage() {
     <div>
       <h2 className="text-3xl font-bold text-gray-800 mb-6">Panel Principal</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
         {/* Cuadro 1: Trabajos en Curso */}
         <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500 flex flex-col h-full">
@@ -105,6 +108,31 @@ export default async function DashboardPage() {
           </ul>
           <Link href="/facturacion" className="block w-full mt-4 text-sm text-red-600 hover:text-red-800 font-semibold text-right">
             Ver facturación &rarr;
+          </Link>
+        </div>
+
+        {/* Cuadro 4: Cuentas por Cobrar */}
+        <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-purple-500 flex flex-col h-full">
+          <h3 className="text-lg font-semibold mb-4 text-purple-700">
+            <i className="fas fa-hand-holding-dollar mr-2"></i> Cuentas por Cobrar
+          </h3>
+          <p className="text-2xl font-bold text-slate-800 mb-4">{formatCurrency(cuentasPorCobrar.total)}</p>
+          <ul className="space-y-3 flex-1">
+            {cuentasPorCobrar.topClientes.length > 0 ? (
+              cuentasPorCobrar.topClientes.map((c: any) => (
+                <li key={c.id_cliente} className="flex justify-between items-center border-b border-gray-100 pb-2">
+                  <span className="font-medium text-gray-700 truncate mr-2" title={`${c.nombre} ${c.apellido}`}>
+                    {c.nombre} {c.apellido}
+                  </span>
+                  <span className="text-purple-700 font-bold whitespace-nowrap text-sm">{formatCurrency(c.saldo)}</span>
+                </li>
+              ))
+            ) : (
+              <p className="text-gray-400 text-sm">Sin deuda pendiente.</p>
+            )}
+          </ul>
+          <Link href="/cobros" className="block w-full mt-4 text-sm text-purple-600 hover:text-purple-800 font-semibold text-right">
+            Ver cobros &rarr;
           </Link>
         </div>
 
