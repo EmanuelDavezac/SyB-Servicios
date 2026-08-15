@@ -229,6 +229,44 @@ export async function obtenerDeudaPorCliente(id_cliente: number) {
   }
 }
 
+export async function obtenerReciboCompleto(id_recibo: number) {
+  try {
+    const recibo = await prisma.recibo.findUnique({
+      where: { id_recibo },
+      include: {
+        cliente: true,
+        pagos_parciales: { include: { factura: true } },
+      },
+    });
+
+    if (!recibo) return null;
+
+    const deudaRestanteCliente = await obtenerDeudaPorCliente(recibo.id_cliente);
+
+    const resultado = {
+      ...recibo,
+      monto_total: Number(recibo.monto_total),
+      pagos_parciales: recibo.pagos_parciales.map((p) => ({
+        id_pago: p.id_pago,
+        id_factura: p.id_factura,
+        monto_pagado: Number(p.monto_pagado),
+        saldo_restante: Number(p.factura.saldo_pendiente),
+        factura: {
+          ...p.factura,
+          monto_total: Number(p.factura.monto_total),
+          saldo_pendiente: Number(p.factura.saldo_pendiente),
+        },
+      })),
+      deudaRestanteCliente,
+    };
+
+    return JSON.parse(JSON.stringify(resultado));
+  } catch (error) {
+    console.error("Error obteniendo recibo completo:", error);
+    return null;
+  }
+}
+
 export async function obtenerCobros() {
   try {
     const recibos = await prisma.recibo.findMany({

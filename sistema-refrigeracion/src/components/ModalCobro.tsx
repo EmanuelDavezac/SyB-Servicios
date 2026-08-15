@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { registrarCobro, obtenerFacturasPendientesCliente } from "@/actions/cobros";
+import { imprimirRecibo } from "@/components/BotonImprimirRecibo";
 
 interface Cliente {
     id_cliente: number;
@@ -121,6 +122,9 @@ export default function ModalCobro({ clientes }: Props) {
         if (resultado.success) {
             setAbierto(false);
             resetForm();
+            if (resultado.recibo?.id_recibo) {
+                imprimirRecibo(resultado.recibo.id_recibo);
+            }
         } else {
             setError(resultado.error || "Error al registrar el cobro.");
         }

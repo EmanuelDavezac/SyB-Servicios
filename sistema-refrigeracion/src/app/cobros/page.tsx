@@ -1,6 +1,7 @@
 import { obtenerClientesConDeuda, obtenerCobros } from "@/actions/cobros";
 import ModalCobro from "@/components/ModalCobro";
 import BotonAnularCobro from "@/components/BotonAnularCobro";
+import BotonImprimirRecibo from "@/components/BotonImprimirRecibo";
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount);
@@ -80,7 +81,8 @@ export default async function CobrosPage() {
                                     {r.pagos_parciales.map((p: any) => p.factura?.num_factura || `#${p.id_factura}`).join(", ")}
                                 </div>
                                 <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
-                                <div className="text-right">
+                                <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">
+                                    <BotonImprimirRecibo idRecibo={r.id_recibo} />
                                     <BotonAnularCobro idRecibo={r.id_recibo} />
                                 </div>
                             </div>
