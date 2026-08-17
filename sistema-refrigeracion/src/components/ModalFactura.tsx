@@ -39,9 +39,13 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [idOrden, setIdOrden] = useState("");
     const [tipo, setTipo] = useState("Factura");
     const [letraNumero, setLetraNumero] = useState("");
-    const [montoTotal, setMontoTotal] = useState("");
+    const [neto, setNeto] = useState("");
+    const [alicuotaIva, setAlicuotaIva] = useState("21");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
+
+    const montoIva = neto ? (parseFloat(neto) * (parseFloat(alicuotaIva || "0") / 100)) : 0;
+    const montoTotalCalculado = neto ? (parseFloat(neto) + montoIva) : 0;
 
     /* Insumos */
     const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
@@ -107,7 +111,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setIdOrden("");
         setTipo("Factura");
         setLetraNumero("");
-        setMontoTotal("");
+        setNeto("");
+        setAlicuotaIva("21");
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
@@ -116,8 +121,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     }
 
     async function handleGuardar() {
-        if (!idOrden || !tipo || !montoTotal) {
-            setError("Completá la Orden, Tipo y Monto antes de guardar.");
+        if (!idOrden || !tipo || !neto) {
+            setError("Completá la Orden, Tipo y Neto antes de guardar.");
             return;
         }
 
@@ -128,7 +133,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             id_orden: Number(idOrden),
             tipo,
             num_factura: `${tipo} ${letraNumero}`.trim(),
-            monto_total: parseFloat(montoTotal),
+            neto: parseFloat(neto),
+            alicuota_iva: parseFloat(alicuotaIva || "0"),
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
             insumos: insumosSeleccionados.map((i) => ({
@@ -165,7 +171,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                             <div>
                                 <h3 className="text-lg font-bold tracking-wide">Nuevo Comprobante</h3>
                                 <p className="text-blue-100 text-xs mt-0.5">
-                                    Generá una factura, recibo, remito o presupuesto.
+                                    Generá una factura o remito. Recibos y presupuestos tienen su propio flujo.
                                 </p>
                             </div>
                             <button
@@ -237,9 +243,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         >
                                             <option value="Factura">Factura</option>
-                                            <option value="Presupuesto">Presupuesto</option>
                                             <option value="Remito">Remito</option>
-                                            <option value="Recibo">Recibo</option>
                                         </select>
                                     </div>
                                     <div>
@@ -256,18 +260,29 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Monto Total * ($)
+                                            Neto * ($)
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
                                             <input
                                                 type="number"
-                                                value={montoTotal}
-                                                onChange={(e) => setMontoTotal(e.target.value)}
+                                                value={neto}
+                                                onChange={(e) => setNeto(e.target.value)}
                                                 placeholder="0.00"
                                                 className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                             />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                                            Alícuota IVA (%)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={alicuotaIva}
+                                            onChange={(e) => setAlicuotaIva(e.target.value)}
+                                            className={inputCls}
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -280,6 +295,12 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
+                                    {neto && (
+                                        <div className="col-span-2 flex justify-end gap-4 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs">
+                                            <span className="text-blue-700">IVA: <strong>${montoIva.toFixed(2)}</strong></span>
+                                            <span className="text-blue-800 font-bold">Total: ${montoTotalCalculado.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
                                             Descripción / Notas

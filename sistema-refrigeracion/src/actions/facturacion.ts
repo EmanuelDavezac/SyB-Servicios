@@ -56,12 +56,15 @@ export async function crearFactura(data: {
   id_orden: number;
   num_factura: string;
   tipo: string;
-  monto_total: number;
+  neto: number;
+  alicuota_iva: number;
   descripcion?: string;
   fecha_vencimiento?: Date;
   insumos?: { id_insumo: number; cantidad: number }[];
 }) {
   try {
+    const montoTotal = data.neto + data.neto * (data.alicuota_iva / 100);
+
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
       //    setea el id directo desde la URL, sin validar si ya está facturada)
@@ -83,8 +86,10 @@ export async function crearFactura(data: {
           tipo: data.tipo,
           fecha_emision: new Date(),
           fecha_vencimiento: data.fecha_vencimiento,
-          monto_total: data.monto_total,
-          saldo_pendiente: data.monto_total,
+          neto: data.neto,
+          alicuota_iva: data.alicuota_iva,
+          monto_total: montoTotal,
+          saldo_pendiente: montoTotal,
           estado_pago: ESTADOS_FACTURA.IMPAGA,
           descripcion: data.descripcion,
         },

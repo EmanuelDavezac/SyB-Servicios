@@ -19,6 +19,7 @@ model cliente {
   localidad                String?                    @db.VarChar(100)
   historial_notificaciones historial_notificaciones[]
   orden_trabajo            orden_trabajo[]
+  presupuesto              presupuesto[]
   recibo                   recibo[]
 }
 
@@ -77,6 +78,8 @@ model factura {
   saldo_pendiente          Decimal                    @db.Decimal(10, 2)
   estado_pago              String                     @default("IMPAGA") @db.VarChar(20)
   descripcion              String?
+  neto                     Decimal?                   @db.Decimal(10, 2)
+  alicuota_iva             Decimal?                   @db.Decimal(5, 2)
   orden_trabajo            orden_trabajo?             @relation(fields: [id_orden], references: [id_orden], onDelete: Restrict, onUpdate: NoAction)
   historial_notificaciones historial_notificaciones[]
   pagos_parciales          pagos_parciales[]
@@ -126,6 +129,7 @@ model orden_trabajo {
   detalle_orden_servicio detalle_orden_servicio[]
   factura                factura[]
   cliente                cliente?                 @relation(fields: [id_cliente], references: [id_cliente], onDelete: Restrict, onUpdate: NoAction)
+  presupuesto            presupuesto[]
 
   @@index([fecha_creacion])
   @@index([estado_trabajo])
@@ -163,6 +167,7 @@ model servicio {
   precio                 Decimal                  @db.Decimal(10, 2)
   estado                 Boolean?                 @default(true)
   detalle_orden_servicio detalle_orden_servicio[]
+  detalle_presupuesto    detalle_presupuesto[]
   servicio_insumo        servicio_insumo[]
 }
 
@@ -203,4 +208,45 @@ model spatial_ref_sys {
   auth_srid Int?
   srtext    String? @db.VarChar(2048)
   proj4text String? @db.VarChar(2048)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model detalle_presupuesto {
+  id_detalle      Int         @id @default(autoincrement())
+  id_presupuesto  Int
+  orden_linea     Int         @default(1)
+  cantidad        Decimal     @db.Decimal(10, 3)
+  descripcion     String
+  precio_unitario Decimal     @db.Decimal(10, 2)
+  id_servicio     Int?
+  presupuesto     presupuesto @relation(fields: [id_presupuesto], references: [id_presupuesto], onDelete: Cascade, onUpdate: NoAction)
+  servicio        servicio?   @relation(fields: [id_servicio], references: [id_servicio], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id_presupuesto], map: "idx_detalle_presupuesto_id_presupuesto")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model presupuesto {
+  id_presupuesto             Int                   @id @default(autoincrement())
+  numero                     Int                   @unique @default(autoincrement())
+  id_cliente                 Int?
+  destinatario_nombre        String                @db.VarChar(150)
+  destinatario_cuit          String?               @db.VarChar(20)
+  destinatario_domicilio     String?               @db.VarChar(150)
+  destinatario_localidad     String?               @db.VarChar(100)
+  destinatario_condicion_iva String?               @db.VarChar(50)
+  fecha_emision              DateTime              @default(dbgenerated("CURRENT_DATE")) @db.Date
+  validez_dias               Int                   @default(5)
+  condicion_pago             String?               @db.VarChar(100)
+  alicuota_iva               Decimal               @default(21) @db.Decimal(5, 2)
+  estado                     String                @default("PENDIENTE") @db.VarChar(20)
+  observaciones              String?
+  id_orden                   Int?
+  detalle_presupuesto        detalle_presupuesto[]
+  cliente                    cliente?              @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
+  orden_trabajo              orden_trabajo?        @relation(fields: [id_orden], references: [id_orden], onUpdate: NoAction)
+
+  @@index([estado], map: "idx_presupuesto_estado")
+  @@index([fecha_emision], map: "idx_presupuesto_fecha_emision")
+  @@index([id_cliente], map: "idx_presupuesto_id_cliente")
 }
