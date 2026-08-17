@@ -294,7 +294,7 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">CUIT</label>
-                                        <input type="text" value={destinatarioCuit} onChange={(e) => setDestinatarioCuit(e.target.value)} className={inputCls} />
+                                        <input type="text" value={destinatarioCuit} onChange={(e) => setDestinatarioCuit(e.target.value.replace(/[^\d\-]/g, '').slice(0, 20))} className={inputCls} />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Condición IVA</label>

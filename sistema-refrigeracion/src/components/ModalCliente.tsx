@@ -26,6 +26,7 @@ export default function ModalCliente({ cliente }: Props) {
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errores, setErrores] = useState<{ cuit?: string; telefono?: string; email?: string }>({});
 
     /* campos del formulario */
     const [nombre, setNombre] = useState("");
@@ -50,6 +51,7 @@ export default function ModalCliente({ cliente }: Props) {
         setNumCalle(cliente?.num_calle != null ? String(cliente.num_calle) : "");
         setLocalidad(cliente?.localidad ?? "");
         setError(null);
+        setErrores({});
         setIsOpen(true);
     }
 
@@ -60,8 +62,18 @@ export default function ModalCliente({ cliente }: Props) {
             return;
         }
 
+        const nuevosErrores: typeof errores = {};
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            nuevosErrores.email = "El email no tiene un formato válido.";
+        }
+        if (Object.keys(nuevosErrores).length > 0) {
+            setErrores(nuevosErrores);
+            return;
+        }
+
         setLoading(true);
         setError(null);
+        setErrores({});
 
         const datos = {
             nombre: nombre.trim(),
@@ -147,7 +159,10 @@ export default function ModalCliente({ cliente }: Props) {
                                     <input
                                         type="text"
                                         value={cuit}
-                                        onChange={(e) => setCuit(e.target.value)}
+                                        onChange={(e) => {
+                                            setCuit(e.target.value.replace(/[^\d\-]/g, '').slice(0, 20));
+                                            setErrores((prev) => ({ ...prev, cuit: undefined }));
+                                        }}
                                         placeholder="Ej: 20-12345678-9"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
@@ -157,7 +172,10 @@ export default function ModalCliente({ cliente }: Props) {
                                     <input
                                         type="text"
                                         value={telefono}
-                                        onChange={(e) => setTelefono(e.target.value)}
+                                        onChange={(e) => {
+                                            setTelefono(e.target.value.replace(/[^\d\s\-\+\(\)]/g, '').slice(0, 20));
+                                            setErrores((prev) => ({ ...prev, telefono: undefined }));
+                                        }}
                                         placeholder="Ej: 351 123-4567"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
@@ -165,12 +183,16 @@ export default function ModalCliente({ cliente }: Props) {
                                 <div className="col-span-2">
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
                                     <input
-                                        type="email"
+                                        type="text"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value);
+                                            setErrores((prev) => ({ ...prev, email: undefined }));
+                                        }}
                                         placeholder="Ej: juan@mail.com"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.email ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
+                                    {errores.email && <p className="text-red-500 text-xs mt-1">{errores.email}</p>}
                                 </div>
                             </div>
                         </section>
