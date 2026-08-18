@@ -39,10 +39,26 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [idOrden, setIdOrden] = useState("");
     const [tipo, setTipo] = useState("Factura");
     const [letraNumero, setLetraNumero] = useState("");
-    const [montoTotal, setMontoTotal] = useState("");
-    const [estadoPago, setEstadoPago] = useState("PENDIENTE");
+    const [neto, setNeto] = useState("");
+    const [alicuotaIva, setAlicuotaIva] = useState("21");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
+
+    const [tipoDescuento, setTipoDescuento] = useState("");
+    const [descuentoPorcentaje, setDescuentoPorcentaje] = useState("");
+    const [descuentoImporte, setDescuentoImporte] = useState("");
+    const [equipoDescripcion, setEquipoDescripcion] = useState("");
+
+    const netoBrutoNum = neto ? parseFloat(neto) : 0;
+    const descuentoMontoNum =
+        tipoDescuento === "PORCENTAJE" && descuentoPorcentaje
+            ? netoBrutoNum * parseFloat(descuentoPorcentaje) / 100
+            : tipoDescuento === "EQUIPO" && descuentoImporte
+            ? parseFloat(descuentoImporte)
+            : 0;
+    const netoGravadoNum = netoBrutoNum - descuentoMontoNum;
+    const montoIva = netoGravadoNum * (parseFloat(alicuotaIva || "0") / 100);
+    const montoTotalCalculado = netoGravadoNum + montoIva;
 
     /* Insumos */
     const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
@@ -62,7 +78,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         if (openWithOrdenId) {
             setIdOrden(openWithOrdenId);
             setLetraNumero(`A-${openWithOrdenId.padStart(4, "0")}`);
-            setEstadoPago("PAGADA");
             setAbierto(true);
         }
     }, [openWithOrdenId]);
@@ -82,6 +97,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             setInsumosDeOrden([]);
         }
     }, [idOrden]);
+
+    /* Orden seleccionada — se usa para autocompletar cliente y N° de orden */
+    const ordenSeleccionada = ordenes.find((o) => String(o.id_orden) === idOrden);
 
     function agregarInsumo() {
         if (!idInsumoSeleccionado) return;
@@ -106,19 +124,46 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setIdOrden("");
         setTipo("Factura");
         setLetraNumero("");
-        setMontoTotal("");
-        setEstadoPago("PENDIENTE");
+        setNeto("");
+        setAlicuotaIva("21");
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
         setInsumosDeOrden([]);
+        setTipoDescuento("");
+        setDescuentoPorcentaje("");
+        setDescuentoImporte("");
+        setEquipoDescripcion("");
         setError(null);
     }
 
     async function handleGuardar() {
-        if (!idOrden || !tipo || !montoTotal) {
-            setError("Completá la Orden, Tipo y Monto antes de guardar.");
+        if (!idOrden || !tipo || !neto) {
+            setError("Completá la Orden, Tipo y Subtotal antes de guardar.");
             return;
+        }
+
+        if (tipoDescuento === "PORCENTAJE") {
+            const pct = parseFloat(descuentoPorcentaje);
+            if (!descuentoPorcentaje || isNaN(pct) || pct < 0 || pct > 100) {
+                setError("El porcentaje de descuento debe estar entre 0 y 100.");
+                return;
+            }
+        }
+        if (tipoDescuento === "EQUIPO") {
+            if (!equipoDescripcion.trim()) {
+                setError("Indicá qué equipo entrega el cliente en parte de pago.");
+                return;
+            }
+            const imp = parseFloat(descuentoImporte);
+            if (!descuentoImporte || isNaN(imp) || imp <= 0) {
+                setError("El importe del equipo debe ser mayor a cero.");
+                return;
+            }
+            if (imp >= parseFloat(neto)) {
+                setError("El descuento no puede igualar o superar el subtotal.");
+                return;
+            }
         }
 
         setCargando(true);
@@ -128,14 +173,18 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             id_orden: Number(idOrden),
             tipo,
             num_factura: `${tipo} ${letraNumero}`.trim(),
-            monto_total: parseFloat(montoTotal),
-            estado_pago: estadoPago,
+            neto: parseFloat(neto),
+            alicuota_iva: parseFloat(alicuotaIva || "0"),
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
             insumos: insumosSeleccionados.map((i) => ({
                 id_insumo: i.id_insumo,
                 cantidad: i.cantidad,
             })),
+            tipo_descuento: tipoDescuento ? (tipoDescuento as "PORCENTAJE" | "EQUIPO") : null,
+            descuento_porcentaje: tipoDescuento === "PORCENTAJE" ? parseFloat(descuentoPorcentaje) : null,
+            descuento_monto_equipo: tipoDescuento === "EQUIPO" ? parseFloat(descuentoImporte) : null,
+            equipo_descripcion: tipoDescuento === "EQUIPO" ? equipoDescripcion.trim() : null,
         });
 
         setCargando(false);
@@ -166,7 +215,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                             <div>
                                 <h3 className="text-lg font-bold tracking-wide">Nuevo Comprobante</h3>
                                 <p className="text-blue-100 text-xs mt-0.5">
-                                    Generá una factura, recibo, remito o presupuesto.
+                                    Generá una factura o remito. Recibos y presupuestos tienen su propio flujo.
                                 </p>
                             </div>
                             <button
@@ -208,6 +257,20 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         ))}
                                     </select>
                                 </div>
+
+                                {/* Autocompletado: cliente y N° de orden */}
+                                {ordenSeleccionada && (
+                                    <div className="mt-3 flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs">
+                                        <span className="text-blue-800 font-semibold">
+                                            Cliente: {ordenSeleccionada.cliente
+                                                ? `${ordenSeleccionada.cliente.apellido}, ${ordenSeleccionada.cliente.nombre}`
+                                                : "Sin cliente asignado"}
+                                        </span>
+                                        <span className="text-blue-600 font-bold">
+                                            N° Orden: #{String(ordenSeleccionada.id_orden).padStart(5, "0")}
+                                        </span>
+                                    </div>
+                                )}
                             </section>
 
                             {/* ── Comprobante ── */}
@@ -224,9 +287,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         >
                                             <option value="Factura">Factura</option>
-                                            <option value="Presupuesto">Presupuesto</option>
                                             <option value="Remito">Remito</option>
-                                            <option value="Recibo">Recibo</option>
                                         </select>
                                     </div>
                                     <div>
@@ -243,14 +304,14 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Monto Total * ($)
+                                            Subtotal *
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
                                             <input
                                                 type="number"
-                                                value={montoTotal}
-                                                onChange={(e) => setMontoTotal(e.target.value)}
+                                                value={neto}
+                                                onChange={(e) => setNeto(e.target.value)}
                                                 placeholder="0.00"
                                                 className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                             />
@@ -258,19 +319,14 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Estado de Pago *
+                                            Alícuota IVA (%)
                                         </label>
-                                        <select
-                                            value={estadoPago}
-                                            onChange={(e) => setEstadoPago(e.target.value)}
+                                        <input
+                                            type="number"
+                                            value={alicuotaIva}
+                                            onChange={(e) => setAlicuotaIva(e.target.value)}
                                             className={inputCls}
-                                        >
-                                            <option value="PAGADA">PAGADA</option>
-                                            <option value="IMPAGA">IMPAGA</option>
-                                            <option value="PENDIENTE">PENDIENTE</option>
-                                            <option value="ENTREGADO">ENTREGADO</option>
-                                            <option value="ANULADA">ANULADA</option>
-                                        </select>
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -283,6 +339,38 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
+                                    {neto && (
+                                        <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1.5">
+                                            <div className="flex justify-between text-blue-700">
+                                                <span>Subtotal</span>
+                                                <span>${netoBrutoNum.toFixed(2)}</span>
+                                            </div>
+                                            {tipoDescuento && descuentoMontoNum > 0 && (
+                                                <div className="flex justify-between text-orange-700">
+                                                    <span>
+                                                        {tipoDescuento === "PORCENTAJE"
+                                                            ? `Bonificacion ${descuentoPorcentaje}%`
+                                                            : "Equipo en parte de pago"}
+                                                    </span>
+                                                    <span>- ${descuentoMontoNum.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {tipoDescuento && descuentoMontoNum > 0 && (
+                                                <div className="flex justify-between text-blue-700 border-t border-blue-200 pt-1">
+                                                    <span>Neto gravado</span>
+                                                    <span>${netoGravadoNum.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between text-blue-700">
+                                                <span>IVA {alicuotaIva}%</span>
+                                                <span>${montoIva.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-bold text-blue-800 border-t border-blue-200 pt-1">
+                                                <span>Total</span>
+                                                <span>${montoTotalCalculado.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
                                             Descripción / Notas
@@ -295,6 +383,84 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         />
                                     </div>
                                 </div>
+                            </section>
+
+                            {/* ── Descuento ── */}
+                            <section>
+                                <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-3 border-b pb-1">
+                                    Descuento
+                                </h4>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                        Tipo de descuento
+                                    </label>
+                                    <select
+                                        value={tipoDescuento}
+                                        onChange={(e) => {
+                                            setTipoDescuento(e.target.value);
+                                            setDescuentoPorcentaje("");
+                                            setDescuentoImporte("");
+                                            setEquipoDescripcion("");
+                                        }}
+                                        className={inputCls}
+                                    >
+                                        <option value="">Sin descuento</option>
+                                        <option value="PORCENTAJE">Porcentaje</option>
+                                        <option value="EQUIPO">Equipo en parte de pago</option>
+                                    </select>
+                                </div>
+
+                                {tipoDescuento === "PORCENTAJE" && (
+                                    <div className="mt-3">
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                                            Porcentaje (%)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={descuentoPorcentaje}
+                                            onChange={(e) => setDescuentoPorcentaje(e.target.value)}
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            placeholder="Ej: 10"
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                )}
+
+                                {tipoDescuento === "EQUIPO" && (
+                                    <div className="mt-3 space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                Descripcion del equipo *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={equipoDescripcion}
+                                                onChange={(e) => setEquipoDescripcion(e.target.value)}
+                                                placeholder="Ej: Split Surrey 3000 frigorias, funcionando"
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                Importe a descontar *
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={descuentoImporte}
+                                                    onChange={(e) => setDescuentoImporte(e.target.value)}
+                                                    placeholder="0.00"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
 
                             {/* ── Insumos ── */}
@@ -347,7 +513,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         value={cantidadInsumo}
                                         onChange={(e) => setCantidadInsumo(e.target.value)}
                                         className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                        min="1"
+                                        min="0.001"
+                                        step="0.001"
                                         placeholder="Cant."
                                     />
                                     <button

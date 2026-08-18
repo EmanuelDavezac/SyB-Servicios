@@ -34,6 +34,8 @@ export async function obtenerInsumos() {
         // pueda pasarlos a los Client Components sin error
         return insumos.map((insumo) => ({
             ...insumo,
+            stock_actual: Number(insumo.stock_actual),
+            stock_minimo: Number(insumo.stock_minimo),
             precio_costo: Number(insumo.precio_costo),
             precio_venta: Number(insumo.precio_venta),
         }));
@@ -69,7 +71,16 @@ export async function crearInsumo(datos: {
         });
 
         revalidatePath("/insumos");
-        return { success: true, insumo: { ...nuevoInsumo, precio_costo: Number(nuevoInsumo.precio_costo), precio_venta: Number(nuevoInsumo.precio_venta) } };
+        return {
+            success: true,
+            insumo: {
+                ...nuevoInsumo,
+                stock_actual: Number(nuevoInsumo.stock_actual),
+                stock_minimo: Number(nuevoInsumo.stock_minimo),
+                precio_costo: Number(nuevoInsumo.precio_costo),
+                precio_venta: Number(nuevoInsumo.precio_venta),
+            },
+        };
     } catch (error) {
         console.error("Error al crear insumo:", error);
         return { success: false, error: "No se pudo crear el insumo" };
@@ -108,7 +119,16 @@ export async function actualizarInsumo(
         });
 
         revalidatePath("/insumos");
-        return { success: true, insumo: { ...insumoActualizado, precio_costo: Number(insumoActualizado.precio_costo), precio_venta: Number(insumoActualizado.precio_venta) } };
+        return {
+            success: true,
+            insumo: {
+                ...insumoActualizado,
+                stock_actual: Number(insumoActualizado.stock_actual),
+                stock_minimo: Number(insumoActualizado.stock_minimo),
+                precio_costo: Number(insumoActualizado.precio_costo),
+                precio_venta: Number(insumoActualizado.precio_venta),
+            },
+        };
     } catch (error) {
         console.error("Error al actualizar insumo:", error);
         return { success: false, error: "No se pudo actualizar el insumo" };

@@ -1,91 +1,42 @@
 "use client";
 
-import { getFacturaCompleta } from "@/actions/facturacion";
+import { obtenerPresupuestoCompleto } from "@/actions/presupuestos";
 
 interface Props {
-    idFactura: number;
+    idPresupuesto: number;
 }
 
-export default function BotonImprimirFactura({ idFactura }: Props) {
+export default function BotonImprimirPresupuesto({ idPresupuesto }: Props) {
 
     async function handleImprimir() {
-        const factura = await getFacturaCompleta(idFactura);
-        if (!factura) {
-            alert("No se pudo obtener los datos de la factura.");
+        const presupuesto = await obtenerPresupuestoCompleto(idPresupuesto);
+        if (!presupuesto) {
+            alert("No se pudo obtener los datos del presupuesto.");
             return;
         }
 
-        const cliente = factura.orden_trabajo?.cliente;
-        const servicios = factura.orden_trabajo?.detalle_orden_servicio || [];
-        const insumos = factura.orden_trabajo?.detalle_orden_insumo || [];
-
-        const nombreCliente = cliente
-            ? `${cliente.nombre} ${cliente.apellido}`
-            : "Sin cliente asignado";
-        const cuitCliente = cliente?.cuit || "—";
-        const direccionCliente = cliente?.calle
-            ? `${cliente.calle} ${cliente.num_calle || ""}`
-            : "—";
-        const localidadCliente = cliente?.localidad || "—";
-
-        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR");
-
-        const numeroInforme = `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
+        const fechaEmision = new Date(presupuesto.fecha_emision).toLocaleDateString("es-AR");
+        const numero = `0001 – ${String(presupuesto.numero).padStart(10, "0")}`;
 
         const formatMoney = (n: number) =>
-            new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
+            new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n).replace("ARS", "").trim();
 
-        // Build services rows
-        let serviciosHTML = "";
-        let totalServicios = 0;
-        for (const ds of servicios) {
-            const nombre = ds.descripcion_libre || ds.servicio?.nombre || "Servicio";
-            const cant = ds.cantidad || 1;
-            const precio = parseFloat(ds.precio_acordado);
-            const subtotal = cant * precio;
-            totalServicios += subtotal;
-            serviciosHTML += `
+        let itemsHTML = "";
+        for (const d of presupuesto.detalle_presupuesto) {
+            itemsHTML += `
                 <tr>
-                    <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
+                    <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${d.cantidad}</td>
+                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${d.descripcion}</td>
+                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(d.cantidad * d.precio_unitario)}</td>
                 </tr>`;
         }
-
-        // Build insumos rows
-        let insumosHTML = "";
-        let totalInsumos = 0;
-        for (const di of insumos) {
-            const nombre = di.insumo?.nombre || "Insumo";
-            const cant = di.cantidad_usada || 1;
-            const precio = parseFloat(di.precio_aplicado);
-            const subtotal = cant * precio;
-            totalInsumos += subtotal;
-            insumosHTML += `
-                <tr>
-                    <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
-                    <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
-                </tr>`;
-        }
-
-        const montoTotal = parseFloat(factura.monto_total);
-
-        const tipoDescuento: string | null = factura.tipo_descuento || null;
-        const descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
-        const descuentoPct = factura.descuento_porcentaje ? parseFloat(factura.descuento_porcentaje) : 0;
-        const equipoDesc: string = factura.equipo_descripcion || "";
-        const netoGravado = factura.neto ? parseFloat(factura.neto) : 0;
-        const alicuotaIva = factura.alicuota_iva ? parseFloat(factura.alicuota_iva) : 0;
-        const montoIvaCalc = netoGravado * alicuotaIva / 100;
-        const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
         const html = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Informe Técnico ${numeroInforme}</title>
+    <title>Presupuesto ${numero}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -96,7 +47,7 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             font-size: 11px;
             line-height: 1.4;
         }
-        .factura-container {
+        .presupuesto-container {
             border: 1.5px solid #000;
             width: 100%;
             max-width: 750px;
@@ -226,18 +177,18 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         }
         .items-table tbody td.right { text-align: right; }
         .items-table tbody td.center { text-align: center; }
-        .items-table tbody tr.section-separator td {
-            padding: 8px 10px 3px;
-            font-weight: 700;
-            font-size: 10px;
-            color: #444;
-            border-bottom: 1px solid #999;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
         .items-body-spacer {
-            height: 100px;
+            height: 80px;
         }
+
+        /* ===== LEYENDAS ===== */
+        .leyendas {
+            border-top: 2px solid #000;
+            padding: 8px 16px;
+            font-size: 10.5px;
+            font-weight: 700;
+        }
+        .leyendas p { margin: 2px 0; }
 
         /* ===== TOTALS ===== */
         .totals-row {
@@ -264,14 +215,6 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             border-bottom: none;
         }
 
-        /* ===== FIRMA TECNICO ===== */
-        .firma-section {
-            border-top: 2px solid #000;
-            padding: 14px 16px 40px;
-            font-size: 10.5px;
-        }
-        .firma-section p { margin: 1px 0; }
-
         /* ===== FOOTER ===== */
         .footer-section {
             border-top: 1.5px solid #000;
@@ -282,12 +225,12 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
 
         @media print {
             body { padding: 5px 10px; }
-            .factura-container { border-width: 1.2px; max-width: 100%; }
+            .presupuesto-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="factura-container">
+    <div class="presupuesto-container">
 
         <div class="original-tag">ORIGINAL</div>
 
@@ -311,8 +254,8 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             </div>
 
             <div class="header-right">
-                <div class="factura-titulo">INFORME TECNICO DE SERVICIO</div>
-                <div class="factura-numero">N° ${numeroInforme}</div>
+                <div class="factura-titulo">PRESUPUESTO</div>
+                <div class="factura-numero">N° ${numero}</div>
                 <div class="factura-fecha">FECHA: ${fechaEmision}</div>
             </div>
         </div>
@@ -325,14 +268,15 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             <p><span class="label">INICIO DE ACTIVIDADES:</span> 01/09/2019</p>
         </div>
 
-        <!-- DATOS CLIENTE -->
+        <!-- DATOS DESTINATARIO -->
         <div class="datos-cliente">
-            <p><strong>SR./ES.:</strong> ${nombreCliente}</p>
+            <p><strong>SR./ES.:</strong> ${presupuesto.destinatario_nombre}</p>
             <div class="fila">
-                <p><strong>DOMICILIO:</strong> ${direccionCliente}</p>
-                <p><strong>LOCALIDAD:</strong> ${localidadCliente}</p>
+                <p><strong>DOMICILIO:</strong> ${presupuesto.destinatario_domicilio || "—"}</p>
+                <p><strong>LOCALIDAD:</strong> ${presupuesto.destinatario_localidad || "—"}</p>
             </div>
-            <p><strong>CUIT N°:</strong> ${cuitCliente}</p>
+            <p><strong>I.V.A.:</strong> ${presupuesto.destinatario_condicion_iva || "—"}</p>
+            <p><strong>CUIT N°:</strong> ${presupuesto.destinatario_cuit || "—"}</p>
         </div>
 
         <!-- TABLA DE ITEMS -->
@@ -341,61 +285,28 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
                 <tr>
                     <th class="center" style="width: 70px;">CANT.</th>
                     <th>DESCRIPCION</th>
-                    <th class="right" style="width: 120px;">PRECIO</th>
+                    <th class="right" style="width: 120px;">IMPORTE</th>
                 </tr>
             </thead>
             <tbody>
-                ${servicios.length > 0 ? `
-                    <tr class="section-separator"><td colspan="3">— Servicios Prestados —</td></tr>
-                    ${serviciosHTML}
-                ` : factura.descripcion ? `
-                    <tr class="section-separator"><td colspan="3">— Trabajo Realizado —</td></tr>
-                    <tr>
-                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
-                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura.descripcion}</td>
-                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>
-                    </tr>
-                ` : ''}
-                ${insumos.length > 0 ? `
-                    <tr class="section-separator"><td colspan="3">— Insumos Utilizados —</td></tr>
-                    ${insumosHTML}
-                ` : ''}
-                ${servicios.length === 0 && !factura.descripcion && insumos.length === 0 ? '<tr><td colspan="3" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>' : ''}
+                ${itemsHTML || '<tr><td colspan="3" style="padding:20px; text-align:center; color:#999;">Sin ítems</td></tr>'}
                 <tr><td colspan="3" class="items-body-spacer"></td></tr>
             </tbody>
         </table>
 
+        <!-- LEYENDAS -->
+        <div class="leyendas">
+            <p>VALIDEZ DE LA OFERTA ${presupuesto.validez_dias} DIAS</p>
+            ${presupuesto.condicion_pago ? `<p>${presupuesto.condicion_pago}</p>` : ""}
+        </div>
+
         <!-- TOTALES -->
         <div class="totals-row">
             <div class="totals-box">
-                ${servicios.length > 0 ? `<div class="total-line"><span>Subtotal Servicios: $</span><span>${fmtAmt(totalServicios)}</span></div>` : ''}
-                ${insumos.length > 0 ? `<div class="total-line"><span>Subtotal Insumos: $</span><span>${fmtAmt(totalInsumos)}</span></div>` : ''}
-                ${tipoDescuento === 'PORCENTAJE' ? `
-                <div class="total-line" style="color:#92400e;border-top:1px solid #ddd;">
-                    <span>BONIFICACION ${descuentoPct}%:</span>
-                    <span>- $ ${fmtAmt(descuentoMonto)}</span>
-                </div>` : ''}
-                ${tipoDescuento === 'EQUIPO' ? `
-                <div class="total-line" style="color:#92400e;border-top:1px solid #ddd;">
-                    <span>MENOS: EQUIPO EN PARTE DE PAGO:</span>
-                    <span>- $ ${fmtAmt(descuentoMonto)}</span>
-                </div>
-                ${equipoDesc ? `<div class="total-line" style="padding:2px 15px 6px;border-bottom:1px solid #ddd;"><span style="font-size:9px;color:#555;font-style:italic;">${equipoDesc}</span><span></span></div>` : ''}` : ''}
-                ${tipoDescuento ? `
-                <div class="total-line">
-                    <span>Neto Gravado: $</span>
-                    <span>${fmtAmt(netoGravado)}</span>
-                </div>
-                ${alicuotaIva > 0 ? `<div class="total-line"><span>IVA ${alicuotaIva}%: $</span><span>${fmtAmt(montoIvaCalc)}</span></div>` : ''}` : ''}
-                <div class="total-line grand"><span>Total: $</span><span>${fmtAmt(montoTotal)}</span></div>
+                <div class="total-line"><span>Subtotal: $</span><span>${formatMoney(presupuesto.subtotal)}</span></div>
+                <div class="total-line"><span>I.V.A. ${presupuesto.alicuota_iva}%: $</span><span>${formatMoney(presupuesto.monto_iva)}</span></div>
+                <div class="total-line grand"><span>Total: $</span><span>${formatMoney(presupuesto.total)}</span></div>
             </div>
-        </div>
-
-        <!-- FIRMA TECNICO -->
-        <div class="firma-section">
-            <p>HERNAN BRUNAS</p>
-            <p>TEC. EN REFRIGERACION</p>
-            <p>S&amp;B SERVICIOS SRL</p>
         </div>
 
         <!-- FOOTER -->
@@ -407,7 +318,6 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
 </body>
 </html>`;
 
-        // Iframe technique — open, render, auto-print
         const iframe = document.createElement("iframe");
         iframe.style.position = "fixed";
         iframe.style.width = "0";
@@ -424,7 +334,6 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
             iframe.onload = () => {
                 setTimeout(() => {
                     iframe.contentWindow?.print();
-                    // Cleanup after dialog closes
                     setTimeout(() => {
                         document.body.removeChild(iframe);
                     }, 1000);
@@ -436,7 +345,7 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
     return (
         <button
             onClick={handleImprimir}
-            title="Imprimir Comprobante"
+            title="Imprimir Presupuesto"
             className="hover:text-blue-600 transition"
         >
             <i className="fas fa-print"></i>

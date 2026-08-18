@@ -17,6 +17,7 @@ export default async function ReportesPage({
     let totalIngresos = 0;
     let totalEgresos = 0;
     let balanceGeneral = 0;
+    let totalFacturado = 0;
     let ordenesFinalizadas: any[] = [];
 
     if (tipoReporte === "servicios") {
@@ -27,6 +28,7 @@ export default async function ReportesPage({
         totalIngresos = res.totalIngresos;
         totalEgresos = res.totalEgresos;
         balanceGeneral = res.balanceGeneral;
+        totalFacturado = res.totalFacturado;
     }
 
     const formatCurrency = (value: number) => 
@@ -96,9 +98,9 @@ export default async function ReportesPage({
 
             {/* Resume Cards (Solo para ingresos-egresos) */}
             {tipoReporte === "ingresos-egresos" && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-green-500">
-                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Total Ingresos</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Total Ingresos (Cobrado)</p>
                         <p className="text-3xl font-bold text-slate-800">{formatCurrency(totalIngresos)}</p>
                     </div>
                     <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-red-500">
@@ -108,6 +110,10 @@ export default async function ReportesPage({
                     <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-sky-500">
                         <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Balance General</p>
                         <p className="text-3xl font-bold text-slate-800">{formatCurrency(balanceGeneral)}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-amber-500">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Total Facturado (Emitido)</p>
+                        <p className="text-3xl font-bold text-slate-800">{formatCurrency(totalFacturado)}</p>
                     </div>
                 </div>
             )}

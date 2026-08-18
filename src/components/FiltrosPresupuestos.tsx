@@ -3,41 +3,34 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
-export default function FiltrosFacturacion() {
+export default function FiltrosPresupuestos() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Leemos los valores actuales de la URL
     const inicialFechaInicio = searchParams.get("fechaInicio") || "";
     const inicialFechaFin = searchParams.get("fechaFin") || "";
-    const inicialCliente = searchParams.get("cliente") || "";
     const inicialEstado = searchParams.get("estado") || "";
-    const inicialConSaldo = searchParams.get("conSaldo") === "1";
 
     const [fechaInicio, setFechaInicio] = useState(inicialFechaInicio);
     const [fechaFin, setFechaFin] = useState(inicialFechaFin);
-    const [cliente, setCliente] = useState(inicialCliente);
     const [estado, setEstado] = useState(inicialEstado);
-    const [conSaldo, setConSaldo] = useState(inicialConSaldo);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             const params = new URLSearchParams();
             if (fechaInicio) params.set("fechaInicio", fechaInicio);
             if (fechaFin) params.set("fechaFin", fechaFin);
-            if (cliente.trim()) params.set("cliente", cliente.trim());
             if (estado) params.set("estado", estado);
-            if (conSaldo) params.set("conSaldo", "1");
 
             const newQueryString = params.toString();
 
             if (newQueryString !== searchParams.toString()) {
-                router.push(`/facturacion?${newQueryString}`);
+                router.push(`/presupuestos?${newQueryString}`);
             }
         }, 400);
 
         return () => clearTimeout(timer);
-    }, [fechaInicio, fechaFin, cliente, estado, conSaldo, router, searchParams]);
+    }, [fechaInicio, fechaFin, estado, router, searchParams]);
 
     return (
         <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black items-center">
@@ -48,21 +41,13 @@ export default function FiltrosFacturacion() {
                 onChange={(e) => setFechaInicio(e.target.value)}
                 className="border p-2 rounded w-1/5 outline-none focus:border-blue-500 text-sm text-gray-600"
             />
-            
+
             <input
                 type="date"
                 title="Fecha Fin"
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
                 className="border p-2 rounded w-1/5 outline-none focus:border-blue-500 text-sm text-gray-600"
-            />
-            
-            <input
-                type="text"
-                placeholder="Cliente..."
-                value={cliente}
-                onChange={(e) => setCliente(e.target.value)}
-                className="border p-2 rounded flex-1 outline-none focus:border-blue-500"
             />
 
             <select
@@ -71,30 +56,17 @@ export default function FiltrosFacturacion() {
                 className="border p-2 rounded w-1/4 outline-none focus:border-blue-500"
             >
                 <option value="">Todos los Estados</option>
-                <option value="IMPAGA">IMPAGA</option>
-                <option value="PARCIAL">PARCIAL</option>
-                <option value="PAGADA">PAGADA</option>
-                <option value="ANULADA">ANULADA</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="ACEPTADO">ACEPTADO</option>
+                <option value="RECHAZADO">RECHAZADO</option>
             </select>
 
-            <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
-                <input
-                    type="checkbox"
-                    checked={conSaldo}
-                    onChange={(e) => setConSaldo(e.target.checked)}
-                    className="accent-blue-600"
-                />
-                Solo con saldo
-            </label>
-
-            {(fechaInicio || fechaFin || cliente || estado || conSaldo) && (
+            {(fechaInicio || fechaFin || estado) && (
                 <button
                     onClick={() => {
                         setFechaInicio("");
                         setFechaFin("");
-                        setCliente("");
                         setEstado("");
-                        setConSaldo(false);
                     }}
                     className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded hover:bg-red-100 transition text-sm flex items-center gap-2"
                     title="Limpiar todos los filtros"

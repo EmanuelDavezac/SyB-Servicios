@@ -1,6 +1,8 @@
 import { getFacturas, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
+import { obtenerClientesConDeuda } from "@/actions/cobros";
 import FiltrosFacturacion from "@/components/FiltrosFacturacion";
 import ModalFactura from "@/components/ModalFactura";
+import ModalCobro from "@/components/ModalCobro";
 import BotonImprimirFactura from "@/components/BotonImprimirFactura";
 
 export default async function FacturacionPage({
@@ -14,9 +16,13 @@ export default async function FacturacionPage({
     const fechaFinStr = typeof params.fechaFin === "string" ? params.fechaFin : "";
     const filtroCliente = typeof params.cliente === "string" ? params.cliente.toLowerCase() : "";
     const filtroEstado = typeof params.estado === "string" ? params.estado.toUpperCase() : "";
+    const soloConSaldo = params.conSaldo === "1";
 
-    const facturasOriginales = await getFacturas();
-    const ordenesPendientes = await getOrdenesPendientesFacturacion();
+    const [facturasOriginales, ordenesPendientes, clientesConDeuda] = await Promise.all([
+        getFacturas(),
+        getOrdenesPendientesFacturacion(),
+        obtenerClientesConDeuda(),
+    ]);
 
     // Filtramos en memoria (o podrías pasarlo a Prisma)
     const facturas = facturasOriginales.filter((f: any) => {
@@ -43,6 +49,10 @@ export default async function FacturacionPage({
             if (f.estado_pago !== filtroEstado) coincide = false;
         }
 
+        if (soloConSaldo) {
+            if (!(Number(f.saldo_pendiente) > 0)) coincide = false;
+        }
+
         return coincide;
     });
 
@@ -63,17 +73,21 @@ export default async function FacturacionPage({
         <div className="p-8 pb-20 font-sans max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Facturación</h1>
-                <ModalFactura ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />
+                <div className="flex gap-3">
+                    <ModalCobro clientes={clientesConDeuda} />
+                    <ModalFactura ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />
+                </div>
             </div>
 
             <FiltrosFacturacion />
 
             <div className="bg-white rounded shadow text-black overflow-hidden">
-                <div className="grid grid-cols-6 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                <div className="grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                     <div>Fecha / Venc.</div>
                     <div>Comprobante</div>
                     <div>Cliente</div>
-                    <div>Importe Total</div>
+                    <div>Total</div>
+                    <div>Saldo</div>
                     <div>Estado</div>
                     <div className="text-right">Acciones</div>
                 </div>
@@ -93,8 +107,7 @@ export default async function FacturacionPage({
                         switch (factura.estado_pago) {
                             case "PAGADA": badgeColor = "bg-green-100 text-green-800 border border-green-200"; break;
                             case "IMPAGA": badgeColor = "bg-red-100 text-red-800 border border-red-200"; break;
-                            case "PENDIENTE": badgeColor = "bg-yellow-100 text-yellow-800 border border-yellow-200"; break;
-                            case "ENTREGADO": badgeColor = "bg-blue-100 text-blue-800 border border-blue-200"; break;
+                            case "PARCIAL": badgeColor = "bg-yellow-100 text-yellow-800 border border-yellow-200"; break;
                             case "ANULADA": badgeColor = "bg-gray-200 text-gray-500 border border-gray-300"; break;
                         }
 
@@ -109,7 +122,7 @@ export default async function FacturacionPage({
                         }
 
                         return (
-                            <div key={factura.id_factura} className="grid grid-cols-6 items-center p-4 border-b hover:bg-gray-50 text-sm">
+                            <div key={factura.id_factura} className="grid grid-cols-7 items-center p-4 border-b hover:bg-gray-50 text-sm">
                                 <div>
                                     <div className="text-gray-900">{formatDate(factura.fecha_emision)}</div>
                                     {vencioTag || <div className="text-xs text-gray-400 mt-1">{factura.fecha_vencimiento ? `Vence ${formatDate(factura.fecha_vencimiento)}` : ""}</div>}
@@ -118,6 +131,9 @@ export default async function FacturacionPage({
                                 <div className="text-gray-600">{nombreCliente}</div>
                                 <div className="font-bold text-blue-800">
                                     {factura.monto_total ? formatCurrency(parseFloat(factura.monto_total)) : "-"}
+                                </div>
+                                <div className="font-bold text-red-700">
+                                    {factura.saldo_pendiente ? formatCurrency(parseFloat(factura.saldo_pendiente)) : formatCurrency(0)}
                                 </div>
                                 <div>
                                     <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
