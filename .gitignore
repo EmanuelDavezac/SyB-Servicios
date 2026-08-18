@@ -41,5 +41,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma generated client (no usado: la app resuelve @prisma/client desde node_modules/.prisma/client)
+/generated/
+
 # carpeta huérfana con permisos rotos (no se pudo mover ni borrar, ver notas del proyecto)
 /sistema-refrigeracion/
