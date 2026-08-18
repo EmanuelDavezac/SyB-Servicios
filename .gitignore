@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# carpeta huérfana con permisos rotos (no se pudo mover ni borrar, ver notas del proyecto)
+/sistema-refrigeracion/
