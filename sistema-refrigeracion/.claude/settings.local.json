@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npx tsx -e ' *)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

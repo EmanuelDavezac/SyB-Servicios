@@ -2,13 +2,31 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { crearCliente } from "@/actions/clientes";
+import { crearCliente, actualizarCliente } from "@/actions/clientes";
 
-export default function ModalCliente() {
+interface ClienteExistente {
+    id_cliente: number;
+    nombre: string;
+    apellido: string;
+    cuit: string | null;
+    telefono: string | null;
+    email: string | null;
+    calle: string | null;
+    num_calle: number | null;
+    localidad: string | null;
+}
+
+interface Props {
+    cliente?: ClienteExistente;
+}
+
+export default function ModalCliente({ cliente }: Props) {
+    const esEdicion = !!cliente;
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errores, setErrores] = useState<{ cuit?: string; telefono?: string; email?: string }>({});
 
     /* campos del formulario */
     const [nombre, setNombre] = useState("");
@@ -18,19 +36,22 @@ export default function ModalCliente() {
     const [email, setEmail] = useState("");
     const [calle, setCalle] = useState("");
     const [numCalle, setNumCalle] = useState("");
+    const [localidad, setLocalidad] = useState("");
 
     useEffect(() => { setMounted(true); }, []);
 
     function handleAbrir() {
-        /* resetear el form cada vez que se abre */
-        setNombre("");
-        setApellido("");
-        setCuit("");
-        setTelefono("");
-        setEmail("");
-        setCalle("");
-        setNumCalle("");
+        /* precargar datos del cliente si es edición, resetear si es alta */
+        setNombre(cliente?.nombre ?? "");
+        setApellido(cliente?.apellido ?? "");
+        setCuit(cliente?.cuit ?? "");
+        setTelefono(cliente?.telefono ?? "");
+        setEmail(cliente?.email ?? "");
+        setCalle(cliente?.calle ?? "");
+        setNumCalle(cliente?.num_calle != null ? String(cliente.num_calle) : "");
+        setLocalidad(cliente?.localidad ?? "");
         setError(null);
+        setErrores({});
         setIsOpen(true);
     }
 
@@ -41,10 +62,20 @@ export default function ModalCliente() {
             return;
         }
 
+        const nuevosErrores: typeof errores = {};
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            nuevosErrores.email = "El email no tiene un formato válido.";
+        }
+        if (Object.keys(nuevosErrores).length > 0) {
+            setErrores(nuevosErrores);
+            return;
+        }
+
         setLoading(true);
         setError(null);
+        setErrores({});
 
-        const res = await crearCliente({
+        const datos = {
             nombre: nombre.trim(),
             apellido: apellido.trim(),
             cuit: cuit.trim() || undefined,
@@ -52,7 +83,12 @@ export default function ModalCliente() {
             email: email.trim() || undefined,
             calle: calle.trim() || undefined,
             num_calle: numCalle ? parseInt(numCalle) : undefined,
-        });
+            localidad: localidad.trim() || undefined,
+        };
+
+        const res = esEdicion
+            ? await actualizarCliente(cliente.id_cliente, datos)
+            : await crearCliente(datos);
 
         setLoading(false);
 
@@ -72,7 +108,7 @@ export default function ModalCliente() {
 
                 {/* Header */}
                 <div className="modal-header">
-                    <h3 className="text-xl font-bold">Alta de Cliente</h3>
+                    <h3 className="text-xl font-bold">{esEdicion ? "Editar Cliente" : "Alta de Cliente"}</h3>
                     <button
                         type="button"
                         onClick={() => setIsOpen(false)}
@@ -123,7 +159,10 @@ export default function ModalCliente() {
                                     <input
                                         type="text"
                                         value={cuit}
-                                        onChange={(e) => setCuit(e.target.value)}
+                                        onChange={(e) => {
+                                            setCuit(e.target.value.replace(/[^\d\-]/g, '').slice(0, 20));
+                                            setErrores((prev) => ({ ...prev, cuit: undefined }));
+                                        }}
                                         placeholder="Ej: 20-12345678-9"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
@@ -133,7 +172,10 @@ export default function ModalCliente() {
                                     <input
                                         type="text"
                                         value={telefono}
-                                        onChange={(e) => setTelefono(e.target.value)}
+                                        onChange={(e) => {
+                                            setTelefono(e.target.value.replace(/[^\d\s\-\+\(\)]/g, '').slice(0, 20));
+                                            setErrores((prev) => ({ ...prev, telefono: undefined }));
+                                        }}
                                         placeholder="Ej: 351 123-4567"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
@@ -141,12 +183,16 @@ export default function ModalCliente() {
                                 <div className="col-span-2">
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
                                     <input
-                                        type="email"
+                                        type="text"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value);
+                                            setErrores((prev) => ({ ...prev, email: undefined }));
+                                        }}
                                         placeholder="Ej: juan@mail.com"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.email ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
+                                    {errores.email && <p className="text-red-500 text-xs mt-1">{errores.email}</p>}
                                 </div>
                             </div>
                         </section>
@@ -175,6 +221,16 @@ export default function ModalCliente() {
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
                                 </div>
+                                <div className="col-span-3">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Localidad</label>
+                                    <input
+                                        type="text"
+                                        value={localidad}
+                                        onChange={(e) => setLocalidad(e.target.value)}
+                                        placeholder="Ej: Recreo, Santa Fe"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                    />
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -198,6 +254,8 @@ export default function ModalCliente() {
                                     <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
                                     Guardando...
                                 </span>
+                            ) : esEdicion ? (
+                                "Guardar Cambios"
                             ) : (
                                 "Guardar Cliente"
                             )}
@@ -210,12 +268,22 @@ export default function ModalCliente() {
 
     return (
         <>
-            <button
-                onClick={handleAbrir}
-                className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition"
-            >
-                + Nuevo Cliente
-            </button>
+            {esEdicion ? (
+                <button
+                    onClick={handleAbrir}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Editar"
+                >
+                    <i className="fas fa-edit" />
+                </button>
+            ) : (
+                <button
+                    onClick={handleAbrir}
+                    className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition"
+                >
+                    + Nuevo Cliente
+                </button>
+            )}
             {isOpen && mounted && createPortal(modal, document.body)}
         </>
     );

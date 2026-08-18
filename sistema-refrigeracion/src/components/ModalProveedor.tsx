@@ -24,6 +24,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [errores, setErrores] = useState<{ email?: string }>({});
 
     const [razonSocial, setRazonSocial] = useState(proveedorInicial?.razon_social ?? "");
     const [nombreProveedor, setNombreProveedor] = useState(proveedorInicial?.nombre_proveedor ?? "");
@@ -46,6 +47,12 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
 
     async function handleGuardar() {
         if (!razonSocial.trim()) return;
+
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            setErrores({ email: "El email no tiene un formato válido." });
+            return;
+        }
+        setErrores({});
         setCargando(true);
 
         const datos = {
@@ -141,7 +148,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                                 <input
                                     type="text"
                                     value={cuit}
-                                    onChange={(e) => setCuit(e.target.value.replace(/\D/g, ''))}
+                                    onChange={(e) => setCuit(e.target.value.replace(/\D/g, '').slice(0, 11))}
                                     placeholder="Ej: 30123456789"
                                     className={inputCls}
                                 />
@@ -151,7 +158,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                                 <input
                                     type="text"
                                     value={telefono}
-                                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ''))}
+                                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 20))}
                                     placeholder="Ej: 3511234567"
                                     className={inputCls}
                                 />
@@ -159,12 +166,16 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                             <div className="col-span-2">
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
                                 <input
-                                    type="email"
+                                    type="text"
                                     value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    onChange={(e) => {
+                                        setEmail(e.target.value);
+                                        setErrores({});
+                                    }}
                                     placeholder="Ej: ventas@distribuidora.com"
-                                    className={inputCls}
+                                    className={`${inputCls} ${errores.email ? "border-red-400 ring-1 ring-red-400" : ""}`}
                                 />
+                                {errores.email && <p className="text-red-500 text-xs mt-1">{errores.email}</p>}
                             </div>
                         </div>
                     </section>

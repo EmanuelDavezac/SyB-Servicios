@@ -32,6 +32,7 @@ export async function crearCliente(datos: {
     email?: string;
     calle?: string;
     num_calle?: number;
+    localidad?: string;
 }) {
     try {
         const nuevoCliente = await prisma.cliente.create({
@@ -43,6 +44,7 @@ export async function crearCliente(datos: {
                 email: datos.email || null,
                 calle: datos.calle || null,
                 num_calle: datos.num_calle ?? null,
+                localidad: datos.localidad || null,
             },
         });
 
@@ -53,6 +55,40 @@ export async function crearCliente(datos: {
     } catch (error) {
         console.error("Error al crear cliente:", error);
         return { success: false, error: "No se pudo crear el cliente" };
+    }
+}
+
+export async function actualizarCliente(id_cliente: number, datos: {
+    nombre: string;
+    apellido: string;
+    cuit?: string;
+    telefono?: string;
+    email?: string;
+    calle?: string;
+    num_calle?: number;
+    localidad?: string;
+}) {
+    try {
+        const cliente = await prisma.cliente.update({
+            where: { id_cliente },
+            data: {
+                nombre: datos.nombre,
+                apellido: datos.apellido,
+                cuit: datos.cuit || null,
+                telefono: datos.telefono || null,
+                email: datos.email || null,
+                calle: datos.calle || null,
+                num_calle: datos.num_calle ?? null,
+                localidad: datos.localidad || null,
+            },
+        });
+
+        revalidatePath("/clientes");
+        return { success: true, cliente };
+
+    } catch (error) {
+        console.error("Error al actualizar cliente:", error);
+        return { success: false, error: "No se pudo actualizar el cliente" };
     }
 }
 

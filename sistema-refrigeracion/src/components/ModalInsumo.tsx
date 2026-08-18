@@ -49,9 +49,8 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
         const estadoValue = formData.get("estado");
         const estado = estadoValue === "true";
 
-        // Como la base de datos EXIGE precios, los mandamos en 0 por defecto de forma invisible
-        const precio_costo = insumoAEditar?.precio_costo ? Number(insumoAEditar.precio_costo) : 0;
-        const precio_venta = insumoAEditar?.precio_venta ? Number(insumoAEditar.precio_venta) : 0;
+        const precio_costo = Number(formData.get("precio_costo")) || 0;
+        const precio_venta = Number(formData.get("precio_venta")) || 0;
 
         let res;
         if (esEdicion && insumoAEditar) {
@@ -121,7 +120,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Unidad (ej. Metros, Kg)</label>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Unidad (ej. Metro, Kg, Unidad)</label>
                                         <input
                                             name="descripcion"
                                             type="text"
@@ -149,6 +148,44 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                             </div>
                         </section>
 
+                        {/* ── Precios ── */}
+                        <section>
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                                Precio por unidad de medida
+                            </h4>
+                            <p className="text-xs text-gray-400 mb-3">
+                                Si la unidad es metro o kilogramo, cargá el precio de 1 metro/kilo. Al usar menos de 1 en una orden, el precio se calcula proporcionalmente.
+                            </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Precio Costo *</label>
+                                    <input
+                                        name="precio_costo"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        defaultValue={insumoAEditar?.precio_costo ?? ""}
+                                        placeholder="0.00"
+                                        className={inputCls}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Precio Venta *</label>
+                                    <input
+                                        name="precio_venta"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        defaultValue={insumoAEditar?.precio_venta ?? ""}
+                                        placeholder="0.00"
+                                        className={inputCls}
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
                         {/* ── Stock ── */}
                         <section>
                             <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
@@ -160,6 +197,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                                     <input
                                         name="stock_actual"
                                         type="number"
+                                        step="0.001"
                                         required
                                         defaultValue={insumoAEditar?.stock_actual ?? ""}
                                         placeholder="0"
@@ -171,6 +209,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                                     <input
                                         name="stock_minimo"
                                         type="number"
+                                        step="0.001"
                                         required
                                         defaultValue={insumoAEditar?.stock_minimo ?? ""}
                                         placeholder="0"

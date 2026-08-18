@@ -73,9 +73,7 @@ export default async function ClientesPage() {
                                     </td>
                                     <td className="p-4 text-center">
                                         <div className="flex justify-center items-center gap-2">
-                                            <button className="text-blue-600 hover:text-blue-800 transition-colors" title="Editar">
-                                                <i className="fas fa-edit" />
-                                            </button>
+                                            <ModalCliente cliente={cliente} />
                                             <BotonEliminarCliente
                                                 idCliente={cliente.id_cliente}
                                                 nombreCliente={`${cliente.nombre} ${cliente.apellido}`}
