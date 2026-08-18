@@ -7,6 +7,7 @@ import {
     editarOrden,
     agregarServicioAOrden,
     crearServicioYAgregarAOrden,
+    agregarServicioLibreAOrden,
     quitarServicioDeOrden,
     obtenerServiciosDeOrden,
     agregarInsumoAOrden,
@@ -38,12 +39,14 @@ interface DetalleServicio {
     cantidad: number;
     precio_acordado: number | string;
     servicio: { nombre: string } | null;
+    descripcion_libre: string | null;
 }
 
 /** Servicio pendiente de guardar (modo nueva orden) */
 type ServicioPendiente =
     | { _tmpId: string; tipo: "existente"; id_servicio: number; nombre: string; cantidad: number; precio_acordado: number }
-    | { _tmpId: string; tipo: "nuevo"; nombre: string; descripcion?: string; precio: number; cantidad: number };
+    | { _tmpId: string; tipo: "nuevo"; nombre: string; descripcion?: string; precio: number; cantidad: number }
+    | { _tmpId: string; tipo: "libre"; descripcion_libre: string; cantidad: number; precio_acordado: number };
 
 /** Insumo del catálogo */
 interface InsumoCatalogo {
@@ -92,6 +95,8 @@ const fmtMoney = (n: number | string) =>
 let tmpCounter = 0;
 const tmpId = () => `tmp-${++tmpCounter}`;
 
+type ModoPanel = "existente" | "libre" | "nuevo";
+
 /* ─── componente ─────────────────────────────────────────────── */
 export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const modoEdicion = !!ordenInicial;
@@ -122,16 +127,20 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     /* panel de agregar */
     const [panelAbierto, setPanelAbierto] = useState(false);
-    const [modoNuevo, setModoNuevo] = useState(false);
+    const [modoPanel, setModoPanel] = useState<ModoPanel>("existente");
     /* campos seleccionar existente */
     const [srvSeleccionado, setSrvSeleccionado] = useState("");
     const [cantExistente, setCantExistente] = useState("1");
     const [precioExistente, setPrecioExistente] = useState("");
-    /* campos crear nuevo */
+    /* campos crear nuevo (catálogo) */
     const [nuevoNombre, setNuevoNombre] = useState("");
     const [nuevaDesc, setNuevaDesc] = useState("");
     const [nuevoPrecio, setNuevoPrecio] = useState("");
     const [nuevaCant, setNuevaCant] = useState("1");
+    /* campos descripcion libre */
+    const [libreDesc, setLibreDesc] = useState("");
+    const [librePrecio, setLibrePrecio] = useState("");
+    const [libreCant, setLibreCant] = useState("1");
 
     const [agregando, setAgregando] = useState(false);
     const [errSrv, setErrSrv] = useState<string | null>(null);
@@ -183,7 +192,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     function resetPanel() {
         setPanelAbierto(false);
-        setModoNuevo(false);
+        setModoPanel("existente");
         setSrvSeleccionado("");
         setCantExistente("1");
         setPrecioExistente("");
@@ -191,6 +200,9 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setNuevaDesc("");
         setNuevoPrecio("");
         setNuevaCant("1");
+        setLibreDesc("");
+        setLibrePrecio("");
+        setLibreCant("1");
         setErrSrv(null);
     }
 
@@ -213,7 +225,6 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setCargando(true);
 
         if (modoEdicion && ordenInicial) {
-            /* ── modo edición: solo actualiza campos de la orden ── */
             const res = await editarOrden(ordenInicial.id_orden, {
                 id_cliente: Number(idCliente),
                 estado_trabajo: estadoTrabajo,
@@ -222,10 +233,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             setCargando(false);
             if (res.success) {
                 setAbierto(false);
-            }
-            else alert("Error al guardar los cambios. Intentá de nuevo.");
+            } else alert("Error al guardar los cambios. Intentá de nuevo.");
         } else {
-            /* ── modo nueva: crear orden y luego guardar servicios pendientes ── */
             const res = await crearOrden({
                 id_cliente: Number(idCliente),
                 estado_trabajo: estadoTrabajo,
@@ -240,7 +249,6 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
             const id_orden = res.orden.id_orden;
 
-            /* guardar cada servicio pendiente */
             for (const srv of serviciosPendientes) {
                 if (srv.tipo === "existente") {
                     await agregarServicioAOrden({
@@ -249,7 +257,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         cantidad: srv.cantidad,
                         precio_acordado: srv.precio_acordado,
                     });
-                } else {
+                } else if (srv.tipo === "nuevo") {
                     await crearServicioYAgregarAOrden({
                         id_orden,
                         nombre: srv.nombre,
@@ -257,10 +265,16 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         precio: srv.precio,
                         cantidad: srv.cantidad,
                     });
+                } else {
+                    await agregarServicioLibreAOrden({
+                        id_orden,
+                        descripcion_libre: srv.descripcion_libre,
+                        cantidad: srv.cantidad,
+                        precio_acordado: srv.precio_acordado,
+                    });
                 }
             }
 
-            /* guardar cada insumo pendiente (sin descontar stock) */
             for (const ins of insumosPendientes) {
                 await agregarInsumoAOrden({
                     id_orden,
@@ -280,10 +294,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         }
     }
 
-
-    /* ── Agregar servicio existente ──
-       En modo edición → guarda en BD al instante.
-       En modo nuevo   → agrega al estado local pendiente. */
+    /* ── Agregar servicio del catálogo ── */
     async function handleAgregarExistente() {
         if (!srvSeleccionado) { setErrSrv("Seleccioná un servicio."); return; }
         const cantidad = parseInt(cantExistente) || 1;
@@ -306,7 +317,6 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             } else setErrSrv(res.error || "Error al agregar.");
             setAgregando(false);
         } else {
-            /* modo nueva orden: solo acumular en estado local */
             setServiciosPendientes((prev) => [
                 ...prev,
                 { _tmpId: tmpId(), tipo: "existente", id_servicio: srv.id_servicio, nombre: srv.nombre, cantidad, precio_acordado: precio },
@@ -315,9 +325,36 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         }
     }
 
-    /* ── Crear nuevo servicio ──
-       En modo edición → guarda en BD al instante.
-       En modo nuevo   → agrega al estado local pendiente. */
+    /* ── Agregar descripcion libre (sin catálogo) ── */
+    async function handleAgregarLibre() {
+        if (!libreDesc.trim()) { setErrSrv("Describí qué se hizo."); return; }
+        const precio = parseFloat(librePrecio);
+        if (isNaN(precio) || precio < 0) { setErrSrv("El precio no es válido."); return; }
+        const cantidad = parseInt(libreCant) || 1;
+
+        if (modoEdicion && ordenInicial) {
+            setAgregando(true); setErrSrv(null);
+            const res = await agregarServicioLibreAOrden({
+                id_orden: ordenInicial.id_orden,
+                descripcion_libre: libreDesc.trim(),
+                cantidad,
+                precio_acordado: precio,
+            });
+            if (res.success) {
+                setServiciosGuardados(await obtenerServiciosDeOrden(ordenInicial.id_orden));
+                resetPanel();
+            } else setErrSrv(res.error || "Error al agregar.");
+            setAgregando(false);
+        } else {
+            setServiciosPendientes((prev) => [
+                ...prev,
+                { _tmpId: tmpId(), tipo: "libre", descripcion_libre: libreDesc.trim(), cantidad, precio_acordado: precio },
+            ]);
+            resetPanel();
+        }
+    }
+
+    /* ── Crear nuevo servicio en catálogo ── */
     async function handleCrearNuevo() {
         if (!nuevoNombre.trim()) { setErrSrv("El nombre es obligatorio."); return; }
         const precio = parseFloat(nuevoPrecio);
@@ -417,26 +454,43 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     }
 
     /* ── Lista unificada para el render ── */
-    const listaDisplay: { key: string; nombre: string; cantidad: number; precio: number | string; pendiente: boolean; item: DetalleServicio | ServicioPendiente }[] = [
+    const listaDisplay: {
+        key: string;
+        nombre: string;
+        cantidad: number;
+        precio: number | string;
+        pendiente: boolean;
+        libre: boolean;
+        item: DetalleServicio | ServicioPendiente;
+    }[] = [
         ...serviciosGuardados.map((d) => ({
             key: `g-${d.id_detalle_srv}`,
-            nombre: d.servicio?.nombre || "Servicio",
+            nombre: d.descripcion_libre || d.servicio?.nombre || "Servicio",
             cantidad: d.cantidad,
             precio: d.precio_acordado,
             pendiente: false,
+            libre: !!d.descripcion_libre,
             item: d,
         })),
         ...serviciosPendientes.map((p) => ({
             key: p._tmpId,
-            nombre: p.nombre,
+            nombre: p.tipo === "libre" ? p.descripcion_libre : p.nombre,
             cantidad: p.cantidad,
-            precio: p.tipo === "existente" ? p.precio_acordado : p.precio,
+            precio: p.tipo === "existente" || p.tipo === "libre" ? p.precio_acordado : p.precio,
             pendiente: true,
+            libre: p.tipo === "libre",
             item: p,
         })),
     ];
 
-    const insumosDisplay: { key: string; nombre: string; cantidad: number; precio: number; pendiente: boolean; item: DetalleInsumo | InsumoPendiente }[] = [
+    const insumosDisplay: {
+        key: string;
+        nombre: string;
+        cantidad: number;
+        precio: number;
+        pendiente: boolean;
+        item: DetalleInsumo | InsumoPendiente;
+    }[] = [
         ...insumosGuardados.map((d) => ({
             key: `gi-${d.id_detalle_ord_insumo}`,
             nombre: d.insumo?.nombre || "Insumo",
@@ -454,6 +508,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             item: p,
         })),
     ];
+
+    const tabCls = (active: boolean) =>
+        `px-4 py-1.5 rounded-full transition text-xs font-bold ${
+            active ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"
+        }`;
 
     /* ── Modal content ── */
     const modalContent = (
@@ -530,27 +589,32 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             </button>
                         </div>
 
-                        {/* Contenido de servicios */}
+                        {/* Lista servicios */}
                         {listaDisplay.length === 0 ? (
                             <p className="text-sm text-gray-400 italic py-2">Sin servicios cargados todavía.</p>
                         ) : (
                             <div className="space-y-2 mb-4">
-                                {listaDisplay.map(({ key, nombre, cantidad, precio, pendiente, item }) => (
+                                {listaDisplay.map(({ key, nombre, cantidad, precio, pendiente, libre, item }) => (
                                     <div
                                         key={key}
                                         className="flex items-center justify-between rounded-lg px-4 py-2 text-sm border border-gray-100 bg-gray-50/50"
                                     >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
                                             {pendiente && (
-                                                <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
                                                     nuevo
                                                 </span>
                                             )}
-                                            <span className="font-medium text-gray-700">
+                                            {libre && !pendiente && (
+                                                <span className="text-[9px] font-bold uppercase text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded shrink-0">
+                                                    libre
+                                                </span>
+                                            )}
+                                            <span className="font-medium text-gray-700 truncate" title={nombre}>
                                                 {nombre}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-gray-500">
+                                        <div className="flex items-center gap-3 text-gray-500 shrink-0">
                                             <span className="text-xs">x{cantidad}</span>
                                             <span className="font-bold text-gray-800">
                                                 {fmtMoney(precio)}
@@ -568,21 +632,19 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             </div>
                         )}
 
-                        {/* Panel agregar (simplificado para match captura) */}
+                        {/* Panel agregar */}
                         {panelAbierto && (
                             <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/30 space-y-4">
-                                <div className="flex gap-2 text-xs font-bold">
-                                    <button
-                                        onClick={() => setModoNuevo(false)}
-                                        className={`px-4 py-1.5 rounded-full transition ${!modoNuevo ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"}`}
-                                    >
-                                        Seleccionar existente
+                                {/* Tabs */}
+                                <div className="flex gap-2 flex-wrap">
+                                    <button onClick={() => setModoPanel("existente")} className={tabCls(modoPanel === "existente")}>
+                                        Del catalogo
                                     </button>
-                                    <button
-                                        onClick={() => setModoNuevo(true)}
-                                        className={`px-4 py-1.5 rounded-full transition ${modoNuevo ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"}`}
-                                    >
-                                        Crear nuevo
+                                    <button onClick={() => setModoPanel("libre")} className={tabCls(modoPanel === "libre")}>
+                                        Solo en esta orden
+                                    </button>
+                                    <button onClick={() => setModoPanel("nuevo")} className={tabCls(modoPanel === "nuevo")}>
+                                        Crear en catalogo
                                     </button>
                                 </div>
 
@@ -590,7 +652,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                     <p className="text-xs text-red-600 font-bold">{errSrv}</p>
                                 )}
 
-                                {!modoNuevo ? (
+                                {/* Tab: del catálogo */}
+                                {modoPanel === "existente" && (
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="col-span-2">
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Servicio *</label>
@@ -615,13 +678,72 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio Unit.</label>
                                             <input type="number" value={precioExistente} onChange={(e) => setPrecioExistente(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
                                         </div>
-                                        <button onClick={handleAgregarExistente} className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700">Agregar Servicio</button>
+                                        <button
+                                            onClick={handleAgregarExistente}
+                                            disabled={agregando}
+                                            className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            {agregando ? "Agregando..." : "Agregar Servicio"}
+                                        </button>
                                     </div>
-                                ) : (
+                                )}
+
+                                {/* Tab: solo en esta orden */}
+                                {modoPanel === "libre" && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                                Que se hizo *
+                                            </label>
+                                            <input
+                                                value={libreDesc}
+                                                onChange={(e) => setLibreDesc(e.target.value)}
+                                                placeholder="Ej: Reparacion compresor split Carrier 3000 frigorias"
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-1">
+                                                Este texto aparece tal cual en el comprobante. No se agrega al catalogo de servicios.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio *</label>
+                                            <input
+                                                type="number"
+                                                value={librePrecio}
+                                                onChange={(e) => setLibrePrecio(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cant.</label>
+                                            <input
+                                                type="number"
+                                                value={libreCant}
+                                                onChange={(e) => setLibreCant(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleAgregarLibre}
+                                            disabled={agregando}
+                                            className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            {agregando ? "Agregando..." : "Agregar"}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Tab: crear en catálogo */}
+                                {modoPanel === "nuevo" && (
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="col-span-2">
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombre *</label>
-                                            <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Ej: Reparación de compresor" />
+                                            <input
+                                                value={nuevoNombre}
+                                                onChange={(e) => setNuevoNombre(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                                placeholder="Ej: Reparación de compresor"
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio *</label>
@@ -631,7 +753,13 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cant.</label>
                                             <input type="number" value={nuevaCant} onChange={(e) => setNuevaCant(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" />
                                         </div>
-                                        <button onClick={handleCrearNuevo} className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700">Crear y Agregar</button>
+                                        <button
+                                            onClick={handleCrearNuevo}
+                                            disabled={agregando}
+                                            className="col-span-2 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            {agregando ? "Creando..." : "Crear y Agregar"}
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -787,4 +915,4 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             />
         </>
     );
-}
+}

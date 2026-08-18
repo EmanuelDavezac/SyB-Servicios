@@ -61,9 +61,37 @@ export async function crearFactura(data: {
   descripcion?: string;
   fecha_vencimiento?: Date;
   insumos?: { id_insumo: number; cantidad: number }[];
+  tipo_descuento?: "PORCENTAJE" | "EQUIPO" | null;
+  descuento_porcentaje?: number | null;
+  descuento_monto_equipo?: number | null;
+  equipo_descripcion?: string | null;
 }) {
   try {
-    const montoTotal = data.neto + data.neto * (data.alicuota_iva / 100);
+    const netoBruto = data.neto;
+
+    let descuentoMonto: number | null = null;
+    if (data.tipo_descuento === "PORCENTAJE") {
+      const pct = data.descuento_porcentaje ?? null;
+      if (pct === null || pct < 0 || pct > 100) {
+        throw new Error("El porcentaje de descuento debe estar entre 0 y 100.");
+      }
+      descuentoMonto = netoBruto * pct / 100;
+    } else if (data.tipo_descuento === "EQUIPO") {
+      if (!data.equipo_descripcion?.trim()) {
+        throw new Error("Debe indicar qué equipo entrega el cliente en parte de pago.");
+      }
+      const imp = data.descuento_monto_equipo ?? null;
+      if (imp === null || imp <= 0) {
+        throw new Error("El importe del equipo debe ser mayor a cero.");
+      }
+      if (imp >= netoBruto) {
+        throw new Error("El descuento no puede igualar o superar el subtotal de la factura.");
+      }
+      descuentoMonto = imp;
+    }
+
+    const netoGravado = netoBruto - (descuentoMonto ?? 0);
+    const montoTotal = netoGravado + netoGravado * (data.alicuota_iva / 100);
 
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
@@ -86,8 +114,12 @@ export async function crearFactura(data: {
           tipo: data.tipo,
           fecha_emision: new Date(),
           fecha_vencimiento: data.fecha_vencimiento,
-          neto: data.neto,
+          neto: netoGravado,
           alicuota_iva: data.alicuota_iva,
+          tipo_descuento: data.tipo_descuento ?? null,
+          descuento_porcentaje: data.tipo_descuento === "PORCENTAJE" ? (data.descuento_porcentaje ?? null) : null,
+          descuento_monto: descuentoMonto,
+          equipo_descripcion: data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
           monto_total: montoTotal,
           saldo_pendiente: montoTotal,
           estado_pago: ESTADOS_FACTURA.IMPAGA,

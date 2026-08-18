@@ -39,7 +39,7 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         let serviciosHTML = "";
         let totalServicios = 0;
         for (const ds of servicios) {
-            const nombre = ds.servicio?.nombre || "Servicio";
+            const nombre = ds.descripcion_libre || ds.servicio?.nombre || "Servicio";
             const cant = ds.cantidad || 1;
             const precio = parseFloat(ds.precio_acordado);
             const subtotal = cant * precio;
@@ -70,6 +70,15 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         }
 
         const montoTotal = parseFloat(factura.monto_total);
+
+        const tipoDescuento: string | null = factura.tipo_descuento || null;
+        const descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
+        const descuentoPct = factura.descuento_porcentaje ? parseFloat(factura.descuento_porcentaje) : 0;
+        const equipoDesc: string = factura.equipo_descripcion || "";
+        const netoGravado = factura.neto ? parseFloat(factura.neto) : 0;
+        const alicuotaIva = factura.alicuota_iva ? parseFloat(factura.alicuota_iva) : 0;
+        const montoIvaCalc = netoGravado * alicuotaIva / 100;
+        const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
         const html = `
 <!DOCTYPE html>
@@ -339,12 +348,19 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
                 ${servicios.length > 0 ? `
                     <tr class="section-separator"><td colspan="3">— Servicios Prestados —</td></tr>
                     ${serviciosHTML}
+                ` : factura.descripcion ? `
+                    <tr class="section-separator"><td colspan="3">— Trabajo Realizado —</td></tr>
+                    <tr>
+                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
+                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura.descripcion}</td>
+                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>
+                    </tr>
                 ` : ''}
                 ${insumos.length > 0 ? `
                     <tr class="section-separator"><td colspan="3">— Insumos Utilizados —</td></tr>
                     ${insumosHTML}
                 ` : ''}
-                ${servicios.length === 0 && insumos.length === 0 ? '<tr><td colspan="3" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>' : ''}
+                ${servicios.length === 0 && !factura.descripcion && insumos.length === 0 ? '<tr><td colspan="3" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>' : ''}
                 <tr><td colspan="3" class="items-body-spacer"></td></tr>
             </tbody>
         </table>
@@ -352,9 +368,26 @@ export default function BotonImprimirFactura({ idFactura }: Props) {
         <!-- TOTALES -->
         <div class="totals-row">
             <div class="totals-box">
-                ${servicios.length > 0 ? `<div class="total-line"><span>Subtotal Servicios: $</span><span>${formatMoney(totalServicios).replace('$', '').replace('ARS', '').trim()}</span></div>` : ''}
-                ${insumos.length > 0 ? `<div class="total-line"><span>Subtotal Insumos: $</span><span>${formatMoney(totalInsumos).replace('$', '').replace('ARS', '').trim()}</span></div>` : ''}
-                <div class="total-line grand"><span>Total: $</span><span>${formatMoney(montoTotal).replace('$', '').replace('ARS', '').trim()}</span></div>
+                ${servicios.length > 0 ? `<div class="total-line"><span>Subtotal Servicios: $</span><span>${fmtAmt(totalServicios)}</span></div>` : ''}
+                ${insumos.length > 0 ? `<div class="total-line"><span>Subtotal Insumos: $</span><span>${fmtAmt(totalInsumos)}</span></div>` : ''}
+                ${tipoDescuento === 'PORCENTAJE' ? `
+                <div class="total-line" style="color:#92400e;border-top:1px solid #ddd;">
+                    <span>BONIFICACION ${descuentoPct}%:</span>
+                    <span>- $ ${fmtAmt(descuentoMonto)}</span>
+                </div>` : ''}
+                ${tipoDescuento === 'EQUIPO' ? `
+                <div class="total-line" style="color:#92400e;border-top:1px solid #ddd;">
+                    <span>MENOS: EQUIPO EN PARTE DE PAGO:</span>
+                    <span>- $ ${fmtAmt(descuentoMonto)}</span>
+                </div>
+                ${equipoDesc ? `<div class="total-line" style="padding:2px 15px 6px;border-bottom:1px solid #ddd;"><span style="font-size:9px;color:#555;font-style:italic;">${equipoDesc}</span><span></span></div>` : ''}` : ''}
+                ${tipoDescuento ? `
+                <div class="total-line">
+                    <span>Neto Gravado: $</span>
+                    <span>${fmtAmt(netoGravado)}</span>
+                </div>
+                ${alicuotaIva > 0 ? `<div class="total-line"><span>IVA ${alicuotaIva}%: $</span><span>${fmtAmt(montoIvaCalc)}</span></div>` : ''}` : ''}
+                <div class="total-line grand"><span>Total: $</span><span>${fmtAmt(montoTotal)}</span></div>
             </div>
         </div>
 
