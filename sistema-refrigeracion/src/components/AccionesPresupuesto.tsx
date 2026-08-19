@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cambiarEstadoPresupuesto, eliminarPresupuesto } from "@/actions/presupuestos";
 import ModalPresupuesto from "@/components/ModalPresupuesto";
 import BotonImprimirPresupuesto from "@/components/BotonImprimirPresupuesto";
+import ModalClienteDesdePresupuesto from "@/components/ModalClienteDesdePresupuesto";
 
 interface PresupuestoParaEditar {
     id_presupuesto: number;
@@ -29,6 +30,7 @@ interface Props {
 export default function AccionesPresupuesto({ presupuesto }: Props) {
     const [editando, setEditando] = useState(false);
     const [procesando, setProcesando] = useState(false);
+    const [ofreciendoAltaCliente, setOfreciendoAltaCliente] = useState(false);
 
     const esPendiente = presupuesto.estado === "PENDIENTE";
 
@@ -38,7 +40,15 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
         setProcesando(true);
         const resultado = await cambiarEstadoPresupuesto(presupuesto.id_presupuesto, estado);
         setProcesando(false);
-        if (!resultado.success) alert(resultado.error || `No se pudo ${verbo} el presupuesto.`);
+        if (!resultado.success) {
+            alert(resultado.error || `No se pudo ${verbo} el presupuesto.`);
+            return;
+        }
+        if (estado === "ACEPTADO" && !presupuesto.id_cliente) {
+            if (confirm("Presupuesto aceptado. ¿Querés agregar el destinatario a tu base de clientes?")) {
+                setOfreciendoAltaCliente(true);
+            }
+        }
     }
 
     async function handleEliminar() {
@@ -97,6 +107,17 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                 <ModalPresupuesto
                     presupuestoAEditar={presupuesto}
                     onCerrar={() => setEditando(false)}
+                />
+            )}
+
+            {ofreciendoAltaCliente && (
+                <ModalClienteDesdePresupuesto
+                    idPresupuesto={presupuesto.id_presupuesto}
+                    destinatarioNombre={presupuesto.destinatario_nombre}
+                    destinatarioCuit={presupuesto.destinatario_cuit}
+                    destinatarioDomicilio={presupuesto.destinatario_domicilio}
+                    destinatarioLocalidad={presupuesto.destinatario_localidad}
+                    onCerrar={() => setOfreciendoAltaCliente(false)}
                 />
             )}
         </div>

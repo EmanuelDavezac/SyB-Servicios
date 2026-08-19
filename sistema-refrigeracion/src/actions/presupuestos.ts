@@ -226,6 +226,20 @@ export async function cambiarEstadoPresupuesto(id_presupuesto: number, estado: "
     }
 }
 
+export async function vincularClienteAPresupuesto(id_presupuesto: number, id_cliente: number) {
+    try {
+        const actualizado = await prisma.presupuesto.update({
+            where: { id_presupuesto },
+            data: { id_cliente },
+        });
+        revalidatePath("/presupuestos");
+        return { success: true, presupuesto: JSON.parse(JSON.stringify(actualizado)) };
+    } catch (error) {
+        console.error("Error linking cliente to presupuesto:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo vincular el cliente al presupuesto" };
+    }
+}
+
 export async function eliminarPresupuesto(id_presupuesto: number) {
     try {
         const actual = await prisma.presupuesto.findUnique({ where: { id_presupuesto } });
@@ -248,26 +262,15 @@ export async function buscarDestinatarios(query: string) {
         if (!query || query.trim().length < 2) return [];
         const texto = query.trim();
 
-        const [clientes, presupuestosPrevios] = await Promise.all([
-            prisma.cliente.findMany({
-                where: {
-                    OR: [
-                        { nombre: { contains: texto, mode: "insensitive" } },
-                        { apellido: { contains: texto, mode: "insensitive" } },
-                    ],
-                },
-                take: 5,
-            }),
-            prisma.presupuesto.findMany({
-                where: {
-                    id_cliente: null,
-                    destinatario_nombre: { contains: texto, mode: "insensitive" },
-                },
-                distinct: ["destinatario_nombre"],
-                take: 5,
-                orderBy: { fecha_emision: "desc" },
-            }),
-        ]);
+        const clientes = await prisma.cliente.findMany({
+            where: {
+                OR: [
+                    { nombre: { contains: texto, mode: "insensitive" } },
+                    { apellido: { contains: texto, mode: "insensitive" } },
+                ],
+            },
+            take: 5,
+        });
 
         const sugerenciasClientes = clientes.map((c) => ({
             id_cliente: c.id_cliente,
@@ -278,16 +281,7 @@ export async function buscarDestinatarios(query: string) {
             condicion_iva: "",
         }));
 
-        const sugerenciasPresupuestos = presupuestosPrevios.map((p) => ({
-            id_cliente: null,
-            nombre: p.destinatario_nombre,
-            cuit: p.destinatario_cuit || "",
-            domicilio: p.destinatario_domicilio || "",
-            localidad: p.destinatario_localidad || "",
-            condicion_iva: p.destinatario_condicion_iva || "",
-        }));
-
-        return JSON.parse(JSON.stringify([...sugerenciasClientes, ...sugerenciasPresupuestos]));
+        return JSON.parse(JSON.stringify(sugerenciasClientes));
     } catch (error) {
         console.error("Error searching destinatarios:", error);
         return [];

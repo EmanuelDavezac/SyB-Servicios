@@ -64,11 +64,6 @@ export default async function PresupuestosPage({
                                 <div className="text-gray-900">{formatDate(p.fecha_emision)}</div>
                                 <div className="text-gray-600">
                                     {p.destinatario_nombre}
-                                    {p.id_cliente && (
-                                        <span className="ml-1.5 text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                                            Cliente
-                                        </span>
-                                    )}
                                 </div>
                                 <div className="font-bold text-blue-800">{formatCurrency(p.total)}</div>
                                 <div>
