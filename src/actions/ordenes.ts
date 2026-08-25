@@ -16,7 +16,10 @@ export async function obtenerOrdenes() {
                         nombre: true,
                         apellido: true,
                     },
-                }
+                },
+                factura: {
+                    select: { id_factura: true },
+                },
             },
         });
 

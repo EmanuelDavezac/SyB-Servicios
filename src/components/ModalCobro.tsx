@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { registrarCobro, obtenerFacturasPendientesCliente } from "@/actions/cobros";
 import { imprimirRecibo } from "@/components/BotonImprimirRecibo";
+import { imprimirComprobante } from "@/components/BotonImprimirFactura";
 
 interface Cliente {
     id_cliente: number;
@@ -13,6 +14,7 @@ interface Cliente {
 interface FacturaPendiente {
     id_factura: number;
     num_factura: string | null;
+    tipo: string | null;
     fecha_emision: string;
     monto_total: number;
     saldo_pendiente: number;
@@ -120,9 +122,16 @@ export default function ModalCobro({ clientes }: Props) {
         setCargando(false);
 
         if (resultado.success) {
+            const facturasPagadas = lineas
+                .map((l) => facturasPendientes.find((f) => f.id_factura === l.id_factura))
+                .filter((f): f is FacturaPendiente => !!f);
+
             setAbierto(false);
             resetForm();
-            if (resultado.recibo?.id_recibo) {
+
+            if (facturasPagadas.length === 1 && facturasPagadas[0].tipo !== "Recibo") {
+                imprimirComprobante(facturasPagadas[0].id_factura);
+            } else if (resultado.recibo?.id_recibo) {
                 imprimirRecibo(resultado.recibo.id_recibo);
             }
         } else {

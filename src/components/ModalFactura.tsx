@@ -49,6 +49,10 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [descuentoImporte, setDescuentoImporte] = useState("");
     const [equipoDescripcion, setEquipoDescripcion] = useState("");
 
+    const esInformeTecnico = tipo === "Informe Tecnico";
+    const mostrarPrecios = !esInformeTecnico;
+    const mostrarInsumosYDescuento = !esInformeTecnico;
+
     const netoBrutoNum = neto ? parseFloat(neto) : 0;
     const descuentoMontoNum =
         tipoDescuento === "PORCENTAJE" && descuentoPorcentaje
@@ -138,19 +142,23 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     }
 
     async function handleGuardar() {
-        if (!idOrden || !tipo || !neto) {
-            setError("Completá la Orden, Tipo y Subtotal antes de guardar.");
+        if (!idOrden || !tipo) {
+            setError("Completá la Orden y el Tipo antes de guardar.");
+            return;
+        }
+        if (mostrarPrecios && !neto) {
+            setError("Completá el Subtotal antes de guardar.");
             return;
         }
 
-        if (tipoDescuento === "PORCENTAJE") {
+        if (mostrarInsumosYDescuento && tipoDescuento === "PORCENTAJE") {
             const pct = parseFloat(descuentoPorcentaje);
             if (!descuentoPorcentaje || isNaN(pct) || pct < 0 || pct > 100) {
                 setError("El porcentaje de descuento debe estar entre 0 y 100.");
                 return;
             }
         }
-        if (tipoDescuento === "EQUIPO") {
+        if (mostrarInsumosYDescuento && tipoDescuento === "EQUIPO") {
             if (!equipoDescripcion.trim()) {
                 setError("Indicá qué equipo entrega el cliente en parte de pago.");
                 return;
@@ -169,22 +177,26 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setCargando(true);
         setError(null);
 
+        const descuentoActivo = mostrarInsumosYDescuento ? tipoDescuento : "";
+
         const resultado = await crearFactura({
             id_orden: Number(idOrden),
             tipo,
             num_factura: `${tipo} ${letraNumero}`.trim(),
-            neto: parseFloat(neto),
-            alicuota_iva: parseFloat(alicuotaIva || "0"),
+            neto: mostrarPrecios ? parseFloat(neto) : 0,
+            alicuota_iva: mostrarPrecios ? parseFloat(alicuotaIva || "0") : 0,
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
-            insumos: insumosSeleccionados.map((i) => ({
-                id_insumo: i.id_insumo,
-                cantidad: i.cantidad,
-            })),
-            tipo_descuento: tipoDescuento ? (tipoDescuento as "PORCENTAJE" | "EQUIPO") : null,
-            descuento_porcentaje: tipoDescuento === "PORCENTAJE" ? parseFloat(descuentoPorcentaje) : null,
-            descuento_monto_equipo: tipoDescuento === "EQUIPO" ? parseFloat(descuentoImporte) : null,
-            equipo_descripcion: tipoDescuento === "EQUIPO" ? equipoDescripcion.trim() : null,
+            insumos: mostrarInsumosYDescuento
+                ? insumosSeleccionados.map((i) => ({
+                    id_insumo: i.id_insumo,
+                    cantidad: i.cantidad,
+                }))
+                : [],
+            tipo_descuento: descuentoActivo ? (descuentoActivo as "PORCENTAJE" | "EQUIPO") : null,
+            descuento_porcentaje: descuentoActivo === "PORCENTAJE" ? parseFloat(descuentoPorcentaje) : null,
+            descuento_monto_equipo: descuentoActivo === "EQUIPO" ? parseFloat(descuentoImporte) : null,
+            equipo_descripcion: descuentoActivo === "EQUIPO" ? equipoDescripcion.trim() : null,
         });
 
         setCargando(false);
@@ -288,6 +300,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         >
                                             <option value="Factura">Factura</option>
                                             <option value="Remito">Remito</option>
+                                            <option value="Informe Tecnico">Informe Técnico</option>
                                         </select>
                                     </div>
                                     <div>
@@ -302,32 +315,36 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Subtotal *
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                                    {mostrarPrecios && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                Subtotal *
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={neto}
+                                                    onChange={(e) => setNeto(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {mostrarPrecios && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                Alícuota IVA (%)
+                                            </label>
                                             <input
                                                 type="number"
-                                                value={neto}
-                                                onChange={(e) => setNeto(e.target.value)}
-                                                placeholder="0.00"
-                                                className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                value={alicuotaIva}
+                                                onChange={(e) => setAlicuotaIva(e.target.value)}
+                                                className={inputCls}
                                             />
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Alícuota IVA (%)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={alicuotaIva}
-                                            onChange={(e) => setAlicuotaIva(e.target.value)}
-                                            className={inputCls}
-                                        />
-                                    </div>
+                                    )}
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
                                             Vencimiento (Opcional)
@@ -339,7 +356,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
-                                    {neto && (
+                                    {mostrarPrecios && neto && (
                                         <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1.5">
                                             <div className="flex justify-between text-blue-700">
                                                 <span>Subtotal</span>
@@ -386,6 +403,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                             </section>
 
                             {/* ── Descuento ── */}
+                            {mostrarInsumosYDescuento && (
                             <section>
                                 <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-3 border-b pb-1">
                                     Descuento
@@ -462,8 +480,10 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </div>
                                 )}
                             </section>
+                            )}
 
                             {/* ── Insumos ── */}
+                            {mostrarInsumosYDescuento && (
                             <section>
                                 <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-3 border-b pb-1">
                                     Insumos de Stock
@@ -550,6 +570,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     </div>
                                 )}
                             </section>
+                            )}
                         </div>
 
                         {/* Footer */}

@@ -19,7 +19,8 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
         obtenerClientesActivos(),
     ]);
 
-    let ordenes = todasLasOrdenes;
+    // Ocultar órdenes ya facturadas: pasan a vivir en la sección Facturación
+    let ordenes = todasLasOrdenes.filter((orden) => orden.factura.length === 0);
 
     // Filtro por nombre o apellido del cliente
     if (params.busqueda) {
