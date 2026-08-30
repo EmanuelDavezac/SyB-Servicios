@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
 
 export type Movimiento = {
     id: string;
@@ -40,7 +41,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
-                estado_pago: { not: "ANULADA" },
+                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
             },
         });
         const totalFacturado = facturasDelMes.reduce((acc, f) => acc + Number(f.monto_total), 0);
@@ -213,6 +214,78 @@ export async function obtenerDatosDashboard() {
             alertasStock: [],
             facturasPorVencer: [],
             cuentasPorCobrar: { total: 0, topClientes: [] },
+        };
+    }
+}
+
+export async function obtenerPosicionIVA(mes: number, anio: number) {
+    try {
+        const fechaInicio = new Date(anio, mes - 1, 1);
+        const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
+
+        // Ventas: facturas emitidas en el mes, excluyendo anuladas y no-facturables
+        const facturas = await prisma.factura.findMany({
+            where: {
+                fecha_emision: { gte: fechaInicio, lte: fechaFin },
+                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+            },
+        });
+
+        let netoVentas = 0;
+        let ivaVentas = 0;
+        for (const f of facturas) {
+            const neto = Number(f.neto ?? 0);
+            const alicuota = Number(f.alicuota_iva ?? 0);
+            netoVentas += neto;
+            ivaVentas += neto * alicuota / 100;
+        }
+
+        // Compras: compra_insumo con fecha_compra en el mes
+        const compras = await prisma.compra_insumo.findMany({
+            where: {
+                fecha_compra: { gte: fechaInicio, lte: fechaFin },
+            },
+        });
+
+        const comprasConNeto = compras.filter((c) => c.neto !== null);
+        let netoCompras = 0;
+        let ivaCompras = 0;
+        for (const c of comprasConNeto) {
+            const neto = Number(c.neto ?? 0);
+            const alicuota = Number(c.alicuota_iva ?? 0);
+            netoCompras += neto;
+            ivaCompras += neto * alicuota / 100;
+        }
+        const sinDatosCompras = comprasConNeto.length === 0;
+
+        // Retenciones sufridas, agrupadas por tipo
+        const retenciones = await prisma.retencion.findMany({
+            where: {
+                direccion: "SUFRIDA",
+                recibo: { fecha_pago: { gte: fechaInicio, lte: fechaFin } },
+            },
+        });
+        const porTipo = new Map<string, number>();
+        for (const r of retenciones) {
+            porTipo.set(r.tipo, (porTipo.get(r.tipo) ?? 0) + Number(r.monto));
+        }
+
+        return {
+            ventas: { neto: netoVentas, iva: ivaVentas },
+            compras: { neto: netoCompras, iva: ivaCompras, sinDatos: sinDatosCompras },
+            retenciones: {
+                IVA: porTipo.get("IVA") ?? 0,
+                GANANCIAS: porTipo.get("GANANCIAS") ?? 0,
+                IIBB: porTipo.get("IIBB") ?? 0,
+                SUSS: porTipo.get("SUSS") ?? 0,
+            },
+        };
+    } catch (error) {
+        console.error("Error al obtener posición de IVA:", error);
+        return {
+            ventas: { neto: 0, iva: 0 },
+            compras: { neto: 0, iva: 0, sinDatos: true },
+            retenciones: { IVA: 0, GANANCIAS: 0, IIBB: 0, SUSS: 0 },
         };
     }
 }

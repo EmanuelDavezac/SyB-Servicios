@@ -29,6 +29,8 @@ model compra_insumo {
   fecha_compra   DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
   costo_total    Decimal          @db.Decimal(10, 2)
   descripcion    String?
+  neto           Decimal?         @db.Decimal(10, 2)
+  alicuota_iva   Decimal?         @db.Decimal(5, 2)
   proveedor      proveedor?       @relation(fields: [id_proveedor], references: [id_proveedor], onDelete: Restrict, onUpdate: NoAction)
   detalle_compra detalle_compra[]
 
@@ -57,14 +59,14 @@ model detalle_orden_insumo {
 }
 
 model detalle_orden_servicio {
-  id_detalle_srv   Int            @id @default(autoincrement())
-  id_orden         Int?
-  id_servicio      Int?
-  cantidad         Int            @default(1)
-  precio_acordado  Decimal        @db.Decimal(10, 2)
-  descripcion_libre String?       @db.VarChar(255)
-  orden_trabajo    orden_trabajo? @relation(fields: [id_orden], references: [id_orden], onDelete: Cascade, onUpdate: NoAction)
-  servicio         servicio?      @relation(fields: [id_servicio], references: [id_servicio], onDelete: Restrict, onUpdate: NoAction)
+  id_detalle_srv    Int            @id @default(autoincrement())
+  id_orden          Int?
+  id_servicio       Int?
+  cantidad          Int            @default(1)
+  precio_acordado   Decimal        @db.Decimal(10, 2)
+  descripcion_libre String?        @db.VarChar(255)
+  orden_trabajo     orden_trabajo? @relation(fields: [id_orden], references: [id_orden], onDelete: Cascade, onUpdate: NoAction)
+  servicio          servicio?      @relation(fields: [id_servicio], references: [id_servicio], onDelete: Restrict, onUpdate: NoAction)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -201,9 +203,23 @@ model recibo {
   observacion     String?
   pagos_parciales pagos_parciales[]
   cliente         cliente           @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
+  retencion       retencion[]
 
   @@index([fecha_pago], map: "idx_recibo_fecha_pago")
   @@index([id_cliente], map: "idx_recibo_id_cliente")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model retencion {
+  id_retencion Int     @id @default(autoincrement())
+  id_recibo    Int
+  tipo         String  @db.VarChar(20)
+  direccion    String  @default("SUFRIDA") @db.VarChar(10)
+  monto        Decimal @db.Decimal(10, 2)
+  recibo       recibo  @relation(fields: [id_recibo], references: [id_recibo], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_recibo], map: "idx_retencion_id_recibo")
+  @@index([tipo], map: "idx_retencion_tipo")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

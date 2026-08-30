@@ -48,6 +48,14 @@ export default function ModalCobro({ clientes }: Props) {
     const [montoEntregado, setMontoEntregado] = useState("");
     const [imputaciones, setImputaciones] = useState<Record<number, string>>({});
 
+    const [mostrarRetenciones, setMostrarRetenciones] = useState(false);
+    const [retenciones, setRetenciones] = useState<Record<string, string>>({
+        IVA: "",
+        GANANCIAS: "",
+        IIBB: "",
+        SUSS: "",
+    });
+
     useEffect(() => {
         if (idCliente) {
             obtenerFacturasPendientesCliente(Number(idCliente)).then((data: FacturaPendiente[]) => {
@@ -91,7 +99,13 @@ export default function ModalCobro({ clientes }: Props) {
         setFacturasPendientes([]);
         setMontoEntregado("");
         setImputaciones({});
+        setMostrarRetenciones(false);
+        setRetenciones({ IVA: "", GANANCIAS: "", IIBB: "", SUSS: "" });
         setError(null);
+    }
+
+    function actualizarRetencion(tipo: string, valor: string) {
+        setRetenciones((prev) => ({ ...prev, [tipo]: valor }));
     }
 
     async function handleGuardar() {
@@ -108,6 +122,10 @@ export default function ModalCobro({ clientes }: Props) {
             return;
         }
 
+        const lineasRetenciones = Object.entries(retenciones)
+            .map(([tipo, monto]) => ({ tipo, monto: parseFloat(monto) || 0 }))
+            .filter((r) => r.monto > 0);
+
         setCargando(true);
         setError(null);
 
@@ -117,6 +135,7 @@ export default function ModalCobro({ clientes }: Props) {
             observacion: observacion || undefined,
             fecha_pago: fechaPago ? new Date(fechaPago) : undefined,
             imputaciones: lineas,
+            retenciones: lineasRetenciones.length > 0 ? lineasRetenciones : undefined,
         });
 
         setCargando(false);
@@ -300,6 +319,46 @@ export default function ModalCobro({ clientes }: Props) {
                                                 Total a cobrar: {formatCurrency(totalImputado)}
                                             </div>
                                         </>
+                                    )}
+                                </section>
+                            )}
+
+                            {idCliente && (
+                                <section>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMostrarRetenciones((v) => !v)}
+                                        className="text-xs font-bold uppercase tracking-widest text-green-600 mb-3 border-b pb-1 w-full text-left flex items-center justify-between"
+                                    >
+                                        <span>¿Te retuvieron algo de este pago?</span>
+                                        <span className="text-gray-400 normal-case font-normal">{mostrarRetenciones ? "Ocultar" : "Mostrar"}</span>
+                                    </button>
+
+                                    {mostrarRetenciones && (
+                                        <div className="space-y-2">
+                                            {[
+                                                { tipo: "IVA", label: "IVA" },
+                                                { tipo: "GANANCIAS", label: "Ganancias" },
+                                                { tipo: "IIBB", label: "Ingresos Brutos" },
+                                                { tipo: "SUSS", label: "SUSS" },
+                                            ].map((r) => (
+                                                <div key={r.tipo} className="flex items-center justify-between bg-gray-50 border rounded-lg px-3 py-2 text-sm gap-3">
+                                                    <span className="font-medium text-gray-700">{r.label}</span>
+                                                    <div className="relative w-32">
+                                                        <span className="absolute left-3 top-2 text-gray-400 text-xs">$</span>
+                                                        <input
+                                                            type="number"
+                                                            value={retenciones[r.tipo]}
+                                                            onChange={(e) => actualizarRetencion(r.tipo, e.target.value)}
+                                                            placeholder="0.00"
+                                                            min="0"
+                                                            step="0.01"
+                                                            className="w-full border rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
                                 </section>
                             )}

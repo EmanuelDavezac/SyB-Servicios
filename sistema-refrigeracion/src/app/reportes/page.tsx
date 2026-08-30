@@ -1,4 +1,4 @@
-import { obtenerReporteMensual, obtenerReporteServicios } from "@/actions/reportes";
+import { obtenerReporteMensual, obtenerReporteServicios, obtenerPosicionIVA } from "@/actions/reportes";
 
 export default async function ReportesPage({
     searchParams,
@@ -19,9 +19,12 @@ export default async function ReportesPage({
     let balanceGeneral = 0;
     let totalFacturado = 0;
     let ordenesFinalizadas: any[] = [];
+    let posicionIva: Awaited<ReturnType<typeof obtenerPosicionIVA>> | null = null;
 
     if (tipoReporte === "servicios") {
         ordenesFinalizadas = await obtenerReporteServicios(mesSeleccionado, anioSeleccionado);
+    } else if (tipoReporte === "iva") {
+        posicionIva = await obtenerPosicionIVA(mesSeleccionado, anioSeleccionado);
     } else {
         const res = await obtenerReporteMensual(mesSeleccionado, anioSeleccionado);
         movimientos = res.movimientos;
@@ -71,6 +74,7 @@ export default async function ReportesPage({
                     <select name="tipo" defaultValue={tipoReporte} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
                         <option value="ingresos-egresos">Mensual de Ingresos y Egresos</option>
                         <option value="servicios">Servicios Realizados</option>
+                        <option value="iva">Posición de IVA</option>
                     </select>
                 </div>
                 <div className="flex-1">
@@ -128,7 +132,49 @@ export default async function ReportesPage({
                 </div>
             )}
 
+            {/* Posición de IVA */}
+            {tipoReporte === "iva" && posicionIva && (
+                <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium rounded px-4 py-3">
+                        Estimación de control interno, no reemplaza los libros fiscales. La numeración de comprobantes es un correlativo interno y no coincide con AFIP.
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Ventas</p>
+                            <div className="space-y-1 text-sm">
+                                <div className="flex justify-between"><span className="text-gray-500">Importe Ventas (neto)</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.neto)}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-500">IVA Ventas</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.iva)}</span></div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-orange-500">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Compras</p>
+                            {posicionIva.compras.sinDatos ? (
+                                <p className="text-sm text-gray-400">Sin datos de compras discriminadas este mes.</p>
+                            ) : (
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between"><span className="text-gray-500">Importe Compras (neto)</span><span className="font-semibold">{formatCurrency(posicionIva.compras.neto)}</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-500">IVA Compras</span><span className="font-semibold">{formatCurrency(posicionIva.compras.iva)}</span></div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-purple-500">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Retenciones Sufridas</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-500">IVA</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.IVA)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Ganancias</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.GANANCIAS)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Ingresos Brutos</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.IIBB)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">SUSS</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.SUSS)}</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Table */}
+            {tipoReporte !== "iva" && (
             <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
                     <h3 className="text-sm font-semibold text-slate-700">
@@ -220,6 +266,7 @@ export default async function ReportesPage({
                     )}
                 </div>
             </div>
+            )}
         </div>
     );
 }

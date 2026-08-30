@@ -48,6 +48,10 @@ export default function RootLayout({
                 <i className="fas fa-truck mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
                 <span className="font-medium">Proveedores</span>
               </Link>
+              <Link href="/compras" className="flex items-center py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group">
+                <i className="fas fa-cart-shopping mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
+                <span className="font-medium">Compras</span>
+              </Link>
               <Link href="/servicios" className="flex items-center py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group">
                 <i className="fas fa-wrench mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
                 <span className="font-medium">Servicios</span>

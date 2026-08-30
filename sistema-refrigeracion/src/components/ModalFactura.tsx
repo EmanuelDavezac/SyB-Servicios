@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { crearFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden } from "@/actions/ordenes";
+import { esTipoFacturable } from "@/lib/estadoFactura";
 
 interface Cliente {
     id_cliente: number;
@@ -49,9 +50,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [descuentoImporte, setDescuentoImporte] = useState("");
     const [equipoDescripcion, setEquipoDescripcion] = useState("");
 
-    const esInformeTecnico = tipo === "Informe Tecnico";
-    const mostrarPrecios = !esInformeTecnico;
-    const mostrarInsumosYDescuento = !esInformeTecnico;
+    const facturable = esTipoFacturable(tipo);
+    const mostrarPrecios = facturable;
+    const mostrarInsumosYDescuento = facturable;
 
     const netoBrutoNum = neto ? parseFloat(neto) : 0;
     const descuentoMontoNum =
@@ -345,6 +346,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             />
                                         </div>
                                     )}
+                                    {mostrarPrecios && (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
                                             Vencimiento (Opcional)
@@ -356,6 +358,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
+                                    )}
                                     {mostrarPrecios && neto && (
                                         <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1.5">
                                             <div className="flex justify-between text-blue-700">
