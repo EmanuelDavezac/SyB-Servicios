@@ -182,7 +182,7 @@ model servicio_insumo {
   id_servicio_ins Int      @id @default(autoincrement())
   id_servicio     Int
   id_insumo       Int
-  cantidad        Int
+  cantidad        Decimal  @db.Decimal(10, 3)
   insumo          insumo   @relation(fields: [id_insumo], references: [id_insumo])
   servicio        servicio @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade)
 }
