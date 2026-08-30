@@ -17,6 +17,7 @@ model cliente {
   email                    String?                    @db.VarChar(100)
   estado                   Boolean?                   @default(true)
   localidad                String?                    @db.VarChar(100)
+  condicion_pago_dias      Int                        @default(30)
   historial_notificaciones historial_notificaciones[]
   orden_trabajo            orden_trabajo[]
   presupuesto              presupuesto[]
@@ -107,6 +108,8 @@ model historial_notificaciones {
   descripcion       String?
   cliente           cliente? @relation(fields: [id_cliente], references: [id_cliente], onDelete: Cascade, onUpdate: NoAction)
   factura           factura? @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([id_factura, tipo_notificacion, fecha_creacion], map: "historial_notificaciones_dedupe_unique")
 }
 
 model insumo {

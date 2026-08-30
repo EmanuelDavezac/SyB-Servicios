@@ -113,14 +113,29 @@ export async function crearFactura(data: {
         throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
       }
 
-      // 1. Crear la factura
+      // 1. Calcular vencimiento por default si no se cargo a mano
+      //    (fecha_emision + condicion_pago_dias del cliente). El campo manual
+      //    manda si vino cargado: esto no se recalcula sobre facturas existentes.
+      const fechaEmision = new Date();
+      let fechaVencimiento = facturable ? data.fecha_vencimiento : null;
+      if (facturable && !fechaVencimiento) {
+        const orden = await tx.orden_trabajo.findUnique({
+          where: { id_orden: data.id_orden },
+          include: { cliente: true },
+        });
+        const dias = orden?.cliente?.condicion_pago_dias ?? 30;
+        fechaVencimiento = new Date(fechaEmision);
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
+      }
+
+      // 2. Crear la factura
       const factura = await tx.factura.create({
         data: {
           id_orden: data.id_orden,
           num_factura: data.num_factura,
           tipo: data.tipo,
-          fecha_emision: new Date(),
-          fecha_vencimiento: facturable ? data.fecha_vencimiento : null,
+          fecha_emision: fechaEmision,
+          fecha_vencimiento: fechaVencimiento,
           neto: facturable ? netoGravado : null,
           alicuota_iva: facturable ? data.alicuota_iva : null,
           tipo_descuento: facturable ? (data.tipo_descuento ?? null) : null,
@@ -134,7 +149,7 @@ export async function crearFactura(data: {
         },
       });
 
-      // 2. Descontar stock de los insumos ya registrados en la ORDEN
+      // 3. Descontar stock de los insumos ya registrados en la ORDEN
       //    (agregados desde ModalOrden durante el trabajo)
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
@@ -153,7 +168,7 @@ export async function crearFactura(data: {
         });
       }
 
-      // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
+      // 4. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
       //    Solo si NO están ya registrados en detalle_orden_insumo para evitar duplicados
       const idsYaRegistrados = new Set(insumosDeOrden.map((d) => d.id_insumo));
 
