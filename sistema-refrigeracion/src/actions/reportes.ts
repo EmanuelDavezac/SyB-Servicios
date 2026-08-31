@@ -322,3 +322,47 @@ export async function obtenerReporteServicios(mes: number, anio: number) {
         return [];
     }
 }
+
+export async function obtenerReporteClientes(filtros: {
+    fechaInicio?: string;
+    fechaFin?: string;
+    zona?: string;
+}) {
+    try {
+        const clientes = await prisma.cliente.findMany({
+            where: {
+                estado: true,
+                ...(filtros.zona ? { localidad: { contains: filtros.zona, mode: "insensitive" } } : {}),
+                ...(filtros.fechaInicio || filtros.fechaFin
+                    ? {
+                          fecha_alta: {
+                              ...(filtros.fechaInicio ? { gte: new Date(`${filtros.fechaInicio}T00:00:00`) } : {}),
+                              ...(filtros.fechaFin ? { lte: new Date(`${filtros.fechaFin}T23:59:59.999`) } : {}),
+                          },
+                      }
+                    : {}),
+            },
+            orderBy: { apellido: "asc" },
+        });
+
+        return JSON.parse(JSON.stringify(clientes));
+    } catch (error) {
+        console.error("Error al obtener reporte de clientes:", error);
+        return [];
+    }
+}
+
+export async function obtenerZonasClientes() {
+    try {
+        const filas = await prisma.cliente.findMany({
+            where: { estado: true, localidad: { not: null } },
+            select: { localidad: true },
+            distinct: ["localidad"],
+            orderBy: { localidad: "asc" },
+        });
+        return filas.map((f) => f.localidad).filter((z): z is string => !!z);
+    } catch (error) {
+        console.error("Error al obtener zonas de clientes:", error);
+        return [];
+    }
+}

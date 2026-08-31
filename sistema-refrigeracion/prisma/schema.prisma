@@ -18,6 +18,7 @@ model cliente {
   estado                   Boolean?                   @default(true)
   localidad                String?                    @db.VarChar(100)
   condicion_pago_dias      Int                        @default(30)
+  fecha_alta               DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
   historial_notificaciones historial_notificaciones[]
   orden_trabajo            orden_trabajo[]
   presupuesto              presupuesto[]
