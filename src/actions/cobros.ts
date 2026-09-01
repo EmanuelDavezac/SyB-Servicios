@@ -9,7 +9,7 @@ type Tx = Prisma.TransactionClient;
 
 async function recalcularFactura(tx: Tx, id_factura: number) {
   const factura = await tx.factura.findUnique({ where: { id_factura } });
-  if (!factura || factura.estado_pago === ESTADOS_FACTURA.ANULADA) return;
+  if (!factura || factura.estado_pago === ESTADOS_FACTURA.ANULADA || factura.estado_pago === ESTADOS_FACTURA.NO_APLICA) return;
 
   const agregado = await tx.pagos_parciales.aggregate({
     where: { id_factura },
@@ -34,6 +34,7 @@ export async function registrarCobro(data: {
   observacion?: string;
   fecha_pago?: Date;
   imputaciones: { id_factura: number; monto: number }[];
+  retenciones?: { tipo: string; monto: number }[];
 }) {
   try {
     if (!data.imputaciones || data.imputaciones.length === 0) {
@@ -41,6 +42,9 @@ export async function registrarCobro(data: {
     }
     if (data.imputaciones.some((i) => i.monto <= 0)) {
       return { success: false, error: "Los montos imputados deben ser mayores a cero." };
+    }
+    if (data.retenciones?.some((r) => r.monto <= 0)) {
+      return { success: false, error: "Los montos de retención deben ser mayores a cero." };
     }
 
     const nuevoRecibo = await prisma.$transaction(async (tx) => {
@@ -60,6 +64,9 @@ export async function registrarCobro(data: {
         }
         if (factura.estado_pago === ESTADOS_FACTURA.ANULADA) {
           throw new Error(`Factura #${imp.id_factura} está anulada`);
+        }
+        if (factura.estado_pago === ESTADOS_FACTURA.NO_APLICA) {
+          throw new Error(`Comprobante #${imp.id_factura} no admite cobros (no genera deuda)`);
         }
         if (imp.monto > Number(factura.saldo_pendiente) + TOLERANCIA_MONTO) {
           throw new Error(`El monto imputado a la factura #${imp.id_factura} supera su saldo pendiente`);
@@ -90,6 +97,18 @@ export async function registrarCobro(data: {
 
       for (const id_factura of idsFactura) {
         await recalcularFactura(tx, id_factura);
+      }
+
+      if (data.retenciones && data.retenciones.length > 0) {
+        for (const r of data.retenciones) {
+          await tx.retencion.create({
+            data: {
+              id_recibo: recibo.id_recibo,
+              tipo: r.tipo,
+              monto: r.monto,
+            },
+          });
+        }
       }
 
       return recibo;
@@ -264,6 +283,38 @@ export async function obtenerReciboCompleto(id_recibo: number) {
   } catch (error) {
     console.error("Error obteniendo recibo completo:", error);
     return null;
+  }
+}
+
+export async function obtenerRetencionesDelMes(mes: number, anio: number) {
+  try {
+    const fechaInicio = new Date(anio, mes - 1, 1);
+    const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
+
+    const retenciones = await prisma.retencion.findMany({
+      where: {
+        direccion: "SUFRIDA",
+        recibo: {
+          fecha_pago: { gte: fechaInicio, lte: fechaFin },
+        },
+      },
+    });
+
+    const porTipo = new Map<string, number>();
+    for (const r of retenciones) {
+      const actual = porTipo.get(r.tipo) ?? 0;
+      porTipo.set(r.tipo, actual + Number(r.monto));
+    }
+
+    return {
+      IVA: porTipo.get("IVA") ?? 0,
+      GANANCIAS: porTipo.get("GANANCIAS") ?? 0,
+      IIBB: porTipo.get("IIBB") ?? 0,
+      SUSS: porTipo.get("SUSS") ?? 0,
+    };
+  } catch (error) {
+    console.error("Error obteniendo retenciones del mes:", error);
+    return { IVA: 0, GANANCIAS: 0, IIBB: 0, SUSS: 0 };
   }
 }
 

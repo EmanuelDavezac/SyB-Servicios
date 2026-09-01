@@ -2,11 +2,30 @@
 
 import { prisma } from "@/lib/prisma";
 
-export async function obtenerClientes() {
+export async function obtenerClientes(filtros?: {
+    nombre?: string;
+    cuit?: string;
+    estado?: string;
+}) {
     try {
-        // Prisma viaja a la base de datos y trae todos los registros de la tabla 'cliente'
+        const nombre = filtros?.nombre?.trim();
+        const cuit = filtros?.cuit?.trim();
+        const estado = filtros?.estado;
+
         const clientes = await prisma.cliente.findMany({
-            // Opcional: ordenarlos alfabéticamente por apellido
+            where: {
+                ...(nombre
+                    ? {
+                          OR: [
+                              { nombre: { contains: nombre, mode: "insensitive" } },
+                              { apellido: { contains: nombre, mode: "insensitive" } },
+                          ],
+                      }
+                    : {}),
+                ...(cuit ? { cuit: { contains: cuit, mode: "insensitive" } } : {}),
+                ...(estado === "Activo" ? { estado: true } : {}),
+                ...(estado === "Inactivo" ? { estado: false } : {}),
+            },
             orderBy: {
                 apellido: "asc",
             },

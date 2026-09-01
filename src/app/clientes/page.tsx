@@ -1,10 +1,20 @@
 import { obtenerClientes } from "@/actions/clientes";
 import ModalCliente from "@/components/ModalCliente";
 import BotonEliminarCliente from "@/components/BotonEliminarCliente";
+import FiltrosClientes from "@/components/FiltrosClientes";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+    const params = await searchParams;
+    const nombre = typeof params.nombre === "string" ? params.nombre : undefined;
+    const cuit = typeof params.cuit === "string" ? params.cuit : undefined;
+    const estado = typeof params.estado === "string" ? params.estado : undefined;
+
     // Traemos los clientes directamente de Neon usando la acción de Prisma
-    const clientes = await obtenerClientes();
+    const clientes = await obtenerClientes({ nombre, cuit, estado });
 
     return (
         <div>
@@ -14,17 +24,7 @@ export default async function ClientesPage() {
                 <ModalCliente />
             </div>
 
-            {/* Buscador estático de tu prototipo */}
-            <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black">
-                <input type="text" placeholder="Buscar por Nombre..." className="border p-2 rounded w-1/3 outline-none focus:border-sky-500" />
-                <input type="text" placeholder="DNI / CUIT..." className="border p-2 rounded w-1/4 outline-none focus:border-sky-500" />
-                <select className="border p-2 rounded outline-none focus:border-sky-500">
-                    <option>Todos los Estados</option>
-                    <option>Activo</option>
-                    <option>Inactivo</option>
-                </select>
-                <button className="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700 transition">Filtrar</button>
-            </div>
+            <FiltrosClientes />
 
             {/* Tu Tabla del Prototipo, ahora 100% Dinámica */}
             <div className="bg-white rounded shadow overflow-hidden">

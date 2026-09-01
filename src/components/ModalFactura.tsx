@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { crearFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
-import { obtenerInsumosDeOrden } from "@/actions/ordenes";
+import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
+import { esTipoFacturable } from "@/lib/estadoFactura";
 
 interface Cliente {
     id_cliente: number;
@@ -40,6 +41,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [tipo, setTipo] = useState("Factura");
     const [letraNumero, setLetraNumero] = useState("");
     const [neto, setNeto] = useState("");
+    const [netoTocado, setNetoTocado] = useState(false);
     const [alicuotaIva, setAlicuotaIva] = useState("21");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
@@ -49,9 +51,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [descuentoImporte, setDescuentoImporte] = useState("");
     const [equipoDescripcion, setEquipoDescripcion] = useState("");
 
-    const esInformeTecnico = tipo === "Informe Tecnico";
-    const mostrarPrecios = !esInformeTecnico;
-    const mostrarInsumosYDescuento = !esInformeTecnico;
+    const facturable = esTipoFacturable(tipo);
+    const mostrarPrecios = facturable;
+    const mostrarInsumosYDescuento = facturable;
 
     const netoBrutoNum = neto ? parseFloat(neto) : 0;
     const descuentoMontoNum =
@@ -74,7 +76,12 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
     /* Insumos ya registrados en la orden (pre-cargados) */
     const [insumosDeOrden, setInsumosDeOrden] = useState<
-        { id_detalle_ins?: number; id_detalle_ord_insumo?: number; cantidad_usada: number; insumo: { nombre: string } | null }[]
+        { id_detalle_ins?: number; id_detalle_ord_insumo?: number; cantidad_usada: number; precio_aplicado: number | string; insumo: { nombre: string } | null }[]
+    >([]);
+
+    /* Servicios ya registrados en la orden (para sugerir el subtotal) */
+    const [serviciosDeOrden, setServiciosDeOrden] = useState<
+        { cantidad: number; precio_acordado: number | string }[]
     >([]);
 
     /* Abrir con orden preseleccionada desde URL */
@@ -93,14 +100,40 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         }
     }, [abierto]);
 
-    /* Cargar insumos de la orden al seleccionarla */
+    /* Cargar servicios e insumos de la orden al seleccionarla */
     useEffect(() => {
+        setNetoTocado(false);
         if (idOrden) {
             obtenerInsumosDeOrden(Number(idOrden)).then((data: any) => setInsumosDeOrden(data));
+            obtenerServiciosDeOrden(Number(idOrden)).then((data: any) => setServiciosDeOrden(data));
         } else {
             setInsumosDeOrden([]);
+            setServiciosDeOrden([]);
         }
     }, [idOrden]);
+
+    /* Sugerir el subtotal como suma de servicios + insumos de la orden (más los
+       insumos adicionales que se vayan agregando), mientras el usuario no haya
+       tocado el campo a mano */
+    useEffect(() => {
+        if (!facturable || netoTocado) return;
+
+        const totalServicios = serviciosDeOrden.reduce(
+            (acc, s) => acc + (s.cantidad || 1) * parseFloat(String(s.precio_acordado)),
+            0
+        );
+        const totalInsumosOrden = insumosDeOrden.reduce(
+            (acc, d) => acc + (d.cantidad_usada || 1) * parseFloat(String(d.precio_aplicado)),
+            0
+        );
+        const totalInsumosAdicionales = insumosSeleccionados.reduce((acc, item) => {
+            const insumo = insumosDisponibles.find((i) => i.id_insumo === item.id_insumo);
+            return acc + item.cantidad * (insumo?.precio_venta ?? 0);
+        }, 0);
+
+        const sugerido = totalServicios + totalInsumosOrden + totalInsumosAdicionales;
+        setNeto(sugerido > 0 ? sugerido.toFixed(2) : "");
+    }, [facturable, netoTocado, serviciosDeOrden, insumosDeOrden, insumosSeleccionados, insumosDisponibles]);
 
     /* Orden seleccionada — se usa para autocompletar cliente y N° de orden */
     const ordenSeleccionada = ordenes.find((o) => String(o.id_orden) === idOrden);
@@ -129,11 +162,13 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setTipo("Factura");
         setLetraNumero("");
         setNeto("");
+        setNetoTocado(false);
         setAlicuotaIva("21");
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
         setInsumosDeOrden([]);
+        setServiciosDeOrden([]);
         setTipoDescuento("");
         setDescuentoPorcentaje("");
         setDescuentoImporte("");
@@ -325,7 +360,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                 <input
                                                     type="number"
                                                     value={neto}
-                                                    onChange={(e) => setNeto(e.target.value)}
+                                                    onChange={(e) => { setNeto(e.target.value); setNetoTocado(true); }}
                                                     placeholder="0.00"
                                                     className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                                 />
@@ -345,6 +380,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             />
                                         </div>
                                     )}
+                                    {mostrarPrecios && (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
                                             Vencimiento (Opcional)
@@ -356,6 +392,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                             className={inputCls}
                                         />
                                     </div>
+                                    )}
                                     {mostrarPrecios && neto && (
                                         <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1.5">
                                             <div className="flex justify-between text-blue-700">

@@ -30,6 +30,11 @@ interface ServicioCatalogo {
     nombre: string;
     precio: number | string;
     descripcion?: string | null;
+    servicio_insumo?: {
+        id_insumo: number;
+        cantidad: number | string;
+        insumo: { nombre: string; precio_venta: number | string } | null;
+    }[];
 }
 
 /** Servicio ya guardado en la BD (modo edición) */
@@ -303,6 +308,13 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
         const srv = catalogo.find((s) => String(s.id_servicio) === srvSeleccionado)!;
 
+        const recetaLineas = (srv.servicio_insumo ?? []).map((si) => ({
+            id_insumo: si.id_insumo,
+            nombre: si.insumo?.nombre ?? "Insumo",
+            cantidad: (typeof si.cantidad === "string" ? parseFloat(si.cantidad) : si.cantidad) * cantidad,
+            precio_aplicado: parseFloat(String(si.insumo?.precio_venta ?? 0)),
+        }));
+
         if (modoEdicion && ordenInicial) {
             setAgregando(true); setErrSrv(null);
             const res = await agregarServicioAOrden({
@@ -312,7 +324,18 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 precio_acordado: precio,
             });
             if (res.success) {
+                for (const linea of recetaLineas) {
+                    await agregarInsumoAOrden({
+                        id_orden: ordenInicial.id_orden,
+                        id_insumo: linea.id_insumo,
+                        cantidad: linea.cantidad,
+                        precio_aplicado: linea.precio_aplicado,
+                    });
+                }
                 setServiciosGuardados(await obtenerServiciosDeOrden(ordenInicial.id_orden));
+                if (recetaLineas.length > 0) {
+                    setInsumosGuardados(await obtenerInsumosDeOrden(ordenInicial.id_orden));
+                }
                 resetPanel();
             } else setErrSrv(res.error || "Error al agregar.");
             setAgregando(false);
@@ -320,6 +343,10 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             setServiciosPendientes((prev) => [
                 ...prev,
                 { _tmpId: tmpId(), tipo: "existente", id_servicio: srv.id_servicio, nombre: srv.nombre, cantidad, precio_acordado: precio },
+            ]);
+            setInsumosPendientes((prev) => [
+                ...prev,
+                ...recetaLineas.map((linea) => ({ _tmpId: tmpId(), ...linea })),
             ]);
             resetPanel();
         }

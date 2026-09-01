@@ -2,13 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { crearServicio, editarServicio } from "@/actions/servicios";
+import { crearServicio, editarServicio, actualizarRecetaServicio } from "@/actions/servicios";
+import { obtenerInsumos } from "@/actions/insumos";
 
 interface ServicioInicial {
     id_servicio: number;
     nombre: string;
     descripcion: string | null;
     precio: number;
+    servicio_insumo?: { id_insumo: number; cantidad: number; insumo: { nombre: string } | null }[];
+}
+
+interface InsumoCatalogo {
+    id_insumo: number;
+    nombre: string;
+    stock_actual: number | null;
+}
+
+interface RecetaItem {
+    _key: string;
+    id_insumo: number;
+    nombre: string;
+    cantidad: number;
 }
 
 interface Props {
@@ -27,6 +42,12 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
     const [descripcion, setDescripcion] = useState(servicioInicial?.descripcion ?? "");
     const [precio, setPrecio] = useState(servicioInicial ? String(servicioInicial.precio) : "");
 
+    /* ── Receta de insumos base ── */
+    const [insumosDisponibles, setInsumosDisponibles] = useState<InsumoCatalogo[]>([]);
+    const [receta, setReceta] = useState<RecetaItem[]>([]);
+    const [idInsumoReceta, setIdInsumoReceta] = useState("");
+    const [cantidadInsumoReceta, setCantidadInsumoReceta] = useState("1");
+
     useEffect(() => { setMounted(true); }, []);
 
     function handleAbrir() {
@@ -34,8 +55,41 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
             setNombre(servicioInicial.nombre);
             setDescripcion(servicioInicial.descripcion ?? "");
             setPrecio(String(servicioInicial.precio));
+            setReceta(
+                (servicioInicial.servicio_insumo ?? []).map((si) => ({
+                    _key: `${si.id_insumo}-${Date.now()}-${Math.random()}`,
+                    id_insumo: si.id_insumo,
+                    nombre: si.insumo?.nombre ?? "Insumo",
+                    cantidad: Number(si.cantidad),
+                }))
+            );
+        } else {
+            setReceta([]);
         }
+        obtenerInsumos().then((data) => setInsumosDisponibles(data as InsumoCatalogo[]));
         setAbierto(true);
+    }
+
+    function agregarInsumoReceta() {
+        if (!idInsumoReceta) return;
+        const insumo = insumosDisponibles.find((i) => i.id_insumo === Number(idInsumoReceta));
+        if (insumo) {
+            setReceta((prev) => [
+                ...prev,
+                {
+                    _key: `${insumo.id_insumo}-${Date.now()}-${Math.random()}`,
+                    id_insumo: insumo.id_insumo,
+                    nombre: insumo.nombre,
+                    cantidad: Number(cantidadInsumoReceta) || 1,
+                },
+            ]);
+            setIdInsumoReceta("");
+            setCantidadInsumoReceta("1");
+        }
+    }
+
+    function quitarInsumoReceta(key: string) {
+        setReceta((prev) => prev.filter((item) => item._key !== key));
     }
 
     async function handleGuardar() {
@@ -52,14 +106,27 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
             ? await editarServicio(servicioInicial.id_servicio, datos)
             : await crearServicio(datos);
 
+        if (!resultado.success) {
+            setCargando(false);
+            alert(modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio.");
+            return;
+        }
+
+        const id_servicio = modoEdicion && servicioInicial
+            ? servicioInicial.id_servicio
+            : (resultado as { servicio?: { id_servicio: number } }).servicio?.id_servicio;
+
+        if (id_servicio) {
+            await actualizarRecetaServicio(
+                id_servicio,
+                receta.map((r) => ({ id_insumo: r.id_insumo, cantidad: r.cantidad }))
+            );
+        }
+
         setCargando(false);
 
-        if (resultado.success) {
-            if (!modoEdicion) { setNombre(""); setDescripcion(""); setPrecio(""); }
-            setAbierto(false);
-        } else {
-            alert(modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio.");
-        }
+        if (!modoEdicion) { setNombre(""); setDescripcion(""); setPrecio(""); setReceta([]); }
+        setAbierto(false);
     }
 
     const inputCls =
@@ -140,6 +207,69 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
                                 />
                             </div>
                         </div>
+                    </section>
+
+                    {/* ── Insumos base (receta) ── */}
+                    <section>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-sky-600 mb-3 border-b pb-1">
+                            Insumos base
+                            <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-gray-400">
+                                (se precargan al agregar este servicio a una orden)
+                            </span>
+                        </h4>
+
+                        <div className="flex gap-2">
+                            <select
+                                value={idInsumoReceta}
+                                onChange={(e) => setIdInsumoReceta(e.target.value)}
+                                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                            >
+                                <option value="">+ Insumo...</option>
+                                {insumosDisponibles.map((insumo) => (
+                                    <option key={insumo.id_insumo} value={insumo.id_insumo}>
+                                        {insumo.nombre}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="number"
+                                value={cantidadInsumoReceta}
+                                onChange={(e) => setCantidadInsumoReceta(e.target.value)}
+                                className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                                min="0.001"
+                                step="0.001"
+                                placeholder="Cant."
+                            />
+                            <button
+                                type="button"
+                                onClick={agregarInsumoReceta}
+                                className="bg-sky-50 text-sky-600 hover:bg-sky-100 font-bold px-4 py-2 rounded-lg text-sm transition"
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        {receta.length > 0 && (
+                            <div className="mt-3 space-y-1">
+                                {receta.map((item) => (
+                                    <div
+                                        key={item._key}
+                                        className="flex items-center justify-between bg-sky-50 rounded-lg px-3 py-2 text-sm"
+                                    >
+                                        <span className="font-medium text-sky-900">
+                                            {item.nombre} <span className="text-sky-600">x{item.cantidad}</span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => quitarInsumoReceta(item._key)}
+                                            className="text-red-500 hover:text-red-700 text-xs font-bold"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </section>
                 </div>
 

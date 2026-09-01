@@ -66,6 +66,7 @@ export default async function ServiciosPage() {
                                                 nombre: srv.nombre,
                                                 descripcion: srv.descripcion ?? null,
                                                 precio: Number(srv.precio),
+                                                servicio_insumo: srv.servicio_insumo,
                                             }}
                                             trigger={
                                                 <button

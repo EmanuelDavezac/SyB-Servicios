@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
 
 export async function getFacturas() {
   try {
@@ -67,31 +67,38 @@ export async function crearFactura(data: {
   equipo_descripcion?: string | null;
 }) {
   try {
-    const netoBruto = data.neto;
+    const facturable = esTipoFacturable(data.tipo);
 
     let descuentoMonto: number | null = null;
-    if (data.tipo_descuento === "PORCENTAJE") {
-      const pct = data.descuento_porcentaje ?? null;
-      if (pct === null || pct < 0 || pct > 100) {
-        throw new Error("El porcentaje de descuento debe estar entre 0 y 100.");
-      }
-      descuentoMonto = netoBruto * pct / 100;
-    } else if (data.tipo_descuento === "EQUIPO") {
-      if (!data.equipo_descripcion?.trim()) {
-        throw new Error("Debe indicar qué equipo entrega el cliente en parte de pago.");
-      }
-      const imp = data.descuento_monto_equipo ?? null;
-      if (imp === null || imp <= 0) {
-        throw new Error("El importe del equipo debe ser mayor a cero.");
-      }
-      if (imp >= netoBruto) {
-        throw new Error("El descuento no puede igualar o superar el subtotal de la factura.");
-      }
-      descuentoMonto = imp;
-    }
+    let netoGravado = 0;
+    let montoTotal = 0;
 
-    const netoGravado = netoBruto - (descuentoMonto ?? 0);
-    const montoTotal = netoGravado + netoGravado * (data.alicuota_iva / 100);
+    if (facturable) {
+      const netoBruto = data.neto;
+
+      if (data.tipo_descuento === "PORCENTAJE") {
+        const pct = data.descuento_porcentaje ?? null;
+        if (pct === null || pct < 0 || pct > 100) {
+          throw new Error("El porcentaje de descuento debe estar entre 0 y 100.");
+        }
+        descuentoMonto = netoBruto * pct / 100;
+      } else if (data.tipo_descuento === "EQUIPO") {
+        if (!data.equipo_descripcion?.trim()) {
+          throw new Error("Debe indicar qué equipo entrega el cliente en parte de pago.");
+        }
+        const imp = data.descuento_monto_equipo ?? null;
+        if (imp === null || imp <= 0) {
+          throw new Error("El importe del equipo debe ser mayor a cero.");
+        }
+        if (imp >= netoBruto) {
+          throw new Error("El descuento no puede igualar o superar el subtotal de la factura.");
+        }
+        descuentoMonto = imp;
+      }
+
+      netoGravado = netoBruto - (descuentoMonto ?? 0);
+      montoTotal = netoGravado + netoGravado * (data.alicuota_iva / 100);
+    }
 
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
@@ -106,28 +113,43 @@ export async function crearFactura(data: {
         throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
       }
 
-      // 1. Crear la factura
+      // 1. Calcular vencimiento por default si no se cargo a mano
+      //    (fecha_emision + condicion_pago_dias del cliente). El campo manual
+      //    manda si vino cargado: esto no se recalcula sobre facturas existentes.
+      const fechaEmision = new Date();
+      let fechaVencimiento = facturable ? data.fecha_vencimiento : null;
+      if (facturable && !fechaVencimiento) {
+        const orden = await tx.orden_trabajo.findUnique({
+          where: { id_orden: data.id_orden },
+          include: { cliente: true },
+        });
+        const dias = orden?.cliente?.condicion_pago_dias ?? 30;
+        fechaVencimiento = new Date(fechaEmision);
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
+      }
+
+      // 2. Crear la factura
       const factura = await tx.factura.create({
         data: {
           id_orden: data.id_orden,
           num_factura: data.num_factura,
           tipo: data.tipo,
-          fecha_emision: new Date(),
-          fecha_vencimiento: data.fecha_vencimiento,
-          neto: netoGravado,
-          alicuota_iva: data.alicuota_iva,
-          tipo_descuento: data.tipo_descuento ?? null,
-          descuento_porcentaje: data.tipo_descuento === "PORCENTAJE" ? (data.descuento_porcentaje ?? null) : null,
-          descuento_monto: descuentoMonto,
-          equipo_descripcion: data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
-          monto_total: montoTotal,
-          saldo_pendiente: montoTotal,
-          estado_pago: ESTADOS_FACTURA.IMPAGA,
+          fecha_emision: fechaEmision,
+          fecha_vencimiento: fechaVencimiento,
+          neto: facturable ? netoGravado : null,
+          alicuota_iva: facturable ? data.alicuota_iva : null,
+          tipo_descuento: facturable ? (data.tipo_descuento ?? null) : null,
+          descuento_porcentaje: facturable && data.tipo_descuento === "PORCENTAJE" ? (data.descuento_porcentaje ?? null) : null,
+          descuento_monto: facturable ? descuentoMonto : null,
+          equipo_descripcion: facturable && data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
+          monto_total: facturable ? montoTotal : 0,
+          saldo_pendiente: facturable ? montoTotal : 0,
+          estado_pago: facturable ? ESTADOS_FACTURA.IMPAGA : ESTADOS_FACTURA.NO_APLICA,
           descripcion: data.descripcion,
         },
       });
 
-      // 2. Descontar stock de los insumos ya registrados en la ORDEN
+      // 3. Descontar stock de los insumos ya registrados en la ORDEN
       //    (agregados desde ModalOrden durante el trabajo)
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
@@ -146,7 +168,7 @@ export async function crearFactura(data: {
         });
       }
 
-      // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
+      // 4. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
       //    Solo si NO están ya registrados en detalle_orden_insumo para evitar duplicados
       const idsYaRegistrados = new Set(insumosDeOrden.map((d) => d.id_insumo));
 

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { esTipoFacturable } from "@/lib/estadoFactura";
 
 export default function FiltrosFacturacion() {
     const router = useRouter();
@@ -11,14 +12,25 @@ export default function FiltrosFacturacion() {
     const inicialFechaInicio = searchParams.get("fechaInicio") || "";
     const inicialFechaFin = searchParams.get("fechaFin") || "";
     const inicialCliente = searchParams.get("cliente") || "";
+    const inicialTipo = searchParams.get("tipo") || "";
     const inicialEstado = searchParams.get("estado") || "";
     const inicialConSaldo = searchParams.get("conSaldo") === "1";
 
     const [fechaInicio, setFechaInicio] = useState(inicialFechaInicio);
     const [fechaFin, setFechaFin] = useState(inicialFechaFin);
     const [cliente, setCliente] = useState(inicialCliente);
+    const [tipo, setTipo] = useState(inicialTipo);
     const [estado, setEstado] = useState(inicialEstado);
     const [conSaldo, setConSaldo] = useState(inicialConSaldo);
+
+    // "Recibo" no es un tipo facturable (ni siquiera es un tipo de `factura`,
+    // vive en su propia tabla): el estado de pago no le aplica en ninguno de
+    // los dos casos, así que el select de Estado se deshabilita igual.
+    const estadoAplica = tipo === "" || esTipoFacturable(tipo);
+
+    useEffect(() => {
+        if (!estadoAplica && estado) setEstado("");
+    }, [estadoAplica, estado]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -26,7 +38,8 @@ export default function FiltrosFacturacion() {
             if (fechaInicio) params.set("fechaInicio", fechaInicio);
             if (fechaFin) params.set("fechaFin", fechaFin);
             if (cliente.trim()) params.set("cliente", cliente.trim());
-            if (estado) params.set("estado", estado);
+            if (tipo) params.set("tipo", tipo);
+            if (estadoAplica && estado) params.set("estado", estado);
             if (conSaldo) params.set("conSaldo", "1");
 
             const newQueryString = params.toString();
@@ -37,7 +50,7 @@ export default function FiltrosFacturacion() {
         }, 400);
 
         return () => clearTimeout(timer);
-    }, [fechaInicio, fechaFin, cliente, estado, conSaldo, router, searchParams]);
+    }, [fechaInicio, fechaFin, cliente, tipo, estado, estadoAplica, conSaldo, router, searchParams]);
 
     return (
         <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black items-center">
@@ -66,9 +79,23 @@ export default function FiltrosFacturacion() {
             />
 
             <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value)}
+                className="border p-2 rounded w-1/5 outline-none focus:border-blue-500"
+            >
+                <option value="">Todos los Comprobantes</option>
+                <option value="Factura">Factura</option>
+                <option value="Remito">Remito</option>
+                <option value="Informe Tecnico">Informe Técnico</option>
+                <option value="Recibo">Recibo</option>
+            </select>
+
+            <select
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
-                className="border p-2 rounded w-1/4 outline-none focus:border-blue-500"
+                disabled={!estadoAplica}
+                title={estadoAplica ? undefined : "No aplica para este tipo de comprobante"}
+                className="border p-2 rounded w-1/4 outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
             >
                 <option value="">Todos los Estados</option>
                 <option value="IMPAGA">IMPAGA</option>
@@ -87,12 +114,13 @@ export default function FiltrosFacturacion() {
                 Solo con saldo
             </label>
 
-            {(fechaInicio || fechaFin || cliente || estado || conSaldo) && (
+            {(fechaInicio || fechaFin || cliente || tipo || estado || conSaldo) && (
                 <button
                     onClick={() => {
                         setFechaInicio("");
                         setFechaFin("");
                         setCliente("");
+                        setTipo("");
                         setEstado("");
                         setConSaldo(false);
                     }}

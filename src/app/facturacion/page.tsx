@@ -1,9 +1,27 @@
 import { getFacturas, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
-import { obtenerClientesConDeuda } from "@/actions/cobros";
+import { obtenerClientesConDeuda, obtenerCobros } from "@/actions/cobros";
+import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
 import FiltrosFacturacion from "@/components/FiltrosFacturacion";
 import ModalFactura from "@/components/ModalFactura";
 import ModalCobro from "@/components/ModalCobro";
 import BotonImprimirFactura from "@/components/BotonImprimirFactura";
+import BotonImprimirRecibo from "@/components/BotonImprimirRecibo";
+import BotonAnularCobro from "@/components/BotonAnularCobro";
+
+type FilaComprobante = {
+    key: string;
+    origen: "factura" | "recibo";
+    id: number;
+    tipo: string | null;
+    fecha: string | Date;
+    fecha_vencimiento: string | Date | null;
+    comprobante: string;
+    nombreCliente: string;
+    textoBusqueda: string;
+    total: number | null;
+    saldo: number | null;
+    estado_pago: string | null;
+};
 
 export default async function FacturacionPage({
     searchParams,
@@ -15,45 +33,92 @@ export default async function FacturacionPage({
     const fechaInicioStr = typeof params.fechaInicio === "string" ? params.fechaInicio : "";
     const fechaFinStr = typeof params.fechaFin === "string" ? params.fechaFin : "";
     const filtroCliente = typeof params.cliente === "string" ? params.cliente.toLowerCase() : "";
+    const filtroTipo = typeof params.tipo === "string" ? params.tipo : "";
     const filtroEstado = typeof params.estado === "string" ? params.estado.toUpperCase() : "";
     const soloConSaldo = params.conSaldo === "1";
 
-    const [facturasOriginales, ordenesPendientes, clientesConDeuda] = await Promise.all([
+    const [facturasOriginales, ordenesPendientes, clientesConDeuda, recibosOriginales] = await Promise.all([
         getFacturas(),
         getOrdenesPendientesFacturacion(),
         obtenerClientesConDeuda(),
+        obtenerCobros(),
     ]);
 
-    // Filtramos en memoria (o podrías pasarlo a Prisma)
-    const facturas = facturasOriginales.filter((f: any) => {
-        let coincide = true;
+    const filasFactura: FilaComprobante[] = facturasOriginales.map((f: any) => {
+        const cliente = f.orden_trabajo?.cliente;
+        const nombreCliente = cliente
+            ? `${cliente.nombre} ${cliente.apellido}`
+            : (f.descripcion || "Desconocido");
+        return {
+            key: `factura-${f.id_factura}`,
+            origen: "factura",
+            id: f.id_factura,
+            tipo: f.tipo,
+            fecha: f.fecha_emision,
+            fecha_vencimiento: f.fecha_vencimiento,
+            comprobante: f.num_factura,
+            nombreCliente,
+            textoBusqueda: `${nombreCliente} ${f.descripcion || ""}`.toLowerCase(),
+            total: f.monto_total !== null ? Number(f.monto_total) : null,
+            saldo: f.saldo_pendiente !== null ? Number(f.saldo_pendiente) : null,
+            estado_pago: f.estado_pago,
+        };
+    });
 
+    const filasRecibo: FilaComprobante[] = recibosOriginales.map((r: any) => {
+        const nombreCliente = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Desconocido";
+        return {
+            key: `recibo-${r.id_recibo}`,
+            origen: "recibo",
+            id: r.id_recibo,
+            tipo: null,
+            fecha: r.fecha_pago,
+            fecha_vencimiento: null,
+            comprobante: `Recibo #${r.id_recibo}`,
+            nombreCliente,
+            textoBusqueda: `${nombreCliente} ${r.observacion || ""}`.toLowerCase(),
+            total: Number(r.monto_total),
+            saldo: null,
+            estado_pago: null,
+        };
+    });
+
+    const todasLasFilas = [...filasFactura, ...filasRecibo];
+
+    // Filtramos en memoria (o podrías pasarlo a Prisma)
+    const facturas = todasLasFilas.filter((fila) => {
         if (fechaInicioStr) {
             const fi = new Date(`${fechaInicioStr}T00:00:00`);
-            const emision = new Date(f.fecha_emision);
-            if (emision < fi) coincide = false;
+            if (new Date(fila.fecha) < fi) return false;
         }
 
         if (fechaFinStr) {
             const ff = new Date(`${fechaFinStr}T23:59:59.999`);
-            const emision = new Date(f.fecha_emision);
-            if (emision > ff) coincide = false;
+            if (new Date(fila.fecha) > ff) return false;
         }
 
         if (filtroCliente) {
-            const nombreCliente = `${f.orden_trabajo?.cliente?.nombre} ${f.orden_trabajo?.cliente?.apellido} ${f.descripcion || ""}`.toLowerCase();
-            if (!nombreCliente.includes(filtroCliente)) coincide = false;
+            if (!fila.textoBusqueda.includes(filtroCliente)) return false;
         }
 
+        if (filtroTipo === "Recibo") {
+            if (fila.origen !== "recibo") return false;
+        } else if (filtroTipo) {
+            if (fila.origen !== "factura" || fila.tipo !== filtroTipo) return false;
+        }
+
+        // Estado y saldo solo tienen sentido para comprobantes facturables;
+        // un filtro de estado/saldo activo excluye naturalmente todo lo
+        // demás (recibos, informes técnicos, etc.) porque no tienen valor.
         if (filtroEstado) {
-            if (f.estado_pago !== filtroEstado) coincide = false;
+            if (fila.estado_pago !== filtroEstado) return false;
         }
 
         if (soloConSaldo) {
-            if (!(Number(f.saldo_pendiente) > 0)) coincide = false;
+            if (!(fila.saldo !== null && fila.saldo > 0)) return false;
         }
 
-        return coincide;
+        return true;
     });
 
     const formatCurrency = (amount: number) => {
@@ -97,14 +162,15 @@ export default async function FacturacionPage({
                         No se encontraron comprobantes con los filtros actuales.
                     </div>
                 ) : (
-                    facturas.map((factura: any) => {
-                        const cliente = factura.orden_trabajo?.cliente;
-                        const nombreCliente = cliente
-                            ? `${cliente.nombre} ${cliente.apellido}`
-                            : (factura.descripcion || "Desconocido");
+                    facturas.map((fila) => {
+                        // Un comprobante no facturable (informe técnico, o un recibo)
+                        // no tiene estado de pago ni saldo: la columna va vacía, nunca
+                        // en $0,00 ni con el badge NO_APLICA.
+                        const esFacturable = fila.origen === "factura" && fila.estado_pago !== ESTADOS_FACTURA.NO_APLICA;
+                        const esInformeTecnico = fila.origen === "factura" && (fila.tipo === "Informe Tecnico" || fila.tipo === "Informe Técnico");
 
                         let badgeColor = "bg-gray-200 text-gray-800";
-                        switch (factura.estado_pago) {
+                        switch (fila.estado_pago) {
                             case "PAGADA": badgeColor = "bg-green-100 text-green-800 border border-green-200"; break;
                             case "IMPAGA": badgeColor = "bg-red-100 text-red-800 border border-red-200"; break;
                             case "PARCIAL": badgeColor = "bg-yellow-100 text-yellow-800 border border-yellow-200"; break;
@@ -113,8 +179,8 @@ export default async function FacturacionPage({
 
                         // Calcular si vencio
                         let vencioTag = null;
-                        if (factura.fecha_vencimiento && factura.estado_pago !== "PAGADA" && factura.estado_pago !== "ANULADA") {
-                            const venc = new Date(factura.fecha_vencimiento);
+                        if (esFacturable && fila.fecha_vencimiento && fila.estado_pago !== "PAGADA" && fila.estado_pago !== "ANULADA") {
+                            const venc = new Date(fila.fecha_vencimiento);
                             const hoy = new Date();
                             if (venc < hoy) {
                                 vencioTag = <div className="text-xs text-red-600 font-semibold mt-1">Venció {formatDate(venc)}</div>;
@@ -122,27 +188,40 @@ export default async function FacturacionPage({
                         }
 
                         return (
-                            <div key={factura.id_factura} className="grid grid-cols-7 items-center p-4 border-b hover:bg-gray-50 text-sm">
+                            <div key={fila.key} className="grid grid-cols-7 items-center p-4 border-b hover:bg-gray-50 text-sm">
                                 <div>
-                                    <div className="text-gray-900">{formatDate(factura.fecha_emision)}</div>
-                                    {vencioTag || <div className="text-xs text-gray-400 mt-1">{factura.fecha_vencimiento ? `Vence ${formatDate(factura.fecha_vencimiento)}` : ""}</div>}
+                                    <div className="text-gray-900">{formatDate(fila.fecha)}</div>
+                                    {vencioTag || <div className="text-xs text-gray-400 mt-1">{esFacturable && fila.fecha_vencimiento ? `Vence ${formatDate(fila.fecha_vencimiento)}` : ""}</div>}
                                 </div>
-                                <div className="font-semibold text-gray-800">{factura.num_factura}</div>
-                                <div className="text-gray-600">{nombreCliente}</div>
+                                <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                <div className="text-gray-600">{fila.nombreCliente}</div>
                                 <div className="font-bold text-blue-800">
-                                    {factura.monto_total ? formatCurrency(parseFloat(factura.monto_total)) : "-"}
+                                    {esInformeTecnico ? "" : (fila.total !== null ? formatCurrency(fila.total) : "-")}
                                 </div>
                                 <div className="font-bold text-red-700">
-                                    {factura.saldo_pendiente ? formatCurrency(parseFloat(factura.saldo_pendiente)) : formatCurrency(0)}
+                                    {esInformeTecnico ? "" : (esFacturable ? formatCurrency(fila.saldo ?? 0) : <span className="text-gray-400 font-normal">-</span>)}
                                 </div>
                                 <div>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
-                                        {factura.estado_pago}
-                                    </span>
+                                    {esInformeTecnico ? "" : (esFacturable ? (
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
+                                            {fila.estado_pago}
+                                        </span>
+                                    ) : (
+                                        <span className="text-gray-400">-</span>
+                                    ))}
                                 </div>
                                 <div className="text-right flex justify-end gap-3 text-lg opacity-70">
-                                    <BotonImprimirFactura idFactura={factura.id_factura} />
-                                    <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
+                                    {fila.origen === "recibo" ? (
+                                        <>
+                                            <BotonImprimirRecibo idRecibo={fila.id} />
+                                            <BotonAnularCobro idRecibo={fila.id} />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <BotonImprimirFactura idFactura={fila.id} />
+                                            <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         );

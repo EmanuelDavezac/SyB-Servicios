@@ -1,4 +1,4 @@
-import { obtenerReporteMensual, obtenerReporteServicios } from "@/actions/reportes";
+import { obtenerReporteMensual, obtenerReporteServicios, obtenerPosicionIVA, obtenerReporteClientes, obtenerZonasClientes } from "@/actions/reportes";
 
 export default async function ReportesPage({
     searchParams,
@@ -11,6 +11,9 @@ export default async function ReportesPage({
     const mesSeleccionado = params?.mes ? parseInt(params.mes) : hoy.getMonth() + 1;
     const anioSeleccionado = params?.anio ? parseInt(params.anio) : hoy.getFullYear();
     const tipoReporte = params?.tipo || "ingresos-egresos";
+    const fechaAltaInicio = params?.fechaAltaInicio || "";
+    const fechaAltaFin = params?.fechaAltaFin || "";
+    const zonaSeleccionada = params?.zona || "";
 
     // Cargar datos de DB
     let movimientos: any[] = [];
@@ -19,9 +22,19 @@ export default async function ReportesPage({
     let balanceGeneral = 0;
     let totalFacturado = 0;
     let ordenesFinalizadas: any[] = [];
+    let posicionIva: Awaited<ReturnType<typeof obtenerPosicionIVA>> | null = null;
+    let clientesReporte: any[] = [];
+    let zonasDisponibles: string[] = [];
 
     if (tipoReporte === "servicios") {
         ordenesFinalizadas = await obtenerReporteServicios(mesSeleccionado, anioSeleccionado);
+    } else if (tipoReporte === "iva") {
+        posicionIva = await obtenerPosicionIVA(mesSeleccionado, anioSeleccionado);
+    } else if (tipoReporte === "clientes") {
+        [clientesReporte, zonasDisponibles] = await Promise.all([
+            obtenerReporteClientes({ fechaInicio: fechaAltaInicio, fechaFin: fechaAltaFin, zona: zonaSeleccionada }),
+            obtenerZonasClientes(),
+        ]);
     } else {
         const res = await obtenerReporteMensual(mesSeleccionado, anioSeleccionado);
         movimientos = res.movimientos;
@@ -71,24 +84,50 @@ export default async function ReportesPage({
                     <select name="tipo" defaultValue={tipoReporte} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
                         <option value="ingresos-egresos">Mensual de Ingresos y Egresos</option>
                         <option value="servicios">Servicios Realizados</option>
+                        <option value="iva">Posición de IVA</option>
+                        <option value="clientes">Clientes Activos</option>
                     </select>
                 </div>
-                <div className="flex-1">
-                    <label className="block text-sm text-gray-600 mb-1">Mes</label>
-                    <select name="mes" defaultValue={mesSeleccionado} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
-                        {meses.map(m => (
-                            <option key={m.id} value={m.id}>{m.nombre}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex-1">
-                    <label className="block text-sm text-gray-600 mb-1">Año</label>
-                    <select name="anio" defaultValue={anioSeleccionado} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
-                        {anios.map(a => (
-                            <option key={a} value={a}>{a}</option>
-                        ))}
-                    </select>
-                </div>
+                {tipoReporte === "clientes" ? (
+                    <>
+                        <div className="flex-1">
+                            <label className="block text-sm text-gray-600 mb-1">Alta Desde</label>
+                            <input type="date" name="fechaAltaInicio" defaultValue={fechaAltaInicio} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm text-gray-600 mb-1">Alta Hasta</label>
+                            <input type="date" name="fechaAltaFin" defaultValue={fechaAltaFin} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm text-gray-600 mb-1">Zona</label>
+                            <select name="zona" defaultValue={zonaSeleccionada} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                                <option value="">Todas</option>
+                                {zonasDisponibles.map((z) => (
+                                    <option key={z} value={z}>{z}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex-1">
+                            <label className="block text-sm text-gray-600 mb-1">Mes</label>
+                            <select name="mes" defaultValue={mesSeleccionado} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                                {meses.map(m => (
+                                    <option key={m.id} value={m.id}>{m.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm text-gray-600 mb-1">Año</label>
+                            <select name="anio" defaultValue={anioSeleccionado} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                                {anios.map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </>
+                )}
                 <div>
                     <button type="submit" className="px-6 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 transition">
                         Generar
@@ -128,7 +167,96 @@ export default async function ReportesPage({
                 </div>
             )}
 
+            {/* Posición de IVA */}
+            {tipoReporte === "iva" && posicionIva && (
+                <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium rounded px-4 py-3">
+                        Estimación de control interno, no reemplaza los libros fiscales. La numeración de comprobantes es un correlativo interno y no coincide con AFIP.
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Ventas</p>
+                            <div className="space-y-1 text-sm">
+                                <div className="flex justify-between"><span className="text-gray-500">Importe Ventas (neto)</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.neto)}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-500">IVA Ventas</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.iva)}</span></div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-orange-500">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Compras</p>
+                            {posicionIva.compras.sinDatos ? (
+                                <p className="text-sm text-gray-400">Sin datos de compras discriminadas este mes.</p>
+                            ) : (
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between"><span className="text-gray-500">Importe Compras (neto)</span><span className="font-semibold">{formatCurrency(posicionIva.compras.neto)}</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-500">IVA Compras</span><span className="font-semibold">{formatCurrency(posicionIva.compras.iva)}</span></div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-purple-500">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Retenciones Sufridas</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-500">IVA</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.IVA)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Ganancias</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.GANANCIAS)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Ingresos Brutos</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.IIBB)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">SUSS</span><span className="font-semibold">{formatCurrency(posicionIva.retenciones.SUSS)}</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Table */}
+            {tipoReporte === "clientes" && (
+            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
+                    <h3 className="text-sm font-semibold text-slate-700">
+                        Clientes Activos ({clientesReporte.length})
+                    </h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-slate-600">
+                        <thead className="border-b border-gray-100 text-slate-500">
+                            <tr>
+                                <th className="px-4 py-3 font-medium">Nombre</th>
+                                <th className="px-4 py-3 font-medium">DNI / CUIT</th>
+                                <th className="px-4 py-3 font-medium">Dirección</th>
+                                <th className="px-4 py-3 font-medium">Contacto</th>
+                                <th className="px-4 py-3 font-medium">Alta</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {clientesReporte.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No hay clientes con los filtros actuales.</td>
+                                </tr>
+                            ) : (
+                                clientesReporte.map((c: any) => {
+                                    const direccion = [c.calle ? `${c.calle} ${c.num_calle || ""}`.trim() : null, c.localidad]
+                                        .filter(Boolean)
+                                        .join(", ") || "—";
+                                    return (
+                                        <tr key={c.id_cliente} className="hover:bg-slate-50">
+                                            <td className="px-4 py-4 font-medium text-slate-800">{c.apellido}, {c.nombre}</td>
+                                            <td className="px-4 py-4">{c.cuit || "—"}</td>
+                                            <td className="px-4 py-4">{direccion}</td>
+                                            <td className="px-4 py-4">
+                                                {c.telefono || "—"}
+                                                {c.email && <><br /><span className="text-xs text-gray-400">{c.email}</span></>}
+                                            </td>
+                                            <td className="px-4 py-4">{formatDate(c.fecha_alta)}</td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            )}
+            {tipoReporte !== "iva" && tipoReporte !== "clientes" && (
             <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
                     <h3 className="text-sm font-semibold text-slate-700">
@@ -220,6 +348,7 @@ export default async function ReportesPage({
                     )}
                 </div>
             </div>
+            )}
         </div>
     );
 }
