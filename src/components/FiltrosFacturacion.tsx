@@ -87,6 +87,7 @@ export default function FiltrosFacturacion() {
                 <option value="Factura">Factura</option>
                 <option value="Remito">Remito</option>
                 <option value="Informe Tecnico">Informe Técnico</option>
+                <option value="Presupuesto">Presupuesto</option>
                 <option value="Recibo">Recibo</option>
             </select>
 

@@ -2,7 +2,7 @@ import { obtenerProveedores } from "@/actions/proveedores";
 import ModalProveedor from "@/components/ModalProveedor";
 
 export default async function ProveedoresPage() {
-    const proveedores = await obtenerProveedores();
+    const proveedores = await obtenerProveedores(false);
 
     return (
         <div>

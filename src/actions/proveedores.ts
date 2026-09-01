@@ -3,9 +3,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function obtenerProveedores() {
+export async function obtenerProveedores(soloActivos: boolean = true) {
     try {
         return await prisma.proveedor.findMany({
+            where: soloActivos ? { estado: true } : undefined,
             orderBy: { razon_social: "asc" },
         });
     } catch (error) {

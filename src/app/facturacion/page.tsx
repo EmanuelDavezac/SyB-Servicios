@@ -1,6 +1,6 @@
 import { getFacturas, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
 import { obtenerClientesConDeuda, obtenerCobros } from "@/actions/cobros";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { esTipoFacturable } from "@/lib/estadoFactura";
 import FiltrosFacturacion from "@/components/FiltrosFacturacion";
 import ModalFactura from "@/components/ModalFactura";
 import ModalCobro from "@/components/ModalCobro";
@@ -166,7 +166,7 @@ export default async function FacturacionPage({
                         // Un comprobante no facturable (informe técnico, o un recibo)
                         // no tiene estado de pago ni saldo: la columna va vacía, nunca
                         // en $0,00 ni con el badge NO_APLICA.
-                        const esFacturable = fila.origen === "factura" && fila.estado_pago !== ESTADOS_FACTURA.NO_APLICA;
+                        const esFacturable = fila.origen === "factura" && esTipoFacturable(fila.tipo);
                         const esInformeTecnico = fila.origen === "factura" && (fila.tipo === "Informe Tecnico" || fila.tipo === "Informe Técnico");
 
                         let badgeColor = "bg-gray-200 text-gray-800";

@@ -1,4 +1,5 @@
-import { obtenerInsumos, obtenerProveedores } from "@/actions/insumos";
+import { obtenerInsumos } from "@/actions/insumos";
+import { obtenerProveedores } from "@/actions/proveedores";
 import ModalInsumo from "@/components/ModalInsumo";
 import BotonEliminarInsumo from "@/components/BotonEliminarInsumo";
 import FiltrosInsumos from "@/components/FiltrosInsumos";
