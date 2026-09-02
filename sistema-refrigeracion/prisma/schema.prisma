@@ -23,6 +23,24 @@ model cliente {
   orden_trabajo            orden_trabajo[]
   presupuesto              presupuesto[]
   recibo                   recibo[]
+  informe_tecnico          informe_tecnico[]
+}
+
+model informe_tecnico {
+  id_informe   Int      @id @default(autoincrement())
+  numero       String?  @db.VarChar(50)
+  fecha        DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  id_cliente   Int?
+  destinatario String   @db.VarChar(150)
+  cuit         String?  @db.VarChar(20)
+  calle        String?  @db.VarChar(100)
+  num_calle    Int?
+  localidad    String?  @db.VarChar(100)
+  descripcion  String
+  estado       String   @default("ACTIVO") @db.VarChar(20)
+  cliente      cliente? @relation(fields: [id_cliente], references: [id_cliente], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([fecha])
 }
 
 model compra_insumo {

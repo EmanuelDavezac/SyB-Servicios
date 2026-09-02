@@ -262,7 +262,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                             <div>
                                 <h3 className="text-lg font-bold tracking-wide">Nuevo Comprobante</h3>
                                 <p className="text-blue-100 text-xs mt-0.5">
-                                    Generá una factura o remito. Recibos y presupuestos tienen su propio flujo.
+                                    Generá una factura o remito. Recibos, presupuestos e informes técnicos tienen su propio flujo.
                                 </p>
                             </div>
                             <button
@@ -335,7 +335,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         >
                                             <option value="Factura">Factura</option>
                                             <option value="Remito">Remito</option>
-                                            <option value="Informe Tecnico">Informe Técnico</option>
                                         </select>
                                     </div>
                                     <div>

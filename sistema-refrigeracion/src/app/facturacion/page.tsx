@@ -7,6 +7,7 @@ import ModalCobro from "@/components/ModalCobro";
 import BotonImprimirFactura from "@/components/BotonImprimirFactura";
 import BotonImprimirRecibo from "@/components/BotonImprimirRecibo";
 import BotonAnularCobro from "@/components/BotonAnularCobro";
+import BotonAnularFactura from "@/components/BotonAnularFactura";
 
 type FilaComprobante = {
     key: string;
@@ -44,7 +45,11 @@ export default async function FacturacionPage({
         obtenerCobros(),
     ]);
 
-    const filasFactura: FilaComprobante[] = facturasOriginales.map((f: any) => {
+    // Los informes técnicos son solo texto (no se cobran, no generan deuda):
+    // tienen su propia sección en /informes-tecnicos y no aparecen acá.
+    const filasFactura: FilaComprobante[] = facturasOriginales
+        .filter((f: any) => f.tipo !== "Informe Tecnico")
+        .map((f: any) => {
         const cliente = f.orden_trabajo?.cliente;
         const nombreCliente = cliente
             ? `${cliente.nombre} ${cliente.apellido}`
@@ -108,8 +113,8 @@ export default async function FacturacionPage({
         }
 
         // Estado y saldo solo tienen sentido para comprobantes facturables;
-        // un filtro de estado/saldo activo excluye naturalmente todo lo
-        // demás (recibos, informes técnicos, etc.) porque no tienen valor.
+        // un filtro de estado/saldo activo excluye naturalmente los recibos,
+        // que no tienen valor en esas columnas.
         if (filtroEstado) {
             if (fila.estado_pago !== filtroEstado) return false;
         }
@@ -163,11 +168,10 @@ export default async function FacturacionPage({
                     </div>
                 ) : (
                     facturas.map((fila) => {
-                        // Un comprobante no facturable (informe técnico, o un recibo)
-                        // no tiene estado de pago ni saldo: la columna va vacía, nunca
-                        // en $0,00 ni con el badge NO_APLICA.
+                        // Un comprobante no facturable (ej. un recibo) no tiene estado
+                        // de pago ni saldo: la columna va vacía, nunca en $0,00 ni con
+                        // el badge NO_APLICA.
                         const esFacturable = fila.origen === "factura" && fila.estado_pago !== ESTADOS_FACTURA.NO_APLICA;
-                        const esInformeTecnico = fila.origen === "factura" && (fila.tipo === "Informe Tecnico" || fila.tipo === "Informe Técnico");
 
                         let badgeColor = "bg-gray-200 text-gray-800";
                         switch (fila.estado_pago) {
@@ -196,19 +200,19 @@ export default async function FacturacionPage({
                                 <div className="font-semibold text-gray-800">{fila.comprobante}</div>
                                 <div className="text-gray-600">{fila.nombreCliente}</div>
                                 <div className="font-bold text-blue-800">
-                                    {esInformeTecnico ? "" : (fila.total !== null ? formatCurrency(fila.total) : "-")}
+                                    {fila.total !== null ? formatCurrency(fila.total) : "-"}
                                 </div>
                                 <div className="font-bold text-red-700">
-                                    {esInformeTecnico ? "" : (esFacturable ? formatCurrency(fila.saldo ?? 0) : <span className="text-gray-400 font-normal">-</span>)}
+                                    {esFacturable ? formatCurrency(fila.saldo ?? 0) : <span className="text-gray-400 font-normal">-</span>}
                                 </div>
                                 <div>
-                                    {esInformeTecnico ? "" : (esFacturable ? (
+                                    {esFacturable ? (
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
                                             {fila.estado_pago}
                                         </span>
                                     ) : (
                                         <span className="text-gray-400">-</span>
-                                    ))}
+                                    )}
                                 </div>
                                 <div className="text-right flex justify-end gap-3 text-lg opacity-70">
                                     {fila.origen === "recibo" ? (
@@ -220,6 +224,9 @@ export default async function FacturacionPage({
                                         <>
                                             <BotonImprimirFactura idFactura={fila.id} />
                                             <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
+                                            {fila.estado_pago !== ESTADOS_FACTURA.ANULADA && (
+                                                <BotonAnularFactura idFactura={fila.id} />
+                                            )}
                                         </>
                                     )}
                                 </div>
