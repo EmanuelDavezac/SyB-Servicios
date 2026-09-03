@@ -5,6 +5,7 @@ import { crearFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
 import { esTipoFacturable } from "@/lib/estadoFactura";
+import { calcularImportes } from "@/lib/comprobantes";
 
 interface Cliente {
     id_cliente: number;
@@ -56,15 +57,31 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const mostrarInsumosYDescuento = facturable;
 
     const netoBrutoNum = neto ? parseFloat(neto) : 0;
-    const descuentoMontoNum =
-        tipoDescuento === "PORCENTAJE" && descuentoPorcentaje
-            ? netoBrutoNum * parseFloat(descuentoPorcentaje) / 100
-            : tipoDescuento === "EQUIPO" && descuentoImporte
-            ? parseFloat(descuentoImporte)
-            : 0;
-    const netoGravadoNum = netoBrutoNum - descuentoMontoNum;
-    const montoIva = netoGravadoNum * (parseFloat(alicuotaIva || "0") / 100);
-    const montoTotalCalculado = netoGravadoNum + montoIva;
+
+    // Preview en vivo: mientras el usuario está tipeando, el descuento puede
+    // estar incompleto (ej. tipo "PORCENTAJE" elegido pero el % todavía vacío).
+    // calcularImportes tira error en esos casos porque son inválidos para
+    // guardar la factura, pero acá solo queremos mostrar 0 de descuento.
+    let descuentoMontoNum = 0;
+    let netoGravadoNum = netoBrutoNum;
+    let montoTotalCalculado = netoBrutoNum + netoBrutoNum * (parseFloat(alicuotaIva || "0") / 100);
+    try {
+        const importes = calcularImportes({
+            neto: netoBrutoNum,
+            alicuotaIva: parseFloat(alicuotaIva || "0"),
+            tipoDescuento: tipoDescuento === "PORCENTAJE" || tipoDescuento === "EQUIPO" ? tipoDescuento : null,
+            descuentoPorcentaje: descuentoPorcentaje ? parseFloat(descuentoPorcentaje) : null,
+            descuentoMontoEquipo: descuentoImporte ? parseFloat(descuentoImporte) : null,
+            equipoDescripcion,
+            facturable: true,
+        });
+        descuentoMontoNum = importes.descuentoMonto ?? 0;
+        netoGravadoNum = importes.netoGravado;
+        montoTotalCalculado = importes.montoTotal;
+    } catch {
+        // input incompleto/invalido todavia: se mantiene el preview sin descuento
+    }
+    const montoIva = montoTotalCalculado - netoGravadoNum;
 
     /* Insumos */
     const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);

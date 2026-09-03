@@ -89,7 +89,6 @@ model detalle_orden_servicio {
   servicio          servicio?      @relation(fields: [id_servicio], references: [id_servicio], onDelete: Restrict, onUpdate: NoAction)
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model factura {
   id_factura               Int                        @id @default(autoincrement())
   id_orden                 Int?
@@ -116,7 +115,6 @@ model factura {
   @@index([id_orden])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model historial_notificaciones {
   id_notificacion   Int      @id @default(autoincrement())
   id_factura        Int?
@@ -147,7 +145,6 @@ model insumo {
   servicioInsumos      servicio_insumo[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model orden_trabajo {
   id_orden               Int                      @id @default(autoincrement())
   id_cliente             Int?
@@ -209,13 +206,6 @@ model servicio_insumo {
   servicio        servicio @relation(fields: [id_servicio], references: [id_servicio], onDelete: Cascade)
 }
 
-model playing_with_neon {
-  id    Int    @id @default(autoincrement())
-  name  String
-  value Float? @db.Real
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model recibo {
   id_recibo       Int               @id @default(autoincrement())
   id_cliente      Int
@@ -231,7 +221,6 @@ model recibo {
   @@index([id_cliente], map: "idx_recibo_id_cliente")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model retencion {
   id_retencion Int     @id @default(autoincrement())
   id_recibo    Int
@@ -244,16 +233,6 @@ model retencion {
   @@index([tipo], map: "idx_retencion_tipo")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model spatial_ref_sys {
-  srid      Int     @id
-  auth_name String? @db.VarChar(256)
-  auth_srid Int?
-  srtext    String? @db.VarChar(2048)
-  proj4text String? @db.VarChar(2048)
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model detalle_presupuesto {
   id_detalle      Int         @id @default(autoincrement())
   id_presupuesto  Int
@@ -268,7 +247,6 @@ model detalle_presupuesto {
   @@index([id_presupuesto], map: "idx_detalle_presupuesto_id_presupuesto")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model presupuesto {
   id_presupuesto             Int                   @id @default(autoincrement())
   numero                     Int                   @unique @default(autoincrement())

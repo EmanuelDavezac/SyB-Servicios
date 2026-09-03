@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { registrarCobro, obtenerFacturasPendientesCliente } from "@/actions/cobros";
 import { imprimirRecibo } from "@/components/BotonImprimirRecibo";
 import { imprimirComprobante } from "@/components/BotonImprimirFactura";
+import { distribuirCobro } from "@/lib/cobros";
 
 interface Cliente {
     id_cliente: number;
@@ -27,8 +28,6 @@ interface Props {
 
 const inputCls =
     "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
-
-const TOLERANCIA = 0.001;
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount);
@@ -69,20 +68,8 @@ export default function ModalCobro({ clientes }: Props) {
     }, [idCliente]);
 
     function distribuirMontoEntregado() {
-        let restante = parseFloat(montoEntregado) || 0;
-        const nuevasImputaciones: Record<number, string> = {};
-
-        for (const factura of facturasPendientes) {
-            if (restante <= TOLERANCIA) break;
-            const saldo = Number(factura.saldo_pendiente);
-            const aplicar = Math.min(saldo, restante);
-            if (aplicar > TOLERANCIA) {
-                nuevasImputaciones[factura.id_factura] = aplicar.toFixed(2);
-                restante -= aplicar;
-            }
-        }
-
-        setImputaciones(nuevasImputaciones);
+        const monto = parseFloat(montoEntregado) || 0;
+        setImputaciones(distribuirCobro(facturasPendientes, monto));
     }
 
     function actualizarImputacion(id_factura: number, valor: string) {
