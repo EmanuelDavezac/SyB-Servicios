@@ -68,6 +68,10 @@ export default function RootLayout({
                 <i className="fas fa-file-invoice-dollar mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
                 <span className="font-medium">Facturación</span>
               </Link>
+              <Link href="/informes-tecnicos" className="flex items-center py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group">
+                <i className="fas fa-file-lines mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
+                <span className="font-medium">Informe Técnico</span>
+              </Link>
               <Link href="/cobros" className="flex items-center py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group">
                 <i className="fas fa-hand-holding-dollar mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400"></i>
                 <span className="font-medium">Cobros</span>

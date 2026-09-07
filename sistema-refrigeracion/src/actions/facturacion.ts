@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
+import { calcularImportes } from "@/lib/comprobantes";
 
 export async function getFacturas() {
   try {
@@ -69,36 +70,15 @@ export async function crearFactura(data: {
   try {
     const facturable = esTipoFacturable(data.tipo);
 
-    let descuentoMonto: number | null = null;
-    let netoGravado = 0;
-    let montoTotal = 0;
-
-    if (facturable) {
-      const netoBruto = data.neto;
-
-      if (data.tipo_descuento === "PORCENTAJE") {
-        const pct = data.descuento_porcentaje ?? null;
-        if (pct === null || pct < 0 || pct > 100) {
-          throw new Error("El porcentaje de descuento debe estar entre 0 y 100.");
-        }
-        descuentoMonto = netoBruto * pct / 100;
-      } else if (data.tipo_descuento === "EQUIPO") {
-        if (!data.equipo_descripcion?.trim()) {
-          throw new Error("Debe indicar qué equipo entrega el cliente en parte de pago.");
-        }
-        const imp = data.descuento_monto_equipo ?? null;
-        if (imp === null || imp <= 0) {
-          throw new Error("El importe del equipo debe ser mayor a cero.");
-        }
-        if (imp >= netoBruto) {
-          throw new Error("El descuento no puede igualar o superar el subtotal de la factura.");
-        }
-        descuentoMonto = imp;
-      }
-
-      netoGravado = netoBruto - (descuentoMonto ?? 0);
-      montoTotal = netoGravado + netoGravado * (data.alicuota_iva / 100);
-    }
+    const { descuentoMonto, netoGravado, montoTotal } = calcularImportes({
+      neto: data.neto,
+      alicuotaIva: data.alicuota_iva,
+      tipoDescuento: data.tipo_descuento,
+      descuentoPorcentaje: data.descuento_porcentaje,
+      descuentoMontoEquipo: data.descuento_monto_equipo,
+      equipoDescripcion: data.equipo_descripcion,
+      facturable,
+    });
 
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X

@@ -3,20 +3,6 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// 0. OBTENER PROVEEDORES (para el select del modal)
-export async function obtenerProveedores() {
-    try {
-        const proveedores = await prisma.proveedor.findMany({
-            where: { estado: true },
-            orderBy: { razon_social: "asc" },
-        });
-        return proveedores;
-    } catch (error) {
-        console.error("Error al obtener proveedores:", error);
-        return [];
-    }
-}
-
 // 1. OBTENER (LEER)
 export async function obtenerInsumos() {
     try {

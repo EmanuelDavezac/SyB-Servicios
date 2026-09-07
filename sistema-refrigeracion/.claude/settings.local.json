@@ -5,7 +5,14 @@
       "Bash(npx tsc *)",
       "Bash(npm run *)",
       "Bash(npx tsx -e ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node --env-file=.env scratchpad_migrate_informes.mjs)",
+      "Bash(curl -s http://localhost:3000/informes-tecnicos -o /tmp/page.html -w \"HTTP %{http_code}\\\\n\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:3001/informes-tecnicos -o /tmp/page3001.html -w \"HTTP %{http_code}\\\\n\")",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

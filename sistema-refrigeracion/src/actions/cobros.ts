@@ -152,23 +152,53 @@ export async function anularCobro(id_recibo: number) {
 
 export async function anularFactura(id_factura: number) {
   try {
-    const tienePagos = await prisma.pagos_parciales.count({ where: { id_factura } });
-    if (tienePagos > 0) {
-      return { success: false, error: "No se puede anular una factura que ya tiene cobros registrados" };
-    }
+    await prisma.$transaction(async (tx) => {
+      const factura = await tx.factura.findUnique({ where: { id_factura } });
+      if (!factura) {
+        throw new Error("La factura no existe");
+      }
+      if (factura.estado_pago === ESTADOS_FACTURA.ANULADA) {
+        throw new Error("La factura ya está anulada");
+      }
 
-    await prisma.factura.update({
-      where: { id_factura },
-      data: { estado_pago: ESTADOS_FACTURA.ANULADA, saldo_pendiente: 0 },
+      const tienePagos = await tx.pagos_parciales.count({ where: { id_factura } });
+      if (tienePagos > 0) {
+        throw new Error("No se puede anular una factura que ya tiene cobros registrados");
+      }
+
+      // Devolver al stock los insumos que se descontaron al emitir la factura
+      // (crearFactura descuenta, en el paso 3, el stock de todo lo cargado en
+      // detalle_orden_insumo para la orden facturada).
+      const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
+        where: { id_orden: factura.id_orden },
+      });
+
+      for (const detalle of insumosDeOrden) {
+        if (detalle.id_insumo === null) continue;
+        await tx.insumo.update({
+          where: { id_insumo: detalle.id_insumo },
+          data: {
+            stock_actual: {
+              increment: detalle.cantidad_usada,
+            },
+          },
+        });
+      }
+
+      await tx.factura.update({
+        where: { id_factura },
+        data: { estado_pago: ESTADOS_FACTURA.ANULADA, saldo_pendiente: 0 },
+      });
     });
 
     revalidatePath("/facturacion");
     revalidatePath("/cobros");
     revalidatePath("/reportes");
+    revalidatePath("/insumos");
     return { success: true };
   } catch (error) {
     console.error("Error anulando factura:", error);
-    return { success: false, error: "Error al anular la factura" };
+    return { success: false, error: error instanceof Error ? error.message : "Error al anular la factura" };
   }
 }
 

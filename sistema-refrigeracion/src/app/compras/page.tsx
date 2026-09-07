@@ -1,5 +1,5 @@
 import { obtenerCompras } from "@/actions/compras";
-import { obtenerProveedores } from "@/actions/insumos";
+import { obtenerProveedores } from "@/actions/proveedores";
 import ModalCompra from "@/components/ModalCompra";
 import BotonEliminarCompra from "@/components/BotonEliminarCompra";
 

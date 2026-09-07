@@ -3,9 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function obtenerProveedores() {
+export async function obtenerProveedores(opciones?: { incluirInactivos?: boolean }) {
+    const incluirInactivos = opciones?.incluirInactivos ?? false;
     try {
         return await prisma.proveedor.findMany({
+            where: incluirInactivos ? undefined : { estado: true },
             orderBy: { razon_social: "asc" },
         });
     } catch (error) {
