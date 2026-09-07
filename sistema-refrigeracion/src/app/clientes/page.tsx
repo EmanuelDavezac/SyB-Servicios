@@ -28,7 +28,8 @@ export default async function ClientesPage({
 
             {/* Tu Tabla del Prototipo, ahora 100% Dinámica */}
             <div className="bg-white rounded shadow overflow-hidden">
-                <table className="w-full text-left">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left">
                     <thead className="bg-gray-100 border-b">
                         <tr className="text-gray-700 font-semibold">
                             <th className="p-4">Nombre / Razón Social</th>
@@ -85,6 +86,7 @@ export default async function ClientesPage({
                         )}
                     </tbody>
                 </table>
+              </div>
             </div>
         </div>
     );

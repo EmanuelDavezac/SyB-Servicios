@@ -152,7 +152,7 @@ export default async function FacturacionPage({
             <FiltrosFacturacion />
 
             <div className="bg-white rounded shadow text-black overflow-hidden">
-                <div className="grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                <div className="hidden md:grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                     <div>Fecha / Venc.</div>
                     <div>Comprobante</div>
                     <div>Cliente</div>
@@ -191,44 +191,85 @@ export default async function FacturacionPage({
                             }
                         }
 
+                        const acciones = fila.origen === "recibo" ? (
+                            <>
+                                <BotonImprimirRecibo idRecibo={fila.id} />
+                                <BotonAnularCobro idRecibo={fila.id} />
+                            </>
+                        ) : (
+                            <>
+                                <BotonImprimirFactura idFactura={fila.id} />
+                                <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
+                                {fila.estado_pago !== ESTADOS_FACTURA.ANULADA && (
+                                    <BotonAnularFactura idFactura={fila.id} />
+                                )}
+                            </>
+                        );
+
                         return (
-                            <div key={fila.key} className="grid grid-cols-7 items-center p-4 border-b hover:bg-gray-50 text-sm">
-                                <div>
-                                    <div className="text-gray-900">{formatDate(fila.fecha)}</div>
-                                    {vencioTag || <div className="text-xs text-gray-400 mt-1">{esFacturable && fila.fecha_vencimiento ? `Vence ${formatDate(fila.fecha_vencimiento)}` : ""}</div>}
-                                </div>
-                                <div className="font-semibold text-gray-800">{fila.comprobante}</div>
-                                <div className="text-gray-600">{fila.nombreCliente}</div>
-                                <div className="font-bold text-blue-800">
-                                    {fila.total !== null ? formatCurrency(fila.total) : "-"}
-                                </div>
-                                <div className="font-bold text-red-700">
-                                    {esFacturable ? formatCurrency(fila.saldo ?? 0) : <span className="text-gray-400 font-normal">-</span>}
-                                </div>
-                                <div>
-                                    {esFacturable ? (
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
-                                            {fila.estado_pago}
-                                        </span>
-                                    ) : (
-                                        <span className="text-gray-400">-</span>
-                                    )}
-                                </div>
-                                <div className="text-right flex justify-end gap-3 text-lg opacity-70">
-                                    {fila.origen === "recibo" ? (
-                                        <>
-                                            <BotonImprimirRecibo idRecibo={fila.id} />
-                                            <BotonAnularCobro idRecibo={fila.id} />
-                                        </>
-                                    ) : (
-                                        <>
-                                            <BotonImprimirFactura idFactura={fila.id} />
-                                            <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
-                                            {fila.estado_pago !== ESTADOS_FACTURA.ANULADA && (
-                                                <BotonAnularFactura idFactura={fila.id} />
+                            <div key={fila.key} className="border-b hover:bg-gray-50 text-sm">
+                                {/* Tarjeta móvil */}
+                                <div className="p-4 md:hidden">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div>
+                                            <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                            <div className="text-gray-600">{fila.nombreCliente}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-bold text-blue-800">
+                                                {fila.total !== null ? formatCurrency(fila.total) : "-"}
+                                            </div>
+                                            {esFacturable && (
+                                                <div className="font-bold text-red-700 text-xs mt-0.5">
+                                                    Saldo: {formatCurrency(fila.saldo ?? 0)}
+                                                </div>
                                             )}
-                                        </>
-                                    )}
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-3">
+                                        <div>
+                                            <div className="text-gray-900">{formatDate(fila.fecha)}</div>
+                                            {vencioTag || <div className="text-xs text-gray-400 mt-1">{esFacturable && fila.fecha_vencimiento ? `Vence ${formatDate(fila.fecha_vencimiento)}` : ""}</div>}
+                                        </div>
+                                        {esFacturable ? (
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
+                                                {fila.estado_pago}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                    </div>
+                                    <div className="flex justify-end gap-4 text-lg opacity-70 mt-3">
+                                        {acciones}
+                                    </div>
+                                </div>
+
+                                {/* Fila escritorio */}
+                                <div className="hidden md:grid grid-cols-7 items-center p-4">
+                                    <div>
+                                        <div className="text-gray-900">{formatDate(fila.fecha)}</div>
+                                        {vencioTag || <div className="text-xs text-gray-400 mt-1">{esFacturable && fila.fecha_vencimiento ? `Vence ${formatDate(fila.fecha_vencimiento)}` : ""}</div>}
+                                    </div>
+                                    <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                    <div className="text-gray-600">{fila.nombreCliente}</div>
+                                    <div className="font-bold text-blue-800">
+                                        {fila.total !== null ? formatCurrency(fila.total) : "-"}
+                                    </div>
+                                    <div className="font-bold text-red-700">
+                                        {esFacturable ? formatCurrency(fila.saldo ?? 0) : <span className="text-gray-400 font-normal">-</span>}
+                                    </div>
+                                    <div>
+                                        {esFacturable ? (
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
+                                                {fila.estado_pago}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                    </div>
+                                    <div className="text-right flex justify-end gap-3 text-lg opacity-70">
+                                        {acciones}
+                                    </div>
                                 </div>
                             </div>
                         );

@@ -20,19 +20,19 @@ export default function FiltrosOrdenes() {
     }
 
     return (
-        <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black">
+        <div className="bg-white p-4 rounded shadow mb-6 flex flex-col md:flex-row gap-4 text-black">
             <input
                 type="text"
                 placeholder="Buscar por Cliente..."
                 defaultValue={busqueda}
                 onChange={(e) => navegar({ busqueda: e.target.value })}
-                className="border p-2 rounded w-1/3 outline-none focus:border-blue-500"
+                className="border p-2 rounded w-full md:w-1/3 outline-none focus:border-blue-500"
             />
 
             <select
                 value={estado}
                 onChange={(e) => navegar({ estado: e.target.value })}
-                className="border p-2 rounded w-1/4 outline-none focus:border-blue-500"
+                className="border p-2 rounded w-full md:w-1/4 outline-none focus:border-blue-500"
             >
                 <option value="">Todos los Estados</option>
                 <option value="Pendiente">Pendiente</option>

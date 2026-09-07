@@ -33,7 +33,7 @@ export default async function PresupuestosPage({
             <FiltrosPresupuestos />
 
             <div className="bg-white rounded shadow text-black overflow-hidden">
-                <div className="grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                <div className="hidden md:grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                     <div>N°</div>
                     <div>Fecha</div>
                     <div>Destinatario</div>
@@ -56,31 +56,59 @@ export default async function PresupuestosPage({
                             case "RECHAZADO": badgeColor = "bg-red-100 text-red-800 border border-red-200"; break;
                         }
 
+                        const vencimiento = p.estado === "PENDIENTE" && p.vencido ? (
+                            <span className="text-xs text-red-600 font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded">
+                                Vencido {formatDate(p.fecha_vencimiento)}
+                            </span>
+                        ) : (
+                            <span className="text-xs text-gray-400">{formatDate(p.fecha_vencimiento)}</span>
+                        );
+
                         return (
-                            <div key={p.id_presupuesto} className="grid grid-cols-7 items-center p-4 border-b hover:bg-gray-50 text-sm">
-                                <div className="font-semibold text-gray-800">
-                                    0001-{String(p.numero).padStart(10, "0")}
-                                </div>
-                                <div className="text-gray-900">{formatDate(p.fecha_emision)}</div>
-                                <div className="text-gray-600">
-                                    {p.destinatario_nombre}
-                                </div>
-                                <div className="font-bold text-blue-800">{formatCurrency(p.total)}</div>
-                                <div>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
-                                        {p.estado}
-                                    </span>
-                                </div>
-                                <div>
-                                    {p.estado === "PENDIENTE" && p.vencido ? (
-                                        <span className="text-xs text-red-600 font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded">
-                                            Vencido {formatDate(p.fecha_vencimiento)}
+                            <div key={p.id_presupuesto} className="border-b hover:bg-gray-50 text-sm">
+                                {/* Tarjeta móvil */}
+                                <div className="p-4 md:hidden">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div>
+                                            <div className="font-semibold text-gray-800">
+                                                0001-{String(p.numero).padStart(10, "0")}
+                                            </div>
+                                            <div className="text-gray-600">{p.destinatario_nombre}</div>
+                                        </div>
+                                        <div className="font-bold text-blue-800">{formatCurrency(p.total)}</div>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-3">
+                                        <div>
+                                            <div className="text-gray-900">{formatDate(p.fecha_emision)}</div>
+                                            <div className="mt-1">{vencimiento}</div>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
+                                            {p.estado}
                                         </span>
-                                    ) : (
-                                        <span className="text-xs text-gray-400">{formatDate(p.fecha_vencimiento)}</span>
-                                    )}
+                                    </div>
+                                    <div className="mt-3">
+                                        <AccionesPresupuesto presupuesto={p} />
+                                    </div>
                                 </div>
-                                <AccionesPresupuesto presupuesto={p} />
+
+                                {/* Fila escritorio */}
+                                <div className="hidden md:grid grid-cols-7 items-center p-4">
+                                    <div className="font-semibold text-gray-800">
+                                        0001-{String(p.numero).padStart(10, "0")}
+                                    </div>
+                                    <div className="text-gray-900">{formatDate(p.fecha_emision)}</div>
+                                    <div className="text-gray-600">
+                                        {p.destinatario_nombre}
+                                    </div>
+                                    <div className="font-bold text-blue-800">{formatCurrency(p.total)}</div>
+                                    <div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
+                                            {p.estado}
+                                        </span>
+                                    </div>
+                                    <div>{vencimiento}</div>
+                                    <AccionesPresupuesto presupuesto={p} />
+                                </div>
                             </div>
                         );
                     })

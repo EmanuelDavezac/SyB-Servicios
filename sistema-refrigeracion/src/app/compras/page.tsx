@@ -23,7 +23,8 @@ export default async function ComprasPage() {
             </div>
 
             <div className="bg-white rounded shadow overflow-hidden">
-                <table className="w-full text-left">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left">
                     <thead className="bg-gray-100 border-b">
                         <tr className="text-gray-700 font-semibold">
                             <th className="p-4">Fecha</th>
@@ -81,6 +82,7 @@ export default async function ComprasPage() {
                         )}
                     </tbody>
                 </table>
+              </div>
             </div>
         </div>
     );

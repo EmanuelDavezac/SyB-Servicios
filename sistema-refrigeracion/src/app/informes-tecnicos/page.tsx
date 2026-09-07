@@ -28,7 +28,7 @@ export default async function InformesTecnicosPage() {
             </div>
 
             <div className="bg-white rounded shadow text-black overflow-hidden">
-                <div className="grid grid-cols-5 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                <div className="hidden md:grid grid-cols-5 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                     <div>Fecha</div>
                     <div>Número</div>
                     <div>Destinatario</div>
@@ -43,25 +43,47 @@ export default async function InformesTecnicosPage() {
                 ) : (
                     informes.map((informe: any) => {
                         const anulado = informe.estado === "ANULADO";
+                        const numero = (
+                            <>
+                                {informe.numero || `#${informe.id_informe}`}
+                                {anulado && (
+                                    <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-500 border border-gray-300">
+                                        ANULADO
+                                    </span>
+                                )}
+                            </>
+                        );
 
                         return (
-                            <div key={informe.id_informe} className={`grid grid-cols-5 items-center p-4 border-b hover:bg-gray-50 text-sm ${anulado ? "opacity-50" : ""}`}>
-                                <div className="text-gray-900">{formatDate(informe.fecha)}</div>
-                                <div className="font-semibold text-gray-800">
-                                    {informe.numero || `#${informe.id_informe}`}
-                                    {anulado && (
-                                        <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-500 border border-gray-300">
-                                            ANULADO
-                                        </span>
+                            <div key={informe.id_informe} className={`border-b hover:bg-gray-50 text-sm ${anulado ? "opacity-50" : ""}`}>
+                                {/* Tarjeta móvil */}
+                                <div className="p-4 md:hidden">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="font-semibold text-gray-800">{numero}</div>
+                                        <div className="text-gray-900 text-xs">{formatDate(informe.fecha)}</div>
+                                    </div>
+                                    <div className="text-gray-600 mt-1">{informe.destinatario}</div>
+                                    {informe.descripcion && (
+                                        <div className="text-gray-500 text-xs mt-1">{informe.descripcion}</div>
                                     )}
+                                    <div className="flex justify-end gap-4 text-lg opacity-70 mt-3">
+                                        <BotonImprimirInforme informe={informe} />
+                                        {!anulado && <BotonAnularInforme idInforme={informe.id_informe} />}
+                                    </div>
                                 </div>
-                                <div className="text-gray-600">{informe.destinatario}</div>
-                                <div className="text-gray-500 text-xs truncate pr-4" title={informe.descripcion || ""}>
-                                    {informe.descripcion || "-"}
-                                </div>
-                                <div className="text-right flex justify-end gap-3 text-lg opacity-70">
-                                    <BotonImprimirInforme informe={informe} />
-                                    {!anulado && <BotonAnularInforme idInforme={informe.id_informe} />}
+
+                                {/* Fila escritorio */}
+                                <div className="hidden md:grid grid-cols-5 items-center p-4">
+                                    <div className="text-gray-900">{formatDate(informe.fecha)}</div>
+                                    <div className="font-semibold text-gray-800">{numero}</div>
+                                    <div className="text-gray-600">{informe.destinatario}</div>
+                                    <div className="text-gray-500 text-xs truncate pr-4" title={informe.descripcion || ""}>
+                                        {informe.descripcion || "-"}
+                                    </div>
+                                    <div className="text-right flex justify-end gap-3 text-lg opacity-70">
+                                        <BotonImprimirInforme informe={informe} />
+                                        {!anulado && <BotonAnularInforme idInforme={informe.id_informe} />}
+                                    </div>
                                 </div>
                             </div>
                         );

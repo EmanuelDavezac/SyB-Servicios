@@ -29,18 +29,18 @@ export default function FiltrosInsumos({ proveedores }: { proveedores: Proveedor
     }
 
     return (
-        <div className="bg-white p-4 rounded shadow mb-6 flex gap-4 text-black">
+        <div className="bg-white p-4 rounded shadow mb-6 flex flex-col md:flex-row gap-4 text-black">
             <input
                 type="text"
                 placeholder="Buscar por Nombre..."
                 defaultValue={busqueda}
                 onChange={(e) => navegar({ busqueda: e.target.value })}
-                className="border p-2 rounded w-1/3 outline-none focus:border-sky-500"
+                className="border p-2 rounded w-full md:w-1/3 outline-none focus:border-sky-500"
             />
             <select
                 value={proveedor}
                 onChange={(e) => navegar({ proveedor: e.target.value })}
-                className="border p-2 rounded w-1/4 outline-none focus:border-sky-500"
+                className="border p-2 rounded w-full md:w-1/4 outline-none focus:border-sky-500"
             >
                 <option value="">Todos los Proveedores</option>
                 {proveedores.map((prov) => (
@@ -52,7 +52,7 @@ export default function FiltrosInsumos({ proveedores }: { proveedores: Proveedor
             <select
                 value={estado}
                 onChange={(e) => navegar({ estado: e.target.value })}
-                className="border p-2 rounded w-1/4 outline-none focus:border-sky-500"
+                className="border p-2 rounded w-full md:w-1/4 outline-none focus:border-sky-500"
             >
                 <option value="">Todos los Estados</option>
                 <option value="activo">Activo</option>

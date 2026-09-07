@@ -36,7 +36,7 @@ export default async function CobrosPage() {
                 </div>
 
                 <div className="bg-white rounded shadow text-black overflow-hidden">
-                    <div className="grid grid-cols-3 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                    <div className="hidden md:grid grid-cols-3 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                         <div>Cliente</div>
                         <div>Facturas Pendientes</div>
                         <div className="text-right">Saldo</div>
@@ -46,10 +46,22 @@ export default async function CobrosPage() {
                         <div className="p-8 text-center text-gray-500">No hay cuentas pendientes.</div>
                     ) : (
                         clientesConDeuda.map((c: any) => (
-                            <div key={c.id_cliente} className="grid grid-cols-3 items-center p-4 border-b hover:bg-gray-50 text-sm">
-                                <div className="font-semibold text-gray-800">{c.apellido}, {c.nombre}</div>
-                                <div className="text-gray-600">{c.cantidadFacturas}</div>
-                                <div className="text-right font-bold text-red-700">{formatCurrency(c.saldo)}</div>
+                            <div key={c.id_cliente} className="border-b hover:bg-gray-50 text-sm">
+                                {/* Tarjeta móvil */}
+                                <div className="flex justify-between items-center p-4 md:hidden">
+                                    <div className="font-semibold text-gray-800">{c.apellido}, {c.nombre}</div>
+                                    <div className="text-right">
+                                        <div className="font-bold text-red-700">{formatCurrency(c.saldo)}</div>
+                                        <div className="text-xs text-gray-500">{c.cantidadFacturas} factura(s)</div>
+                                    </div>
+                                </div>
+
+                                {/* Fila escritorio */}
+                                <div className="hidden md:grid grid-cols-3 items-center p-4">
+                                    <div className="font-semibold text-gray-800">{c.apellido}, {c.nombre}</div>
+                                    <div className="text-gray-600">{c.cantidadFacturas}</div>
+                                    <div className="text-right font-bold text-red-700">{formatCurrency(c.saldo)}</div>
+                                </div>
                             </div>
                         ))
                     )}
@@ -60,7 +72,7 @@ export default async function CobrosPage() {
                 <h2 className="text-lg font-bold text-gray-800 mb-3">Historial de Recibos</h2>
 
                 <div className="bg-white rounded shadow text-black overflow-hidden">
-                    <div className="grid grid-cols-6 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
+                    <div className="hidden md:grid grid-cols-6 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                         <div>Fecha</div>
                         <div>Cliente</div>
                         <div>Forma de Pago</div>
@@ -72,21 +84,44 @@ export default async function CobrosPage() {
                     {cobros.length === 0 ? (
                         <div className="p-8 text-center text-gray-500">Todavía no se registraron cobros.</div>
                     ) : (
-                        cobros.map((r: any) => (
-                            <div key={r.id_recibo} className="grid grid-cols-6 items-center p-4 border-b hover:bg-gray-50 text-sm">
-                                <div className="text-gray-900">{formatDate(r.fecha_pago)}</div>
-                                <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
-                                <div className="text-gray-600">{r.forma_pago || "-"}</div>
-                                <div className="text-gray-600 text-xs">
-                                    {r.pagos_parciales.map((p: any) => p.factura?.num_factura || `#${p.id_factura}`).join(", ")}
+                        cobros.map((r: any) => {
+                            const facturasImputadas = r.pagos_parciales.map((p: any) => p.factura?.num_factura || `#${p.id_factura}`).join(", ");
+                            return (
+                                <div key={r.id_recibo} className="border-b hover:bg-gray-50 text-sm">
+                                    {/* Tarjeta móvil */}
+                                    <div className="p-4 md:hidden">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
+                                            <div className="font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
+                                            <span>{formatDate(r.fecha_pago)}</span>
+                                            <span>{r.forma_pago || "-"}</span>
+                                        </div>
+                                        {facturasImputadas && (
+                                            <div className="text-gray-500 text-xs mt-1">{facturasImputadas}</div>
+                                        )}
+                                        <div className="flex justify-end gap-4 items-center text-lg opacity-70 mt-3">
+                                            <BotonImprimirRecibo idRecibo={r.id_recibo} />
+                                            <BotonAnularCobro idRecibo={r.id_recibo} />
+                                        </div>
+                                    </div>
+
+                                    {/* Fila escritorio */}
+                                    <div className="hidden md:grid grid-cols-6 items-center p-4">
+                                        <div className="text-gray-900">{formatDate(r.fecha_pago)}</div>
+                                        <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
+                                        <div className="text-gray-600">{r.forma_pago || "-"}</div>
+                                        <div className="text-gray-600 text-xs">{facturasImputadas}</div>
+                                        <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
+                                        <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">
+                                            <BotonImprimirRecibo idRecibo={r.id_recibo} />
+                                            <BotonAnularCobro idRecibo={r.id_recibo} />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
-                                <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">
-                                    <BotonImprimirRecibo idRecibo={r.id_recibo} />
-                                    <BotonAnularCobro idRecibo={r.id_recibo} />
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </section>
