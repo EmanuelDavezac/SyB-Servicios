@@ -155,10 +155,10 @@ export default function ModalCobro({ clientes }: Props) {
             </button>
 
             {abierto && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 overflow-hidden" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4">
+                    <div className="bg-white md:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
 
-                        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-600 to-green-700 text-white rounded-t-2xl">
+                        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-600 to-green-700 text-white md:rounded-t-2xl shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold tracking-wide">Registrar Cobro</h3>
                                 <p className="text-green-100 text-xs mt-0.5">
@@ -173,7 +173,7 @@ export default function ModalCobro({ clientes }: Props) {
                             </button>
                         </div>
 
-                        <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                        <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
 
                             {error && (
                                 <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
@@ -351,7 +351,7 @@ export default function ModalCobro({ clientes }: Props) {
                             )}
                         </div>
 
-                        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 md:rounded-b-2xl shrink-0">
                             <button
                                 onClick={() => setAbierto(false)}
                                 className="px-5 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition"

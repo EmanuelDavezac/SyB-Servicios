@@ -9,10 +9,11 @@ export default async function AppLayout({
   const usuario = await obtenerUsuarioSesion();
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <Sidebar nombre={usuario?.nombre ?? ""} />
 
-      <main className="flex-1 overflow-y-auto p-6 pt-20 md:p-10 bg-slate-50">
+      {/* ÁREA DE CONTENIDO PRINCIPAL */}
+      <main className="flex-1 overflow-y-auto p-4 pt-[4.5rem] lg:p-10 bg-slate-50">
         {children}
       </main>
     </div>

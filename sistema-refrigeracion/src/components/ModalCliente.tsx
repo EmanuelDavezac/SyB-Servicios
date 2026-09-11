@@ -104,7 +104,7 @@ export default function ModalCliente({ cliente }: Props) {
 
     const modal = (
         <div className="modal-backdrop">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800">
+            <div className="bg-white md:rounded-xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
 
                 {/* Header */}
                 <div className="modal-header">
@@ -119,8 +119,8 @@ export default function ModalCliente({ cliente }: Props) {
                 </div>
 
                 {/* Formulario */}
-                <form onSubmit={handleSubmit}>
-                    <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[70vh]">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                    <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1 min-h-0">
 
                         {error && (
                             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 font-bold">

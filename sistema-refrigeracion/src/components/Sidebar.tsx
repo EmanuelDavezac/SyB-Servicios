@@ -1,32 +1,53 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
-const ITEMS_NAV = [
-  { href: "/", icono: "fa-chart-line", label: "Dashboard" },
-  { href: "/clientes", icono: "fa-users", label: "Clientes" },
-  { href: "/insumos", icono: "fa-box-open", label: "Insumos" },
-  { href: "/proveedores", icono: "fa-truck", label: "Proveedores" },
-  { href: "/compras", icono: "fa-cart-shopping", label: "Compras" },
-  { href: "/servicios", icono: "fa-wrench", label: "Servicios" },
-  { href: "/ordenes", icono: "fa-clipboard-list", label: "Órdenes" },
-  { href: "/presupuestos", icono: "fa-file-signature", label: "Presupuestos" },
-  { href: "/facturacion", icono: "fa-file-invoice-dollar", label: "Facturación" },
-  { href: "/informes-tecnicos", icono: "fa-file-lines", label: "Informe Técnico" },
-  { href: "/cobros", icono: "fa-hand-holding-dollar", label: "Cobros" },
-  { href: "/reportes", icono: "fa-chart-pie", label: "Reportes" },
+const LINKS = [
+  { href: "/", icon: "fa-chart-line", label: "Dashboard" },
+  { href: "/clientes", icon: "fa-users", label: "Clientes" },
+  { href: "/insumos", icon: "fa-box-open", label: "Insumos" },
+  { href: "/proveedores", icon: "fa-truck", label: "Proveedores" },
+  { href: "/compras", icon: "fa-cart-shopping", label: "Compras" },
+  { href: "/servicios", icon: "fa-wrench", label: "Servicios" },
+  { href: "/ordenes", icon: "fa-clipboard-list", label: "Órdenes" },
+  { href: "/presupuestos", icon: "fa-file-signature", label: "Presupuestos" },
+  { href: "/facturacion", icon: "fa-file-invoice-dollar", label: "Facturación" },
+  { href: "/informes-tecnicos", icon: "fa-file-lines", label: "Informe Técnico" },
+  { href: "/cobros", icon: "fa-hand-holding-dollar", label: "Cobros" },
+  { href: "/reportes", icon: "fa-chart-pie", label: "Reportes" },
 ];
 
-export default function Sidebar({
-  nombre,
-}: {
-  nombre: string;
-}) {
-  const [abierto, setAbierto] = useState(false);
+export default function Sidebar({ nombre }: { nombre: string }) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollEl = document.querySelector("main");
+    const prevOverflow = scrollEl?.style.overflow ?? "";
+    if (scrollEl) scrollEl.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      if (scrollEl) scrollEl.style.overflow = prevOverflow;
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   async function cerrarSesion() {
     await authClient.signOut();
@@ -36,52 +57,51 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Botón hamburguesa, solo visible en mobile */}
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        className="md:hidden fixed top-4 left-4 z-30 h-10 w-10 flex items-center justify-center rounded-lg bg-slate-900 text-white shadow-lg"
-        aria-label="Abrir menú"
-      >
-        <i className="fas fa-bars"></i>
-      </button>
+      {/* BARRA SUPERIOR MÓVIL */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white flex items-center px-4 z-30 shadow-lg">
+        <button
+          type="button"
+          aria-label="Abrir menú"
+          onClick={() => setOpen(true)}
+          className="w-11 h-11 -ml-2 flex items-center justify-center text-xl"
+        >
+          <i className="fas fa-bars"></i>
+        </button>
+        <h1 className="ml-2 text-lg font-black text-blue-500 tracking-tighter">
+          SyB SERVICIOS
+        </h1>
+      </header>
 
-      {/* Fondo oscuro al abrir el panel en mobile */}
-      {abierto && (
+      {/* CAPA OSCURA */}
+      {open && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={() => setAbierto(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setOpen(false)}
         />
       )}
 
+      {/* BARRA LATERAL */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white shrink-0 flex flex-col shadow-2xl transform transition-transform duration-200 ease-in-out
-        ${abierto ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+        className={`
+          fixed lg:static top-0 left-0 h-dvh w-64 bg-slate-900 text-white shrink-0 flex flex-col z-50 shadow-2xl
+          transition-transform duration-200 ease-in-out
+          ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
+        `}
       >
-        <div className="p-6 flex items-center justify-between">
+        <div className="p-6">
           <h1 className="text-xl font-black border-b border-slate-800 pb-4 text-blue-500 tracking-tighter">
             SyB SERVICIOS
           </h1>
-          <button
-            type="button"
-            onClick={() => setAbierto(false)}
-            className="md:hidden text-slate-400 hover:text-white"
-            aria-label="Cerrar menú"
-          >
-            <i className="fas fa-xmark"></i>
-          </button>
         </div>
-
         <nav className="mt-2 flex-1 space-y-1 overflow-y-auto">
-          {ITEMS_NAV.map((item) => (
+          {LINKS.map(({ href, icon, label }) => (
             <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setAbierto(false)}
-              className="flex items-center py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group"
+              key={href}
+              href={href}
+              className="flex items-center min-h-[44px] py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group"
             >
-              <i className={`fas ${item.icono} mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400`}></i>
-              <span className="font-medium">{item.label}</span>
+              <i className={`fas ${icon} mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400`}></i>
+              <span className="font-medium">{label}</span>
             </Link>
           ))}
         </nav>
@@ -91,7 +111,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={cerrarSesion}
-            className="mt-2 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-all duration-200"
+            className="mt-2 w-full flex items-center justify-center gap-2 min-h-[44px] py-2 px-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-all duration-200"
           >
             <i className="fas fa-right-from-bracket"></i>
             Cerrar sesión

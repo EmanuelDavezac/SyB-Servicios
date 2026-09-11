@@ -543,8 +543,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     /* ── Modal content ── */
     const modalContent = (
-        <div className="modal-backdrop overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 my-auto">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4">
+            <div className="bg-white md:rounded-xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
 
                 {/* Header */}
                 <div className="modal-header">
@@ -558,7 +558,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                     </button>
                 </div>
 
-                <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[75vh]">
+                <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1 min-h-0">
 
                     {/* ── Datos de la orden ── */}
                     <section>

@@ -13,11 +13,11 @@ body {
 
 /* Custom modal backdrop for glassmorphism */
 .modal-backdrop {
-  @apply fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-[9999] p-4;
+  @apply fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4;
 }
 
 .modal-header {
-  @apply flex items-center justify-between px-6 py-4 bg-blue-600 text-white rounded-t-xl;
+  @apply flex items-center justify-between px-6 py-4 bg-blue-600 text-white rounded-t-none md:rounded-t-xl shrink-0;
 }
 
 .section-title {
@@ -25,7 +25,7 @@ body {
 }
 
 .modal-footer {
-  @apply flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl;
+  @apply flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-none md:rounded-b-xl shrink-0;
 }
 
 .btn-primary {

@@ -83,11 +83,11 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
         "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
 
     const modalContent = (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[9999] p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4">
+            <div className="bg-white md:rounded-2xl shadow-2xl w-full max-w-lg flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-sky-600 to-sky-700 text-white rounded-t-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-sky-600 to-sky-700 text-white md:rounded-t-2xl shrink-0">
                     <div>
                         <h3 className="text-lg font-bold tracking-wide">
                             {modoEdicion ? "Editar Proveedor" : "Nuevo Proveedor"}
@@ -106,7 +106,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                 </div>
 
                 {/* Cuerpo */}
-                <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[70vh]">
+                <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
 
                     {/* ── Datos del proveedor ── */}
                     <section>
@@ -182,7 +182,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
+                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 md:rounded-b-2xl shrink-0">
                     <button
                         type="button"
                         onClick={() => setAbierto(false)}

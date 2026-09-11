@@ -78,7 +78,7 @@ export default async function ReportesPage({
             </div>
 
             {/* Filters */}
-            <form method="GET" action="/reportes" className="bg-white p-4 rounded shadow-sm border border-gray-100 flex items-end gap-6">
+            <form method="GET" action="/reportes" className="bg-white p-4 rounded shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
                 <div className="flex-1">
                     <label className="block text-sm text-gray-600 mb-1">Tipo de Reporte</label>
                     <select name="tipo" defaultValue={tipoReporte} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
@@ -217,7 +217,7 @@ export default async function ReportesPage({
                     </h3>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600">
+                    <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                         <thead className="border-b border-gray-100 text-slate-500">
                             <tr>
                                 <th className="px-4 py-3 font-medium">Nombre</th>
@@ -265,7 +265,7 @@ export default async function ReportesPage({
                 </div>
                 <div className="overflow-x-auto">
                     {tipoReporte === "servicios" ? (
-                        <table className="w-full text-left text-sm text-slate-600">
+                        <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                             <thead className="border-b border-gray-100 text-slate-500">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Fecha</th>
@@ -306,7 +306,7 @@ export default async function ReportesPage({
                             </tbody>
                         </table>
                     ) : (
-                        <table className="w-full text-left text-sm text-slate-600">
+                        <table className="w-full min-w-[600px] text-left text-sm text-slate-600">
                             <thead className="border-b border-gray-100 text-slate-500">
                                 <tr>
                                     <th className="px-4 py-3 font-medium">Fecha</th>
