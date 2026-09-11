@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerProveedores(opciones?: { incluirInactivos?: boolean }) {
     const incluirInactivos = opciones?.incluirInactivos ?? false;
@@ -24,6 +25,7 @@ export async function crearProveedor(datos: {
     email?: string;
 }) {
     try {
+        await requerirUsuario();
         await prisma.proveedor.create({ data: datos });
         revalidatePath("/proveedores");
         return { success: true };
@@ -44,6 +46,7 @@ export async function editarProveedor(
     }
 ) {
     try {
+        await requerirUsuario();
         await prisma.proveedor.update({ where: { id_proveedor }, data: datos });
         revalidatePath("/proveedores");
         return { success: true };
@@ -55,6 +58,7 @@ export async function editarProveedor(
 
 export async function toggleEstadoProveedor(id_proveedor: number, estadoActual: boolean) {
     try {
+        await requerirUsuario();
         await prisma.proveedor.update({
             where: { id_proveedor },
             data: { estado: !estadoActual },

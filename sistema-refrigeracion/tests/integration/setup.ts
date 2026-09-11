@@ -11,6 +11,28 @@ vi.mock("next/cache", () => ({
   revalidatePath: () => {},
 }));
 
+// Las actions llaman a requerirUsuario() (src/lib/sesion.ts) al principio de
+// toda escritura para exigir sesion. Estos tests invocan las actions
+// directamente, sin request de Next detras y sin cookie de sesion real, asi
+// que auth.api.getSession (que necesita next/headers) no tiene de donde leer
+// nada. Se simula la sesion devuelta -un usuario ya autorizado-, no el
+// control: la funcion real de la action sigue llamando a requerirUsuario, asi
+// que un cambio que la borre rompe la suite igual que borrar la revalidacion.
+vi.mock("@/lib/sesion", () => ({
+  requerirUsuario: async () => ({
+    id: "test-user-id",
+    email: "test@syb-servicios.local",
+    nombre: "Usuario de Test",
+    rol: "administrador",
+  }),
+  obtenerUsuarioSesion: async () => ({
+    id: "test-user-id",
+    email: "test@syb-servicios.local",
+    nombre: "Usuario de Test",
+    rol: "administrador",
+  }),
+}));
+
 // DATABASE_URL/DATABASE_ADAPTER ya vienen seteadas por vitest.config.ts
 // (campo test.env), asignadas a process.env antes de que este archivo o
 // cualquier modulo de la app se importen. Aca solo se valida.

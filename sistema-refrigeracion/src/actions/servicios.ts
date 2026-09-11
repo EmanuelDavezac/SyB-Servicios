@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerServicios() {
     try {
@@ -23,6 +24,7 @@ export async function crearServicio(datos: {
     precio: number;
 }) {
     try {
+        await requerirUsuario();
         const nuevoServicio = await prisma.servicio.create({
             data: {
                 nombre: datos.nombre,
@@ -44,6 +46,7 @@ export async function actualizarRecetaServicio(
     insumos: { id_insumo: number; cantidad: number }[]
 ) {
     try {
+        await requerirUsuario();
         await prisma.$transaction(async (tx) => {
             await tx.servicio_insumo.deleteMany({ where: { id_servicio } });
             if (insumos.length > 0) {
@@ -73,6 +76,7 @@ export async function editarServicio(
     }
 ) {
     try {
+        await requerirUsuario();
         await prisma.servicio.update({
             where: { id_servicio },
             data: {
@@ -91,6 +95,7 @@ export async function editarServicio(
 
 export async function toggleEstadoServicio(id_servicio: number, estadoActual: boolean) {
     try {
+        await requerirUsuario();
         await prisma.servicio.update({
             where: { id_servicio },
             data: { estado: !estadoActual },

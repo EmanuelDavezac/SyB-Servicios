@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
 import { calcularImportes } from "@/lib/comprobantes";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function getFacturas() {
   try {
@@ -68,6 +69,7 @@ export async function crearFactura(data: {
   equipo_descripcion?: string | null;
 }) {
   try {
+    await requerirUsuario();
     const facturable = esTipoFacturable(data.tipo);
 
     const { descuentoMonto, netoGravado, montoTotal } = calcularImportes({

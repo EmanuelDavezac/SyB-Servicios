@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 // 1. OBTENER (LEER)
 export async function obtenerInsumos() {
@@ -43,6 +44,7 @@ export async function crearInsumo(datos: {
     estado?: boolean; // <-- 1. AGREGAMOS ESTO ACÁ
 }) {
     try {
+        await requerirUsuario();
         const nuevoInsumo = await prisma.insumo.create({
             data: {
                 nombre: datos.nombre,
@@ -88,6 +90,7 @@ export async function actualizarInsumo(
     }
 ) {
     try {
+        await requerirUsuario();
         const insumoActualizado = await prisma.insumo.update({
             where: {
                 id_insumo: id,
@@ -124,6 +127,7 @@ export async function actualizarInsumo(
 // 4. ELIMINAR (DAR DE BAJA)
 export async function eliminarInsumo(id: number) {
     try {
+        await requerirUsuario();
         // Podrías en lugar de borrarlo, cambiarle el estado a inactivo si quisieras
         await prisma.insumo.delete({
             where: {

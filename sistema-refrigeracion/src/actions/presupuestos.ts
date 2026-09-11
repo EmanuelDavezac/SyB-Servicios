@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { calcularTotales, calcularVencimiento } from "@/lib/presupuestos";
+import { requerirUsuario } from "@/lib/sesion";
 
 interface Destinatario {
     id_cliente?: number | null;
@@ -33,6 +34,7 @@ interface DatosPresupuesto {
 
 export async function crearPresupuesto(data: DatosPresupuesto) {
     try {
+        await requerirUsuario();
         if (!data.lineas || data.lineas.length === 0) {
             throw new Error("El presupuesto debe tener al menos una línea.");
         }
@@ -74,6 +76,7 @@ export async function crearPresupuesto(data: DatosPresupuesto) {
 
 export async function actualizarPresupuesto(id_presupuesto: number, data: DatosPresupuesto) {
     try {
+        await requerirUsuario();
         const actualizado = await prisma.$transaction(async (tx) => {
             const actual = await tx.presupuesto.findUnique({ where: { id_presupuesto } });
             if (!actual) throw new Error("Presupuesto no encontrado");
@@ -195,6 +198,7 @@ export async function obtenerPresupuestoCompleto(id_presupuesto: number) {
 
 export async function cambiarEstadoPresupuesto(id_presupuesto: number, estado: "ACEPTADO" | "RECHAZADO") {
     try {
+        await requerirUsuario();
         const actual = await prisma.presupuesto.findUnique({ where: { id_presupuesto } });
         if (!actual) throw new Error("Presupuesto no encontrado");
         if (actual.estado !== "PENDIENTE") {
@@ -216,6 +220,7 @@ export async function cambiarEstadoPresupuesto(id_presupuesto: number, estado: "
 
 export async function vincularClienteAPresupuesto(id_presupuesto: number, id_cliente: number) {
     try {
+        await requerirUsuario();
         const actualizado = await prisma.presupuesto.update({
             where: { id_presupuesto },
             data: { id_cliente },
@@ -230,6 +235,7 @@ export async function vincularClienteAPresupuesto(id_presupuesto: number, id_cli
 
 export async function eliminarPresupuesto(id_presupuesto: number) {
     try {
+        await requerirUsuario();
         const actual = await prisma.presupuesto.findUnique({ where: { id_presupuesto } });
         if (!actual) throw new Error("Presupuesto no encontrado");
         if (actual.estado !== "PENDIENTE") {

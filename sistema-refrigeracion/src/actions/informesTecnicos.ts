@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerInformesTecnicos() {
   try {
@@ -28,6 +29,7 @@ export async function crearInformeTecnico(data: {
   descripcion: string;
 }) {
   try {
+    await requerirUsuario();
     if (!data.destinatario.trim()) {
       return { success: false, error: "Completá a quién va destinado el informe." };
     }
@@ -58,6 +60,7 @@ export async function crearInformeTecnico(data: {
 
 export async function anularInformeTecnico(id_informe: number) {
   try {
+    await requerirUsuario();
     const informe = await prisma.informe_tecnico.findUnique({ where: { id_informe } });
     if (!informe) {
       return { success: false, error: "El informe no existe" };

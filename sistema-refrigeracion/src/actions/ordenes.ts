@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 // Trae todas las órdenes con el nombre del cliente incluido
 export async function obtenerOrdenes() {
@@ -59,6 +60,7 @@ export async function crearOrden(datos: {
     notas_internas?: string;
 }) {
     try {
+        await requerirUsuario();
         const nuevaOrden = await prisma.orden_trabajo.create({
             data: {
                 id_cliente: datos.id_cliente,
@@ -83,6 +85,7 @@ export async function editarOrden(id_orden: number, datos: {
     notas_internas?: string;
 }) {
     try {
+        await requerirUsuario();
         const ordenActualizada = await prisma.orden_trabajo.update({
             where: { id_orden },
             data: {
@@ -109,6 +112,7 @@ export async function agregarServicioAOrden(datos: {
     precio_acordado: number;
 }) {
     try {
+        await requerirUsuario();
         await prisma.detalle_orden_servicio.create({
             data: {
                 id_orden: datos.id_orden,
@@ -133,6 +137,7 @@ export async function agregarServicioLibreAOrden(datos: {
     precio_acordado: number;
 }) {
     try {
+        await requerirUsuario();
         await prisma.detalle_orden_servicio.create({
             data: {
                 id_orden: datos.id_orden,
@@ -159,6 +164,7 @@ export async function crearServicioYAgregarAOrden(datos: {
     cantidad: number;
 }) {
     try {
+        await requerirUsuario();
         // Crear el servicio
         const nuevoServicio = await prisma.servicio.create({
             data: {
@@ -190,6 +196,7 @@ export async function crearServicioYAgregarAOrden(datos: {
 // Elimina un detalle de servicio de una orden
 export async function quitarServicioDeOrden(id_detalle_srv: number) {
     try {
+        await requerirUsuario();
         await prisma.detalle_orden_servicio.delete({
             where: { id_detalle_srv },
         });
@@ -227,6 +234,7 @@ export async function agregarInsumoAOrden(datos: {
     precio_aplicado: number;
 }) {
     try {
+        await requerirUsuario();
         await prisma.detalle_orden_insumo.create({
             data: {
                 id_orden: datos.id_orden,
@@ -246,6 +254,7 @@ export async function agregarInsumoAOrden(datos: {
 /** Quita un insumo de la orden */
 export async function quitarInsumoDeOrden(id_detalle_ord_insumo: number) {
     try {
+        await requerirUsuario();
         await prisma.detalle_orden_insumo.delete({
             where: { id_detalle_ins: id_detalle_ord_insumo },
         });

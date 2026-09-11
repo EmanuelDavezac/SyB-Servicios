@@ -42,6 +42,7 @@ export async function obtenerClientes(filtros?: {
 
 // Next.js nos da esta herramienta para actualizar la pantalla automáticamente
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function crearCliente(datos: {
     nombre: string;
@@ -54,6 +55,7 @@ export async function crearCliente(datos: {
     localidad?: string;
 }) {
     try {
+        await requerirUsuario();
         const nuevoCliente = await prisma.cliente.create({
             data: {
                 nombre: datos.nombre,
@@ -88,6 +90,7 @@ export async function actualizarCliente(id_cliente: number, datos: {
     localidad?: string;
 }) {
     try {
+        await requerirUsuario();
         const cliente = await prisma.cliente.update({
             where: { id_cliente },
             data: {
@@ -113,6 +116,7 @@ export async function actualizarCliente(id_cliente: number, datos: {
 
 export async function eliminarCliente(id_cliente: number) {
     try {
+        await requerirUsuario();
         await prisma.cliente.delete({ where: { id_cliente } });
         revalidatePath("/clientes");
         return { success: true };

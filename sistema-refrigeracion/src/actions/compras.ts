@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerCompras() {
     try {
@@ -28,6 +29,7 @@ export async function crearCompra(data: {
     insumos: { id_insumo: number; cantidad: number; precio_unitario: number }[];
 }) {
     try {
+        await requerirUsuario();
         if (!data.insumos || data.insumos.length === 0) {
             return { success: false, error: "Agregá al menos un insumo a la compra." };
         }
@@ -82,6 +84,7 @@ export async function crearCompra(data: {
 
 export async function eliminarCompra(id_compra: number) {
     try {
+        await requerirUsuario();
         await prisma.$transaction(async (tx) => {
             const detalles = await tx.detalle_compra.findMany({ where: { id_compra } });
 

@@ -24,6 +24,8 @@ Sistema de gestión para un negocio de service de refrigeración (instalación/r
 - `compra_insumo` / `detalle_compra` — compras a proveedores (egresos), poco usado actualmente.
 - `servicio_insumo` — insumos típicamente asociados a un servicio (catálogo/receta, no movimiento de stock).
 - `historial_notificaciones` — log de notificaciones enviadas por factura/cliente.
+- `user`, `session`, `account`, `verification` — tablas de Better Auth (login con Google), generadas con `npx auth@latest generate`. `user` es palabra reservada en Postgres: cualquier SQL crudo contra esa tabla (`$queryRaw`, `$executeRaw`, scripts sueltos) necesita comillas dobles (`"user"`), si no el parser la toma como la keyword y falla o apunta a otra cosa.
+- `usuario_autorizado` — lista blanca de login: email único, nombre, rol, activo. Se consulta en cada login (Google) y en cada pedido autenticado (plugin `customSession` de `src/lib/auth.ts`); desactivar una fila saca a ese usuario en su próxima acción sin esperar a que expire la cookie.
 
 ### Estructura del código
 - `src/app/<seccion>/page.tsx` — Server Components que leen datos vía las funciones de `src/actions/` y arman la tabla/página. Filtros por querystring (`searchParams`) resueltos en el servidor.

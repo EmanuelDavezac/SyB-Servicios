@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado } from "@/lib/estadoFactura";
 import type { Prisma } from "@prisma/client";
+import { requerirUsuario } from "@/lib/sesion";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,6 +38,7 @@ export async function registrarCobro(data: {
   retenciones?: { tipo: string; monto: number }[];
 }) {
   try {
+    await requerirUsuario();
     if (!data.imputaciones || data.imputaciones.length === 0) {
       return { success: false, error: "Agregá al menos una imputación a una factura." };
     }
@@ -126,6 +128,7 @@ export async function registrarCobro(data: {
 
 export async function anularCobro(id_recibo: number) {
   try {
+    await requerirUsuario();
     await prisma.$transaction(async (tx) => {
       const pagos = await tx.pagos_parciales.findMany({ where: { id_recibo } });
       if (pagos.length === 0) {
@@ -152,6 +155,7 @@ export async function anularCobro(id_recibo: number) {
 
 export async function anularFactura(id_factura: number) {
   try {
+    await requerirUsuario();
     await prisma.$transaction(async (tx) => {
       const factura = await tx.factura.findUnique({ where: { id_factura } });
       if (!factura) {
