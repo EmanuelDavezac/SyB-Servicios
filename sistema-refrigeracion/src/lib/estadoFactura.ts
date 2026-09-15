@@ -25,7 +25,7 @@ export function calcularEstado(saldoPendiente: number, montoTotal: number): Esta
 // es discutible (documenta una entrega, no una deuda, y si luego se emite la
 // factura por la misma entrega la deuda del cliente se duplica). Sacarlo de
 // acá es la única línea a tocar el día que se decida cambiar eso.
-export const TIPOS_COMPROBANTE_FACTURABLE = ["Factura", "Remito"] as const;
+export const TIPOS_COMPROBANTE_FACTURABLE = ["Factura"] as const;
 
 export function esTipoFacturable(tipo: string | null | undefined): boolean {
   return !!tipo && (TIPOS_COMPROBANTE_FACTURABLE as readonly string[]).includes(tipo);
