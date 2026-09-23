@@ -44,7 +44,13 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                 estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
             },
         });
-        const totalFacturado = facturasDelMes.reduce((acc, f) => acc + Number(f.monto_total), 0);
+        let totalFacturadoFiscal = 0;
+        let totalFacturadoInterno = 0;
+        for (const f of facturasDelMes) {
+            if (f.fiscal) totalFacturadoFiscal += Number(f.monto_total);
+            else totalFacturadoInterno += Number(f.monto_total);
+        }
+        const totalFacturado = totalFacturadoFiscal + totalFacturadoInterno;
 
         // 3. Obtener Egresos (Compras de Insumos)
         const compras = await prisma.compra_insumo.findMany({
@@ -109,11 +115,21 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
             totalEgresos,
             balanceGeneral,
             totalFacturado,
+            totalFacturadoFiscal,
+            totalFacturadoInterno,
         };
 
     } catch (error) {
         console.error("Error al obtener reporte mensual:", error);
-        return { movimientos: [], totalIngresos: 0, totalEgresos: 0, balanceGeneral: 0, totalFacturado: 0 };
+        return {
+            movimientos: [],
+            totalIngresos: 0,
+            totalEgresos: 0,
+            balanceGeneral: 0,
+            totalFacturado: 0,
+            totalFacturadoFiscal: 0,
+            totalFacturadoInterno: 0,
+        };
     }
 }
 
@@ -223,21 +239,29 @@ export async function obtenerPosicionIVA(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        // Ventas: facturas emitidas en el mes, excluyendo anuladas y no-facturables
+        // Ventas: facturas emitidas en el mes, excluyendo anuladas y no-facturables.
+        // Solo las fiscales (cargadas en ARCA): es el IVA que se declara.
         const facturas = await prisma.factura.findMany({
             where: {
                 fecha_emision: { gte: fechaInicio, lte: fechaFin },
                 estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+                fiscal: true,
             },
+            include: { factura_iva: true },
         });
 
         let netoVentas = 0;
         let ivaVentas = 0;
         for (const f of facturas) {
             const neto = Number(f.neto ?? 0);
-            const alicuota = Number(f.alicuota_iva ?? 0);
             netoVentas += neto;
-            ivaVentas += neto * alicuota / 100;
+            if (f.factura_iva.length > 0) {
+                ivaVentas += f.factura_iva.reduce((acc, fi) => acc + Number(fi.monto_iva), 0);
+            } else {
+                // Facturas anteriores al IVA por linea: una sola alicuota
+                const alicuota = Number(f.alicuota_iva ?? 0);
+                ivaVentas += neto * alicuota / 100;
+            }
         }
 
         // Compras: compra_insumo con fecha_compra en el mes

@@ -3,6 +3,27 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
+import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
+import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+
+function validarAlicuota(alicuota: number | undefined): number {
+    const valor = alicuota ?? ALICUOTA_IVA_DEFAULT;
+    if (!alicuotaValida(valor)) {
+        throw new Error("La alícuota de IVA debe estar entre 0 y 100.");
+    }
+    return valor;
+}
+
+// Las lineas de una orden ya facturada no se tocan: su IVA ya quedo
+// congelado en factura_iva y no se recalculan facturas emitidas.
+async function ordenYaFacturada(id_orden: number | null): Promise<boolean> {
+    if (id_orden === null) return false;
+    const factura = await prisma.factura.findFirst({
+        where: { id_orden, estado_pago: { not: ESTADOS_FACTURA.ANULADA } },
+        select: { id_factura: true },
+    });
+    return !!factura;
+}
 
 // Trae todas las órdenes con el nombre del cliente incluido
 export async function obtenerOrdenes() {
@@ -110,15 +131,18 @@ export async function agregarServicioAOrden(datos: {
     id_servicio: number;
     cantidad: number;
     precio_acordado: number;
+    alicuota_iva?: number;
 }) {
     try {
         await requerirUsuario();
+        const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
                 id_orden: datos.id_orden,
                 id_servicio: datos.id_servicio,
                 cantidad: datos.cantidad,
                 precio_acordado: datos.precio_acordado,
+                alicuota_iva,
             },
         });
         revalidatePath("/ordenes");
@@ -135,9 +159,11 @@ export async function agregarServicioLibreAOrden(datos: {
     descripcion_libre: string;
     cantidad: number;
     precio_acordado: number;
+    alicuota_iva?: number;
 }) {
     try {
         await requerirUsuario();
+        const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
                 id_orden: datos.id_orden,
@@ -145,6 +171,7 @@ export async function agregarServicioLibreAOrden(datos: {
                 descripcion_libre: datos.descripcion_libre,
                 cantidad: datos.cantidad,
                 precio_acordado: datos.precio_acordado,
+                alicuota_iva,
             },
         });
         revalidatePath("/ordenes");
@@ -162,9 +189,11 @@ export async function crearServicioYAgregarAOrden(datos: {
     descripcion?: string;
     precio: number;
     cantidad: number;
+    alicuota_iva?: number;
 }) {
     try {
         await requerirUsuario();
+        const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         // Crear el servicio
         const nuevoServicio = await prisma.servicio.create({
             data: {
@@ -181,6 +210,7 @@ export async function crearServicioYAgregarAOrden(datos: {
                 id_servicio: nuevoServicio.id_servicio,
                 cantidad: datos.cantidad,
                 precio_acordado: datos.precio,
+                alicuota_iva,
             },
         });
 
@@ -208,6 +238,30 @@ export async function quitarServicioDeOrden(id_detalle_srv: number) {
     }
 }
 
+// Cambia la alicuota de IVA de una linea de servicio ya guardada
+export async function actualizarAlicuotaServicio(id_detalle_srv: number, alicuota_iva: number) {
+    try {
+        await requerirUsuario();
+        if (!alicuotaValida(alicuota_iva)) {
+            return { success: false, error: "La alícuota de IVA debe estar entre 0 y 100." };
+        }
+        const detalle = await prisma.detalle_orden_servicio.findUnique({ where: { id_detalle_srv } });
+        if (!detalle) return { success: false, error: "La línea no existe." };
+        if (await ordenYaFacturada(detalle.id_orden)) {
+            return { success: false, error: "La orden ya está facturada: no se puede cambiar el IVA." };
+        }
+        await prisma.detalle_orden_servicio.update({
+            where: { id_detalle_srv },
+            data: { alicuota_iva },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al actualizar alicuota de servicio:", error);
+        return { success: false, error: "No se pudo actualizar el IVA" };
+    }
+}
+
 // Obtiene los detalles de servicios de una orden
 export async function obtenerServiciosDeOrden(id_orden: number) {
     try {
@@ -232,15 +286,18 @@ export async function agregarInsumoAOrden(datos: {
     id_insumo: number;
     cantidad: number;
     precio_aplicado: number;
+    alicuota_iva?: number;
 }) {
     try {
         await requerirUsuario();
+        const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_insumo.create({
             data: {
                 id_orden: datos.id_orden,
                 id_insumo: datos.id_insumo,
                 cantidad_usada: datos.cantidad,
                 precio_aplicado: datos.precio_aplicado,
+                alicuota_iva,
             },
         });
         revalidatePath("/ordenes");
@@ -263,6 +320,30 @@ export async function quitarInsumoDeOrden(id_detalle_ord_insumo: number) {
     } catch (error) {
         console.error("Error al quitar insumo de la orden:", error);
         return { success: false, error: "No se pudo quitar el insumo" };
+    }
+}
+
+/** Cambia la alícuota de IVA de un insumo ya guardado en la orden */
+export async function actualizarAlicuotaInsumo(id_detalle_ord_insumo: number, alicuota_iva: number) {
+    try {
+        await requerirUsuario();
+        if (!alicuotaValida(alicuota_iva)) {
+            return { success: false, error: "La alícuota de IVA debe estar entre 0 y 100." };
+        }
+        const detalle = await prisma.detalle_orden_insumo.findUnique({ where: { id_detalle_ins: id_detalle_ord_insumo } });
+        if (!detalle) return { success: false, error: "La línea no existe." };
+        if (await ordenYaFacturada(detalle.id_orden)) {
+            return { success: false, error: "La orden ya está facturada: no se puede cambiar el IVA." };
+        }
+        await prisma.detalle_orden_insumo.update({
+            where: { id_detalle_ins: id_detalle_ord_insumo },
+            data: { alicuota_iva },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al actualizar alicuota de insumo:", error);
+        return { success: false, error: "No se pudo actualizar el IVA" };
     }
 }
 

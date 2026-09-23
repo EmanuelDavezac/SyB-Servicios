@@ -15,6 +15,8 @@ export default function FiltrosFacturacion() {
     const inicialTipo = searchParams.get("tipo") || "";
     const inicialEstado = searchParams.get("estado") || "";
     const inicialConSaldo = searchParams.get("conSaldo") === "1";
+    const paramFiscal = searchParams.get("fiscal");
+    const inicialFiscal = paramFiscal === "1" || paramFiscal === "0" ? paramFiscal : "";
 
     const [fechaInicio, setFechaInicio] = useState(inicialFechaInicio);
     const [fechaFin, setFechaFin] = useState(inicialFechaFin);
@@ -22,6 +24,7 @@ export default function FiltrosFacturacion() {
     const [tipo, setTipo] = useState(inicialTipo);
     const [estado, setEstado] = useState(inicialEstado);
     const [conSaldo, setConSaldo] = useState(inicialConSaldo);
+    const [fiscal, setFiscal] = useState(inicialFiscal);
 
     // "Recibo" no es un tipo facturable (ni siquiera es un tipo de `factura`,
     // vive en su propia tabla): el estado de pago no le aplica en ninguno de
@@ -41,6 +44,7 @@ export default function FiltrosFacturacion() {
             if (tipo) params.set("tipo", tipo);
             if (estadoAplica && estado) params.set("estado", estado);
             if (conSaldo) params.set("conSaldo", "1");
+            if (fiscal) params.set("fiscal", fiscal);
 
             const newQueryString = params.toString();
 
@@ -50,7 +54,7 @@ export default function FiltrosFacturacion() {
         }, 400);
 
         return () => clearTimeout(timer);
-    }, [fechaInicio, fechaFin, cliente, tipo, estado, estadoAplica, conSaldo, router, searchParams]);
+    }, [fechaInicio, fechaFin, cliente, tipo, estado, estadoAplica, conSaldo, fiscal, router, searchParams]);
 
     return (
         <div className="bg-white p-4 rounded shadow mb-6 text-black flex flex-col gap-4">
@@ -96,6 +100,17 @@ export default function FiltrosFacturacion() {
                     <option value="ANULADA">ANULADA</option>
                 </select>
 
+                <select
+                    value={fiscal}
+                    onChange={(e) => setFiscal(e.target.value)}
+                    title="Facturas cargadas en ARCA o internas"
+                    className="border p-2 rounded w-full md:w-1/5 outline-none focus:border-blue-500"
+                >
+                    <option value="">Todas</option>
+                    <option value="1">Fiscales (ARCA)</option>
+                    <option value="0">Internas</option>
+                </select>
+
                 <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
                     <input
                         type="checkbox"
@@ -106,7 +121,7 @@ export default function FiltrosFacturacion() {
                     Solo con saldo
                 </label>
 
-                {(fechaInicio || fechaFin || cliente || tipo || estado || conSaldo) && (
+                {(fechaInicio || fechaFin || cliente || tipo || estado || conSaldo || fiscal) && (
                     <button
                         onClick={() => {
                             setFechaInicio("");
@@ -115,6 +130,7 @@ export default function FiltrosFacturacion() {
                             setTipo("");
                             setEstado("");
                             setConSaldo(false);
+                            setFiscal("");
                         }}
                         className="w-full md:w-auto bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded hover:bg-red-100 transition text-sm flex items-center justify-center gap-2"
                         title="Limpiar todos los filtros"

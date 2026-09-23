@@ -13,10 +13,13 @@ import {
     agregarInsumoAOrden,
     quitarInsumoDeOrden,
     obtenerInsumosDeOrden,
+    actualizarAlicuotaServicio,
+    actualizarAlicuotaInsumo,
 } from "@/actions/ordenes";
 import { obtenerServicios } from "@/actions/servicios";
 import { obtenerInsumos } from "@/actions/insumos";
 import ModalConfirmacion from "@/components/ModalConfirmacion";
+import { ALICUOTAS_IVA_SUGERIDAS, ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
 
 /* ─── tipos ──────────────────────────────────────────────────── */
 interface Cliente {
@@ -45,13 +48,14 @@ interface DetalleServicio {
     precio_acordado: number | string;
     servicio: { nombre: string } | null;
     descripcion_libre: string | null;
+    alicuota_iva: number | string;
 }
 
 /** Servicio pendiente de guardar (modo nueva orden) */
 type ServicioPendiente =
-    | { _tmpId: string; tipo: "existente"; id_servicio: number; nombre: string; cantidad: number; precio_acordado: number }
-    | { _tmpId: string; tipo: "nuevo"; nombre: string; descripcion?: string; precio: number; cantidad: number }
-    | { _tmpId: string; tipo: "libre"; descripcion_libre: string; cantidad: number; precio_acordado: number };
+    | { _tmpId: string; tipo: "existente"; id_servicio: number; nombre: string; cantidad: number; precio_acordado: number; alicuota_iva: number }
+    | { _tmpId: string; tipo: "nuevo"; nombre: string; descripcion?: string; precio: number; cantidad: number; alicuota_iva: number }
+    | { _tmpId: string; tipo: "libre"; descripcion_libre: string; cantidad: number; precio_acordado: number; alicuota_iva: number };
 
 /** Insumo del catálogo */
 interface InsumoCatalogo {
@@ -67,6 +71,7 @@ interface DetalleInsumo {
     id_insumo: number;
     cantidad_usada: number;
     precio_aplicado: number | string;
+    alicuota_iva: number | string;
     insumo: { nombre: string } | null;
 }
 
@@ -77,6 +82,7 @@ interface InsumoPendiente {
     nombre: string;
     cantidad: number;
     precio_aplicado: number;
+    alicuota_iva: number;
 }
 
 interface OrdenInicial {
@@ -101,6 +107,53 @@ let tmpCounter = 0;
 const tmpId = () => `tmp-${++tmpCounter}`;
 
 type ModoPanel = "existente" | "libre" | "nuevo";
+
+const DATALIST_IVA_ID = "orden-alicuotas-iva";
+
+/** "21" / "10,5" -> número válido de alícuota, o null si no es válido */
+function parseAlicuota(texto: string): number | null {
+    const n = parseFloat(texto.replace(",", "."));
+    return alicuotaValida(n) ? n : null;
+}
+
+/** Input de IVA % por línea. Guarda (onCommit) al salir del campo si el valor
+ *  es válido y cambió; si es inválido vuelve al último valor guardado. */
+function InputIva({
+    valor,
+    onCommit,
+    className = "",
+}: {
+    valor: number;
+    onCommit: (alicuota: number) => void | Promise<void>;
+    className?: string;
+}) {
+    const [texto, setTexto] = useState(String(valor));
+    // Si el valor guardado cambia desde afuera, el texto se resincroniza
+    const [valorPrevio, setValorPrevio] = useState(valor);
+    if (valor !== valorPrevio) {
+        setValorPrevio(valor);
+        setTexto(String(valor));
+    }
+
+    return (
+        <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.5"
+            list={DATALIST_IVA_ID}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onBlur={() => {
+                const n = parseAlicuota(texto);
+                if (n === null) { setTexto(String(valor)); return; }
+                if (n !== valor) onCommit(n);
+            }}
+            title="Alícuota de IVA (%)"
+            className={`w-16 border border-gray-300 rounded px-1.5 py-0.5 text-xs text-right bg-white ${className}`}
+        />
+    );
+}
 
 /* ─── componente ─────────────────────────────────────────────── */
 export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
@@ -146,6 +199,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [libreDesc, setLibreDesc] = useState("");
     const [librePrecio, setLibrePrecio] = useState("");
     const [libreCant, setLibreCant] = useState("1");
+    /* IVA % del servicio a agregar (compartido por las 3 pestañas) */
+    const [ivaServicio, setIvaServicio] = useState(String(ALICUOTA_IVA_DEFAULT));
 
     const [agregando, setAgregando] = useState(false);
     const [errSrv, setErrSrv] = useState<string | null>(null);
@@ -157,6 +212,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [panelInsumoAbierto, setPanelInsumoAbierto] = useState(false);
     const [insumoSeleccionado, setInsumoSeleccionado] = useState("");
     const [cantInsumo, setCantInsumo] = useState("1");
+    const [ivaInsumo, setIvaInsumo] = useState(String(ALICUOTA_IVA_DEFAULT));
     const [agregandoInsumo, setAgregandoInsumo] = useState(false);
     const [errInsumo, setErrInsumo] = useState<string | null>(null);
 
@@ -208,6 +264,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setLibreDesc("");
         setLibrePrecio("");
         setLibreCant("1");
+        setIvaServicio(String(ALICUOTA_IVA_DEFAULT));
         setErrSrv(null);
     }
 
@@ -215,7 +272,29 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         setPanelInsumoAbierto(false);
         setInsumoSeleccionado("");
         setCantInsumo("1");
+        setIvaInsumo(String(ALICUOTA_IVA_DEFAULT));
         setErrInsumo(null);
+    }
+
+    /* ── Cambiar IVA % de una línea ya listada ── */
+    async function cambiarIvaServicio(item: DetalleServicio | ServicioPendiente, alicuota: number) {
+        if ("id_detalle_srv" in item) {
+            const res = await actualizarAlicuotaServicio(item.id_detalle_srv, alicuota);
+            if (!res.success) { setErrSrv(res.error || "No se pudo actualizar el IVA."); return; }
+            setServiciosGuardados((p) => p.map((s) => s.id_detalle_srv === item.id_detalle_srv ? { ...s, alicuota_iva: alicuota } : s));
+        } else {
+            setServiciosPendientes((p) => p.map((s) => s._tmpId === item._tmpId ? { ...s, alicuota_iva: alicuota } : s));
+        }
+    }
+
+    async function cambiarIvaInsumo(item: DetalleInsumo | InsumoPendiente, alicuota: number) {
+        if ("id_detalle_ord_insumo" in item) {
+            const res = await actualizarAlicuotaInsumo(item.id_detalle_ord_insumo, alicuota);
+            if (!res.success) { setErrInsumo(res.error || "No se pudo actualizar el IVA."); return; }
+            setInsumosGuardados((p) => p.map((i) => i.id_detalle_ord_insumo === item.id_detalle_ord_insumo ? { ...i, alicuota_iva: alicuota } : i));
+        } else {
+            setInsumosPendientes((p) => p.map((i) => i._tmpId === item._tmpId ? { ...i, alicuota_iva: alicuota } : i));
+        }
     }
 
     function handleSeleccionarSrv(idStr: string) {
@@ -261,6 +340,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         id_servicio: srv.id_servicio,
                         cantidad: srv.cantidad,
                         precio_acordado: srv.precio_acordado,
+                        alicuota_iva: srv.alicuota_iva,
                     });
                 } else if (srv.tipo === "nuevo") {
                     await crearServicioYAgregarAOrden({
@@ -269,6 +349,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         descripcion: srv.descripcion,
                         precio: srv.precio,
                         cantidad: srv.cantidad,
+                        alicuota_iva: srv.alicuota_iva,
                     });
                 } else {
                     await agregarServicioLibreAOrden({
@@ -276,6 +357,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         descripcion_libre: srv.descripcion_libre,
                         cantidad: srv.cantidad,
                         precio_acordado: srv.precio_acordado,
+                        alicuota_iva: srv.alicuota_iva,
                     });
                 }
             }
@@ -286,6 +368,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                     id_insumo: ins.id_insumo,
                     cantidad: ins.cantidad,
                     precio_aplicado: ins.precio_aplicado,
+                    alicuota_iva: ins.alicuota_iva,
                 });
             }
 
@@ -305,6 +388,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         const cantidad = parseInt(cantExistente) || 1;
         const precio = parseFloat(precioExistente);
         if (isNaN(precio) || precio < 0) { setErrSrv("El precio no es válido."); return; }
+        const alicuota = parseAlicuota(ivaServicio);
+        if (alicuota === null) { setErrSrv("El IVA debe estar entre 0 y 100."); return; }
 
         const srv = catalogo.find((s) => String(s.id_servicio) === srvSeleccionado)!;
 
@@ -313,6 +398,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: si.insumo?.nombre ?? "Insumo",
             cantidad: (typeof si.cantidad === "string" ? parseFloat(si.cantidad) : si.cantidad) * cantidad,
             precio_aplicado: parseFloat(String(si.insumo?.precio_venta ?? 0)),
+            alicuota_iva: ALICUOTA_IVA_DEFAULT,
         }));
 
         if (modoEdicion && ordenInicial) {
@@ -322,6 +408,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 id_servicio: srv.id_servicio,
                 cantidad,
                 precio_acordado: precio,
+                alicuota_iva: alicuota,
             });
             if (res.success) {
                 for (const linea of recetaLineas) {
@@ -330,6 +417,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         id_insumo: linea.id_insumo,
                         cantidad: linea.cantidad,
                         precio_aplicado: linea.precio_aplicado,
+                        alicuota_iva: linea.alicuota_iva,
                     });
                 }
                 setServiciosGuardados(await obtenerServiciosDeOrden(ordenInicial.id_orden));
@@ -342,7 +430,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         } else {
             setServiciosPendientes((prev) => [
                 ...prev,
-                { _tmpId: tmpId(), tipo: "existente", id_servicio: srv.id_servicio, nombre: srv.nombre, cantidad, precio_acordado: precio },
+                { _tmpId: tmpId(), tipo: "existente", id_servicio: srv.id_servicio, nombre: srv.nombre, cantidad, precio_acordado: precio, alicuota_iva: alicuota },
             ]);
             setInsumosPendientes((prev) => [
                 ...prev,
@@ -358,6 +446,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         const precio = parseFloat(librePrecio);
         if (isNaN(precio) || precio < 0) { setErrSrv("El precio no es válido."); return; }
         const cantidad = parseInt(libreCant) || 1;
+        const alicuota = parseAlicuota(ivaServicio);
+        if (alicuota === null) { setErrSrv("El IVA debe estar entre 0 y 100."); return; }
 
         if (modoEdicion && ordenInicial) {
             setAgregando(true); setErrSrv(null);
@@ -366,6 +456,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 descripcion_libre: libreDesc.trim(),
                 cantidad,
                 precio_acordado: precio,
+                alicuota_iva: alicuota,
             });
             if (res.success) {
                 setServiciosGuardados(await obtenerServiciosDeOrden(ordenInicial.id_orden));
@@ -375,7 +466,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         } else {
             setServiciosPendientes((prev) => [
                 ...prev,
-                { _tmpId: tmpId(), tipo: "libre", descripcion_libre: libreDesc.trim(), cantidad, precio_acordado: precio },
+                { _tmpId: tmpId(), tipo: "libre", descripcion_libre: libreDesc.trim(), cantidad, precio_acordado: precio, alicuota_iva: alicuota },
             ]);
             resetPanel();
         }
@@ -387,6 +478,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         const precio = parseFloat(nuevoPrecio);
         if (isNaN(precio) || precio < 0) { setErrSrv("El precio no es válido."); return; }
         const cantidad = parseInt(nuevaCant) || 1;
+        const alicuota = parseAlicuota(ivaServicio);
+        if (alicuota === null) { setErrSrv("El IVA debe estar entre 0 y 100."); return; }
 
         if (modoEdicion && ordenInicial) {
             setAgregando(true); setErrSrv(null);
@@ -396,6 +489,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 descripcion: nuevaDesc.trim() || undefined,
                 precio,
                 cantidad,
+                alicuota_iva: alicuota,
             });
             if (res.success) {
                 setServiciosGuardados(await obtenerServiciosDeOrden(ordenInicial.id_orden));
@@ -407,7 +501,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         } else {
             setServiciosPendientes((prev) => [
                 ...prev,
-                { _tmpId: tmpId(), tipo: "nuevo", nombre: nuevoNombre.trim(), descripcion: nuevaDesc.trim() || undefined, precio, cantidad },
+                { _tmpId: tmpId(), tipo: "nuevo", nombre: nuevoNombre.trim(), descripcion: nuevaDesc.trim() || undefined, precio, cantidad, alicuota_iva: alicuota },
             ]);
             resetPanel();
         }
@@ -437,6 +531,9 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         const cantidad = parseFloat(cantInsumo) || 0;
         if (cantidad <= 0) { setErrInsumo("La cantidad debe ser mayor a 0."); return; }
 
+        const alicuota = parseAlicuota(ivaInsumo);
+        if (alicuota === null) { setErrInsumo("El IVA debe estar entre 0 y 100."); return; }
+
         const ins = catalogoInsumos.find((i) => String(i.id_insumo) === insumoSeleccionado)!;
         const precio = parseFloat(String(ins.precio_venta));
 
@@ -447,6 +544,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 id_insumo: ins.id_insumo,
                 cantidad,
                 precio_aplicado: precio,
+                alicuota_iva: alicuota,
             });
             if (res.success) {
                 setInsumosGuardados(await obtenerInsumosDeOrden(ordenInicial.id_orden));
@@ -456,7 +554,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         } else {
             setInsumosPendientes((prev) => [
                 ...prev,
-                { _tmpId: tmpId(), id_insumo: ins.id_insumo, nombre: ins.nombre, cantidad, precio_aplicado: precio },
+                { _tmpId: tmpId(), id_insumo: ins.id_insumo, nombre: ins.nombre, cantidad, precio_aplicado: precio, alicuota_iva: alicuota },
             ]);
             resetPanelInsumo();
         }
@@ -486,6 +584,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         nombre: string;
         cantidad: number;
         precio: number | string;
+        alicuota: number;
         pendiente: boolean;
         libre: boolean;
         item: DetalleServicio | ServicioPendiente;
@@ -495,6 +594,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: d.descripcion_libre || d.servicio?.nombre || "Servicio",
             cantidad: d.cantidad,
             precio: d.precio_acordado,
+            alicuota: parseFloat(String(d.alicuota_iva)),
             pendiente: false,
             libre: !!d.descripcion_libre,
             item: d,
@@ -504,6 +604,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: p.tipo === "libre" ? p.descripcion_libre : p.nombre,
             cantidad: p.cantidad,
             precio: p.tipo === "existente" || p.tipo === "libre" ? p.precio_acordado : p.precio,
+            alicuota: p.alicuota_iva,
             pendiente: true,
             libre: p.tipo === "libre",
             item: p,
@@ -515,6 +616,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         nombre: string;
         cantidad: number;
         precio: number;
+        alicuota: number;
         pendiente: boolean;
         item: DetalleInsumo | InsumoPendiente;
     }[] = [
@@ -523,6 +625,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: d.insumo?.nombre || "Insumo",
             cantidad: d.cantidad_usada,
             precio: parseFloat(String(d.precio_aplicado)),
+            alicuota: parseFloat(String(d.alicuota_iva)),
             pendiente: false,
             item: d,
         })),
@@ -531,6 +634,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             nombre: p.nombre,
             cantidad: p.cantidad,
             precio: p.precio_aplicado,
+            alicuota: p.alicuota_iva,
             pendiente: true,
             item: p,
         })),
@@ -559,6 +663,12 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                 </div>
 
                 <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1 min-h-0">
+
+                    <datalist id={DATALIST_IVA_ID}>
+                        {ALICUOTAS_IVA_SUGERIDAS.map((a) => (
+                            <option key={a} value={a} />
+                        ))}
+                    </datalist>
 
                     {/* ── Datos de la orden ── */}
                     <section>
@@ -621,7 +731,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             <p className="text-sm text-gray-400 italic py-2">Sin servicios cargados todavía.</p>
                         ) : (
                             <div className="space-y-2 mb-4">
-                                {listaDisplay.map(({ key, nombre, cantidad, precio, pendiente, libre, item }) => (
+                                {listaDisplay.map(({ key, nombre, cantidad, precio, alicuota, pendiente, libre, item }) => (
                                     <div
                                         key={key}
                                         className="flex items-center justify-between rounded-lg px-4 py-2 text-sm border border-gray-100 bg-gray-50/50"
@@ -646,6 +756,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                             <span className="font-bold text-gray-800">
                                                 {fmtMoney(precio)}
                                             </span>
+                                            <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400">
+                                                IVA
+                                                <InputIva valor={alicuota} onCommit={(n) => cambiarIvaServicio(item, n)} />
+                                                %
+                                            </label>
                                             <button
                                                 onClick={() => handleQuitar(item)}
                                                 className="text-red-400 hover:text-red-600 transition"
@@ -678,6 +793,20 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                 {errSrv && (
                                     <p className="text-xs text-red-600 font-bold">{errSrv}</p>
                                 )}
+
+                                <div className="w-32">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">IVA %</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.5"
+                                        list={DATALIST_IVA_ID}
+                                        value={ivaServicio}
+                                        onChange={(e) => setIvaServicio(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                    />
+                                </div>
 
                                 {/* Tab: del catálogo */}
                                 {modoPanel === "existente" && (
@@ -815,7 +944,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             <p className="text-xs text-gray-400 italic mb-2">Sin insumos registrados.</p>
                         ) : (
                             <div className="space-y-1 mb-3">
-                                {insumosDisplay.map(({ key, nombre, cantidad, precio, pendiente, item }) => (
+                                {insumosDisplay.map(({ key, nombre, cantidad, precio, alicuota, pendiente, item }) => (
                                     <div
                                         key={key}
                                         className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
@@ -835,6 +964,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                         <div className="flex items-center gap-3 text-gray-600 text-xs">
                                             <span>x{cantidad}</span>
                                             <span className="font-bold text-gray-800">{fmtMoney(precio * cantidad)}</span>
+                                            <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400">
+                                                IVA
+                                                <InputIva valor={alicuota} onCommit={(n) => cambiarIvaInsumo(item, n)} />
+                                                %
+                                            </label>
                                             <button
                                                 onClick={() => handleQuitarInsumo(item)}
                                                 className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
@@ -878,6 +1012,19 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                         value={cantInsumo}
                                         onChange={(e) => setCantInsumo(e.target.value)}
                                         className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">IVA %</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.5"
+                                        list={DATALIST_IVA_ID}
+                                        value={ivaInsumo}
+                                        onChange={(e) => setIvaInsumo(e.target.value)}
+                                        className="w-32 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                                     />
                                 </div>
                                 <button

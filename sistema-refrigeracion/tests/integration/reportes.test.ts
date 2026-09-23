@@ -107,7 +107,19 @@ describe("obtenerReporteMensual", () => {
       totalEgresos: 0,
       balanceGeneral: 0,
       totalFacturado: 0,
+      totalFacturadoFiscal: 0,
+      totalFacturadoInterno: 0,
     });
+  });
+
+  it("totalFacturado se separa en fiscal e interno", async () => {
+    await crearFacturaEmitida({ monto_total: 1000, saldo_pendiente: 1000, fiscal: true });
+    await crearFacturaEmitida({ monto_total: 300, saldo_pendiente: 300, fiscal: false });
+
+    const reporte = await obtenerReporteMensual(MES, ANIO);
+    expect(reporte.totalFacturado).toBe(1300);
+    expect(reporte.totalFacturadoFiscal).toBe(1000);
+    expect(reporte.totalFacturadoInterno).toBe(300);
   });
 
   // Bug conocido con issue abierto: obtenerReporteMensual no resta las
@@ -154,6 +166,42 @@ describe("obtenerPosicionIVA", () => {
       saldo_pendiente: 0,
       estado_pago: "NO_APLICA",
     });
+
+    const posicion = await obtenerPosicionIVA(MES, ANIO);
+    expect(posicion.ventas.neto).toBe(1000);
+    expect(posicion.ventas.iva).toBe(210);
+  });
+
+  it("las facturas internas no entran en la posicion de IVA", async () => {
+    await crearFacturaEmitida({ neto: 1000, alicuota_iva: 21, monto_total: 1210, saldo_pendiente: 1210, fiscal: true });
+    await crearFacturaEmitida({ neto: 500, alicuota_iva: 21, monto_total: 605, saldo_pendiente: 605, fiscal: false });
+
+    const posicion = await obtenerPosicionIVA(MES, ANIO);
+    expect(posicion.ventas.neto).toBe(1000);
+    expect(posicion.ventas.iva).toBe(210);
+  });
+
+  it("el IVA de ventas se suma desde factura_iva cuando la factura lo tiene discriminado", async () => {
+    await crearFacturaEmitida({
+      neto: 3000,
+      monto_total: 3420,
+      saldo_pendiente: 3420,
+      iva: [
+        { alicuota: 21, neto_gravado: 1000, monto_iva: 210 },
+        { alicuota: 10.5, neto_gravado: 2000, monto_iva: 210 },
+      ],
+    });
+
+    const posicion = await obtenerPosicionIVA(MES, ANIO);
+    expect(posicion.ventas.neto).toBe(3000);
+    expect(posicion.ventas.iva).toBe(420);
+  });
+
+  it("factura interna generada por crearFactura no suma IVA, la fiscal si", async () => {
+    const ordenFiscal = await crearOrdenFinalizada({ insumos: [] });
+    const ordenInterna = await crearOrdenFinalizada({ insumos: [] });
+    await crearFactura({ id_orden: ordenFiscal.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    await crearFactura({ id_orden: ordenInterna.id_orden, num_factura: "X-1", tipo: "Factura", fiscal: false });
 
     const posicion = await obtenerPosicionIVA(MES, ANIO);
     expect(posicion.ventas.neto).toBe(1000);
@@ -241,8 +289,7 @@ describe("obtenerReporteServicios", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const reporteDeLaOrden = await obtenerReporteServicios(1, 2020);
@@ -262,8 +309,7 @@ describe("obtenerReporteServicios", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const reporteDelMesDeEmision = await obtenerReporteServicios(MES, ANIO);

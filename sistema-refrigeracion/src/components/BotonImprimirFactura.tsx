@@ -20,7 +20,13 @@ export async function imprimirComprobante(idFactura: number) {
         }
 
         const esInformeTecnico = factura.tipo === "Informe Tecnico";
-        const tituloComprobante = factura.tipo === "Factura"
+        const esFactura = factura.tipo === "Factura";
+        // Factura interna: no se carga en ARCA, pero se cobra y lleva IVA igual
+        const esInterna = esFactura && factura.fiscal === false;
+        const esFacturaFiscal = esFactura && !esInterna;
+        const tituloComprobante = esInterna
+            ? "COMPROBANTE INTERNO"
+            : esFactura
             ? "FACTURA"
             : factura.tipo === "Remito"
             ? "REMITO"
@@ -41,10 +47,51 @@ export async function imprimirComprobante(idFactura: number) {
 
         const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR");
 
-        const numeroInforme = `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
+        // Número: si la factura fiscal tiene punto de venta, formato ARCA
+        // PPPPP – NNNNNNNN (el número sale de los dígitos finales de num_factura)
+        const puntoVenta: number | null = esFacturaFiscal ? factura.punto_venta ?? null : null;
+        const nroDelComprobante = String(factura.num_factura ?? "").match(/(\d+)\s*$/)?.[1] ?? String(factura.id_factura);
+        const numeroInforme = puntoVenta
+            ? `${String(puntoVenta).padStart(5, "0")} – ${nroDelComprobante.padStart(8, "0")}`
+            : `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
+
+        // Letra de la factura fiscal (A/B) tomada del número cargado; A por defecto
+        const letraFactura = String(factura.num_factura ?? "").match(/\b([AB])-/)?.[1] ?? "A";
+        const codigoLetra = letraFactura === "B" ? "COD. 06" : "COD. 01";
 
         const formatMoney = (n: number) =>
             new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
+        const fmtAlicuota = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+
+        // IVA discriminado: de factura_iva; las facturas anteriores al IVA por
+        // línea no tienen filas ahí y usan su alícuota única.
+        const netoGravado = factura.neto ? parseFloat(factura.neto) : 0;
+        const alicuotaUnica = factura.alicuota_iva !== null && factura.alicuota_iva !== undefined
+            ? parseFloat(factura.alicuota_iva)
+            : null;
+        const facturaIva: { alicuota: string; neto_gravado: string; monto_iva: string }[] = factura.factura_iva ?? [];
+        const esFacturaAnterior = facturaIva.length === 0;
+        const ivaPorAlicuota: { alicuota: number; neto: number; iva: number }[] = !esFacturaAnterior
+            ? facturaIva.map((fi) => ({
+                alicuota: parseFloat(fi.alicuota),
+                neto: parseFloat(fi.neto_gravado),
+                iva: parseFloat(fi.monto_iva),
+            }))
+            : alicuotaUnica && alicuotaUnica > 0
+            ? [{ alicuota: alicuotaUnica, neto: netoGravado, iva: netoGravado * alicuotaUnica / 100 }]
+            : [];
+        const mostrarIva = !esInformeTecnico && factura.neto !== null && factura.neto !== undefined;
+
+        // Alícuota a mostrar en cada línea: la de la línea, salvo en facturas
+        // anteriores, donde la línea quedó con el default y manda la de la factura.
+        const alicuotaLinea = (valorLinea: string | number | null | undefined) =>
+            esFacturaAnterior && alicuotaUnica !== null
+                ? alicuotaUnica
+                : parseFloat(String(valorLinea ?? 0));
+
+        const celdaIva = (alicuota: number) => esInformeTecnico
+            ? ""
+            : `<td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${fmtAlicuota(alicuota)}%</td>`;
 
         // Build services rows
         let serviciosHTML = "";
@@ -59,6 +106,7 @@ export async function imprimirComprobante(idFactura: number) {
                 <tr>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
+                    ${celdaIva(alicuotaLinea(ds.alicuota_iva))}
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
@@ -76,9 +124,11 @@ export async function imprimirComprobante(idFactura: number) {
                 <tr>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
+                    ${celdaIva(alicuotaLinea(di.alicuota_iva))}
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
+        const columnas = esInformeTecnico ? 2 : 4;
 
         const montoTotal = parseFloat(factura.monto_total);
 
@@ -86,9 +136,6 @@ export async function imprimirComprobante(idFactura: number) {
         const descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
         const descuentoPct = factura.descuento_porcentaje ? parseFloat(factura.descuento_porcentaje) : 0;
         const equipoDesc: string = factura.equipo_descripcion || "";
-        const netoGravado = factura.neto ? parseFloat(factura.neto) : 0;
-        const alicuotaIva = factura.alicuota_iva ? parseFloat(factura.alicuota_iva) : 0;
-        const montoIvaCalc = netoGravado * alicuotaIva / 100;
         const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
         const html = `
@@ -175,6 +222,14 @@ export async function imprimirComprobante(idFactura: number) {
             text-align: center;
             margin-top: 2px;
             line-height: 1.1;
+        }
+        .leyenda-interna {
+            border: 2px solid #000;
+            padding: 6px 4px;
+            font-size: 8px;
+            font-weight: 800;
+            text-align: center;
+            line-height: 1.3;
         }
         .header-right {
             width: 40%;
@@ -311,20 +366,30 @@ export async function imprimirComprobante(idFactura: number) {
                     TEL.: 03496 – 15546618 / 15506054<br>
                     E-MAIL: sybservicios@hotmail.com
                 </div>
-                <div class="empresa-tipo">I.V.A.: RESPONSABLE INSCRIPTO</div>
+                ${esInterna ? '' : '<div class="empresa-tipo">I.V.A.: RESPONSABLE INSCRIPTO</div>'}
             </div>
 
             <div class="header-mid">
+                ${esInterna ? `
+                <div class="leyenda-interna">DOCUMENTO NO VÁLIDO COMO FACTURA</div>
+                ` : esFacturaFiscal ? `
+                <div class="letra-box">
+                    <div class="letra">${letraFactura}</div>
+                    <div class="cod">${codigoLetra}</div>
+                </div>
+                ` : `
                 <div class="letra-box">
                     <div class="letra">X</div>
                     <div class="cod">NO VALIDO<br>COMO<br>FACTURA</div>
                 </div>
+                `}
             </div>
 
             <div class="header-right">
                 <div class="factura-titulo">${tituloComprobante}</div>
                 <div class="factura-numero">N° ${numeroInforme}</div>
                 <div class="factura-fecha">FECHA: ${fechaEmision}</div>
+                ${esInterna ? '<div class="factura-numero" style="margin-top:6px;font-size:9.5px;">Documento no válido como factura</div>' : ''}
             </div>
         </div>
 
@@ -352,27 +417,27 @@ export async function imprimirComprobante(idFactura: number) {
                 <tr>
                     <th class="center" style="width: 70px;">CANT.</th>
                     <th>DESCRIPCION</th>
-                    ${esInformeTecnico ? '' : '<th class="right" style="width: 120px;">PRECIO</th>'}
+                    ${esInformeTecnico ? '' : '<th class="center" style="width: 60px;">IVA %</th><th class="right" style="width: 120px;">PRECIO</th>'}
                 </tr>
             </thead>
             <tbody>
                 ${servicios.length > 0 ? `
-                    <tr class="section-separator"><td colspan="${esInformeTecnico ? 2 : 3}">— Servicios Prestados —</td></tr>
+                    <tr class="section-separator"><td colspan="${columnas}">— Servicios Prestados —</td></tr>
                     ${serviciosHTML}
                 ` : factura.descripcion ? `
-                    <tr class="section-separator"><td colspan="${esInformeTecnico ? 2 : 3}">— Trabajo Realizado —</td></tr>
+                    <tr class="section-separator"><td colspan="${columnas}">— Trabajo Realizado —</td></tr>
                     <tr>
                         <td style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
                         <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura.descripcion}</td>
-                        ${esInformeTecnico ? '' : '<td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>'}
+                        ${esInformeTecnico ? '' : '<td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td><td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>'}
                     </tr>
                 ` : ''}
                 ${insumos.length > 0 ? `
-                    <tr class="section-separator"><td colspan="${esInformeTecnico ? 2 : 3}">— Insumos Utilizados —</td></tr>
+                    <tr class="section-separator"><td colspan="${columnas}">— Insumos Utilizados —</td></tr>
                     ${insumosHTML}
                 ` : ''}
-                ${servicios.length === 0 && !factura.descripcion && insumos.length === 0 ? `<tr><td colspan="${esInformeTecnico ? 2 : 3}" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>` : ''}
-                <tr><td colspan="${esInformeTecnico ? 2 : 3}" class="items-body-spacer"></td></tr>
+                ${servicios.length === 0 && !factura.descripcion && insumos.length === 0 ? `<tr><td colspan="${columnas}" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>` : ''}
+                <tr><td colspan="${columnas}" class="items-body-spacer"></td></tr>
             </tbody>
         </table>
 
@@ -393,12 +458,12 @@ export async function imprimirComprobante(idFactura: number) {
                     <span>- $ ${fmtAmt(descuentoMonto)}</span>
                 </div>
                 ${equipoDesc ? `<div class="total-line" style="padding:2px 15px 6px;border-bottom:1px solid #ddd;"><span style="font-size:9px;color:#555;font-style:italic;">${equipoDesc}</span><span></span></div>` : ''}` : ''}
-                ${tipoDescuento ? `
-                <div class="total-line">
+                ${mostrarIva ? `
+                <div class="total-line" style="border-top:1px solid #999;">
                     <span>Neto Gravado: $</span>
                     <span>${fmtAmt(netoGravado)}</span>
                 </div>
-                ${alicuotaIva > 0 ? `<div class="total-line"><span>IVA ${alicuotaIva}%: $</span><span>${fmtAmt(montoIvaCalc)}</span></div>` : ''}` : ''}
+                ${ivaPorAlicuota.map((l) => `<div class="total-line"><span>IVA ${fmtAlicuota(l.alicuota)}%: $</span><span>${fmtAmt(l.iva)}</span></div>`).join('')}` : ''}
                 <div class="total-line grand"><span>Total: $</span><span>${fmtAmt(montoTotal)}</span></div>
             </div>
         </div>

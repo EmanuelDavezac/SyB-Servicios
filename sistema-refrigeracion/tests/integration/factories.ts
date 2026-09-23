@@ -49,12 +49,14 @@ interface LineaServicio {
   id_servicio?: number;
   cantidad?: number;
   precio_acordado?: number;
+  alicuota_iva?: number;
 }
 
 interface LineaInsumo {
   id_insumo?: number;
   cantidad_usada?: number;
   precio_aplicado?: number;
+  alicuota_iva?: number;
 }
 
 interface OrdenFinalizadaOptions {
@@ -78,6 +80,7 @@ export async function crearOrdenFinalizada(options: OrdenFinalizadaOptions = {})
       id_servicio: linea.id_servicio ?? (await crearServicio()).id_servicio,
       cantidad: linea.cantidad ?? 1,
       precio_acordado: linea.precio_acordado ?? 1000,
+      alicuota_iva: linea.alicuota_iva ?? 21,
     }))
   );
 
@@ -86,6 +89,7 @@ export async function crearOrdenFinalizada(options: OrdenFinalizadaOptions = {})
       id_insumo: linea.id_insumo ?? (await crearInsumo()).id_insumo,
       cantidad_usada: linea.cantidad_usada ?? 1,
       precio_aplicado: linea.precio_aplicado ?? 200,
+      alicuota_iva: linea.alicuota_iva ?? 21,
     }))
   );
 
@@ -113,6 +117,9 @@ interface FacturaEmitidaOptions {
   saldo_pendiente?: number;
   estado_pago?: string;
   fecha_vencimiento?: Date;
+  fiscal?: boolean;
+  /** IVA discriminado (factura_iva); si no se pasa, la factura queda como las anteriores al IVA por linea */
+  iva?: { alicuota: number; neto_gravado: number; monto_iva: number }[];
 }
 
 // Comprobante ya emitido directo en la base (sin pasar por crearFactura), util
@@ -135,6 +142,8 @@ export async function crearFacturaEmitida(overrides: FacturaEmitidaOptions = {})
       monto_total,
       saldo_pendiente: overrides.saldo_pendiente ?? monto_total,
       estado_pago: overrides.estado_pago ?? "IMPAGA",
+      fiscal: overrides.fiscal ?? true,
+      factura_iva: overrides.iva ? { create: overrides.iva } : undefined,
     },
   });
 }

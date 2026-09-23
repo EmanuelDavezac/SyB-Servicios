@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
-import { calcularImportes } from "@/lib/comprobantes";
+import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
 import { requerirUsuario } from "@/lib/sesion";
 
 export async function getFacturas() {
@@ -54,15 +54,20 @@ export async function getOrdenesPendientesFacturacion() {
   }
 }
 
+// Solo las facturas eligen si se cargan en ARCA o son internas; el resto de
+// los comprobantes (ej. Remito) queda siempre con fiscal = true.
+const TIPO_CON_OPCION_FISCAL = "Factura";
+
 export async function crearFactura(data: {
   id_orden: number;
   num_factura: string;
   tipo: string;
-  neto: number;
-  alicuota_iva: number;
+  /** true = se carga en ARCA; false = comprobante interno (se cobra igual, lleva IVA igual) */
+  fiscal: boolean;
+  punto_venta?: number | null;
   descripcion?: string;
   fecha_vencimiento?: Date;
-  insumos?: { id_insumo: number; cantidad: number }[];
+  insumos?: { id_insumo: number; cantidad: number; alicuota_iva?: number }[];
   tipo_descuento?: "PORCENTAJE" | "EQUIPO" | null;
   descuento_porcentaje?: number | null;
   descuento_monto_equipo?: number | null;
@@ -71,16 +76,19 @@ export async function crearFactura(data: {
   try {
     await requerirUsuario();
     const facturable = esTipoFacturable(data.tipo);
+    const fiscal = data.tipo === TIPO_CON_OPCION_FISCAL ? data.fiscal : true;
+    const conPuntoVenta = fiscal && data.tipo === TIPO_CON_OPCION_FISCAL;
 
-    const { descuentoMonto, netoGravado, montoTotal } = calcularImportes({
-      neto: data.neto,
-      alicuotaIva: data.alicuota_iva,
-      tipoDescuento: data.tipo_descuento,
-      descuentoPorcentaje: data.descuento_porcentaje,
-      descuentoMontoEquipo: data.descuento_monto_equipo,
-      equipoDescripcion: data.equipo_descripcion,
-      facturable,
-    });
+    const puntoVenta = conPuntoVenta ? (data.punto_venta ?? null) : null;
+    if (puntoVenta !== null && (!Number.isInteger(puntoVenta) || puntoVenta < 1 || puntoVenta > 99999)) {
+      throw new Error("El punto de venta debe ser un número entero entre 1 y 99999.");
+    }
+
+    for (const item of data.insumos ?? []) {
+      if (item.alicuota_iva !== undefined && !alicuotaValida(item.alicuota_iva)) {
+        throw new Error("La alícuota de IVA debe estar entre 0 y 100.");
+      }
+    }
 
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
@@ -110,28 +118,7 @@ export async function crearFactura(data: {
         fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
       }
 
-      // 2. Crear la factura
-      const factura = await tx.factura.create({
-        data: {
-          id_orden: data.id_orden,
-          num_factura: data.num_factura,
-          tipo: data.tipo,
-          fecha_emision: fechaEmision,
-          fecha_vencimiento: fechaVencimiento,
-          neto: facturable ? netoGravado : null,
-          alicuota_iva: facturable ? data.alicuota_iva : null,
-          tipo_descuento: facturable ? (data.tipo_descuento ?? null) : null,
-          descuento_porcentaje: facturable && data.tipo_descuento === "PORCENTAJE" ? (data.descuento_porcentaje ?? null) : null,
-          descuento_monto: facturable ? descuentoMonto : null,
-          equipo_descripcion: facturable && data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
-          monto_total: facturable ? montoTotal : 0,
-          saldo_pendiente: facturable ? montoTotal : 0,
-          estado_pago: facturable ? ESTADOS_FACTURA.IMPAGA : ESTADOS_FACTURA.NO_APLICA,
-          descripcion: data.descripcion,
-        },
-      });
-
-      // 3. Descontar stock de los insumos ya registrados en la ORDEN
+      // 2. Descontar stock de los insumos ya registrados en la ORDEN
       //    (agregados desde ModalOrden durante el trabajo)
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
@@ -150,7 +137,7 @@ export async function crearFactura(data: {
         });
       }
 
-      // 4. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
+      // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
       //    Solo si NO están ya registrados en detalle_orden_insumo para evitar duplicados
       const idsYaRegistrados = new Set(insumosDeOrden.map((d) => d.id_insumo));
 
@@ -183,10 +170,77 @@ export async function crearFactura(data: {
               id_insumo: item.id_insumo,
               cantidad_usada: item.cantidad,
               precio_aplicado: insumo.precio_venta,
+              alicuota_iva: item.alicuota_iva ?? ALICUOTA_IVA_DEFAULT,
             },
           });
         }
       }
+
+      // 4. Calcular importes a partir de las lineas guardadas en la orden
+      //    (incluye los insumos adicionales recien agregados). No se usa
+      //    ningun monto que venga del cliente.
+      let importes: ImportesComprobante | null = null;
+      if (facturable) {
+        const [serviciosOrden, insumosOrden] = await Promise.all([
+          tx.detalle_orden_servicio.findMany({ where: { id_orden: data.id_orden } }),
+          tx.detalle_orden_insumo.findMany({ where: { id_orden: data.id_orden } }),
+        ]);
+        const lineas = [
+          ...serviciosOrden.map((s) => ({
+            neto: (s.cantidad || 1) * Number(s.precio_acordado),
+            alicuota: Number(s.alicuota_iva),
+          })),
+          ...insumosOrden.map((i) => ({
+            neto: Number(i.cantidad_usada) * Number(i.precio_aplicado),
+            alicuota: Number(i.alicuota_iva),
+          })),
+        ];
+        importes = calcularImportes({
+          lineas,
+          tipoDescuento: data.tipo_descuento,
+          descuentoPorcentaje: data.descuento_porcentaje,
+          descuentoMontoEquipo: data.descuento_monto_equipo,
+          equipoDescripcion: data.equipo_descripcion,
+          facturable,
+        });
+        if (importes.netoBruto <= 0) {
+          throw new Error("La orden no tiene servicios ni insumos con precio para facturar.");
+        }
+      }
+
+      // 5. Crear la factura y su IVA discriminado por alicuota
+      const alicuotaUnica = importes && importes.desglose.length === 1 ? importes.desglose[0].alicuota : null;
+      const factura = await tx.factura.create({
+        data: {
+          id_orden: data.id_orden,
+          num_factura: data.num_factura,
+          tipo: data.tipo,
+          fiscal,
+          punto_venta: puntoVenta,
+          fecha_emision: fechaEmision,
+          fecha_vencimiento: fechaVencimiento,
+          neto: importes ? importes.netoGravado : null,
+          alicuota_iva: alicuotaUnica,
+          tipo_descuento: facturable ? (data.tipo_descuento ?? null) : null,
+          descuento_porcentaje: facturable && data.tipo_descuento === "PORCENTAJE" ? (data.descuento_porcentaje ?? null) : null,
+          descuento_monto: importes ? importes.descuentoMonto : null,
+          equipo_descripcion: facturable && data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
+          monto_total: importes ? importes.montoTotal : 0,
+          saldo_pendiente: importes ? importes.montoTotal : 0,
+          estado_pago: facturable ? ESTADOS_FACTURA.IMPAGA : ESTADOS_FACTURA.NO_APLICA,
+          descripcion: data.descripcion,
+          factura_iva: importes
+            ? {
+                create: importes.desglose.map((d) => ({
+                  alicuota: d.alicuota,
+                  neto_gravado: d.netoGravado,
+                  monto_iva: d.montoIva,
+                })),
+              }
+            : undefined,
+        },
+        include: { factura_iva: true },
+      });
 
       return factura;
     });
@@ -206,6 +260,7 @@ export async function getFacturaCompleta(id_factura: number) {
     const factura = await prisma.factura.findUnique({
       where: { id_factura },
       include: {
+        factura_iva: { orderBy: { alicuota: "desc" } },
         orden_trabajo: {
           include: {
             cliente: true,

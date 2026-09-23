@@ -5,14 +5,13 @@ import { crearCliente, crearInsumo, crearOrdenFinalizada } from "./factories";
 
 describe("crearFactura", () => {
   it("factura sobre orden finalizada: IMPAGA, saldo igual al total, neto y alicuota guardados", async () => {
-    const orden = await crearOrdenFinalizada();
+    const orden = await crearOrdenFinalizada({ insumos: [] });
 
     const resultado = await crearFactura({
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
@@ -32,8 +31,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
     expect(primera.success).toBe(true);
 
@@ -41,8 +39,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-2",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
     expect(segunda.success).toBe(false);
     if (segunda.success) return;
@@ -60,8 +57,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
       insumos: [{ id_insumo: 999999, cantidad: 1 }],
     });
 
@@ -82,8 +78,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
@@ -98,8 +93,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
       insumos: [{ id_insumo: insumo.id_insumo, cantidad: 5 }],
     });
 
@@ -115,8 +109,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "IT-1",
       tipo: "Informe Tecnico",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
@@ -134,8 +127,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
@@ -155,8 +147,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
       fecha_vencimiento: vencimiento,
     });
 
@@ -166,14 +157,13 @@ describe("crearFactura", () => {
   });
 
   it("descuento por porcentaje persistido en las columnas correctas", async () => {
-    const orden = await crearOrdenFinalizada();
+    const orden = await crearOrdenFinalizada({ insumos: [] });
 
     const resultado = await crearFactura({
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
       tipo_descuento: "PORCENTAJE",
       descuento_porcentaje: 10,
     });
@@ -188,14 +178,13 @@ describe("crearFactura", () => {
   });
 
   it("descuento por equipo persistido en las columnas correctas", async () => {
-    const orden = await crearOrdenFinalizada();
+    const orden = await crearOrdenFinalizada({ insumos: [] });
 
     const resultado = await crearFactura({
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
       tipo_descuento: "EQUIPO",
       descuento_monto_equipo: 300,
       equipo_descripcion: "Heladera vieja",
@@ -210,6 +199,160 @@ describe("crearFactura", () => {
     expect(resultado.factura.equipo_descripcion).toBe("Heladera vieja");
   });
 
+  it("calcula los importes en el servidor a partir de las lineas de la orden y discrimina el IVA", async () => {
+    const orden = await crearOrdenFinalizada({
+      servicios: [{ precio_acordado: 1000, alicuota_iva: 21 }],
+      insumos: [{ cantidad_usada: 0.5, precio_aplicado: 400, alicuota_iva: 10.5 }],
+    });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(Number(resultado.factura.neto)).toBe(1200);
+    // varias alicuotas: no hay alicuota unica en la factura
+    expect(resultado.factura.alicuota_iva).toBeNull();
+    expect(Number(resultado.factura.monto_total)).toBe(1200 + 210 + 21);
+
+    const iva = await prisma.factura_iva.findMany({
+      where: { id_factura: resultado.factura.id_factura },
+      orderBy: { alicuota: "desc" },
+    });
+    expect(iva.map((i) => [Number(i.alicuota), Number(i.neto_gravado), Number(i.monto_iva)])).toEqual([
+      [21, 1000, 210],
+      [10.5, 200, 21],
+    ]);
+  });
+
+  it("el descuento se reparte entre alicuotas en factura_iva", async () => {
+    const orden = await crearOrdenFinalizada({
+      servicios: [{ precio_acordado: 1000, alicuota_iva: 21 }, { precio_acordado: 1000, alicuota_iva: 10.5 }],
+      insumos: [],
+    });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      tipo_descuento: "PORCENTAJE",
+      descuento_porcentaje: 10,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(Number(resultado.factura.descuento_monto)).toBe(200);
+    expect(Number(resultado.factura.neto)).toBe(1800);
+    expect(Number(resultado.factura.monto_total)).toBe(1800 + 189 + 94.5);
+  });
+
+  it("factura interna: se guarda con fiscal false, genera deuda y el IVA se calcula igual", async () => {
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "Factura X-0001",
+      tipo: "Factura",
+      fiscal: false,
+      punto_venta: 3,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.factura.fiscal).toBe(false);
+    expect(resultado.factura.estado_pago).toBe("IMPAGA");
+    expect(Number(resultado.factura.monto_total)).toBe(1210);
+    expect(Number(resultado.factura.saldo_pendiente)).toBe(1210);
+    // una interna no guarda punto de venta
+    expect(resultado.factura.punto_venta).toBeNull();
+  });
+
+  it("factura fiscal guarda punto de venta", async () => {
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "Factura A-0001",
+      tipo: "Factura",
+      fiscal: true,
+      punto_venta: 3,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.factura.fiscal).toBe(true);
+    expect(resultado.factura.punto_venta).toBe(3);
+  });
+
+  it("punto de venta invalido rechaza la factura", async () => {
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      punto_venta: 0,
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error).toContain("punto de venta");
+  });
+
+  it("un remito queda siempre fiscal aunque se mande fiscal false", async () => {
+    const orden = await crearOrdenFinalizada();
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "R-1",
+      tipo: "Remito",
+      fiscal: false,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.factura.fiscal).toBe(true);
+  });
+
+  it("insumos adicionales se registran con su alicuota y entran en el calculo", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10, precio_venta: 100 });
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad: 2, alicuota_iva: 10.5 }],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(Number(resultado.factura.neto)).toBe(1200);
+    expect(Number(resultado.factura.monto_total)).toBe(1200 + 210 + 21);
+    const detalle = await prisma.detalle_orden_insumo.findFirst({ where: { id_orden: orden.id_orden } });
+    expect(Number(detalle?.alicuota_iva)).toBe(10.5);
+  });
+
+  it("orden sin lineas con precio no se puede facturar", async () => {
+    const orden = await crearOrdenFinalizada({ servicios: [], insumos: [] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(false);
+  });
+
   // Bug conocido con issue abierto: crearFactura descuenta stock incluso para
   // comprobantes no facturables (Informe Tecnico), que no deberian tocar stock.
   test.fails("comprobante no facturable no deberia descontar stock", async () => {
@@ -220,8 +363,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "IT-1",
       tipo: "Informe Tecnico",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
@@ -238,8 +380,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     expect(resultado.success).toBe(false);
@@ -254,8 +395,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const ordenFinal = await prisma.orden_trabajo.findUnique({ where: { id_orden: orden.id_orden } });
@@ -271,8 +411,7 @@ describe("crearFactura", () => {
       id_orden: orden.id_orden,
       num_factura: "R-1",
       tipo: "Remito",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
@@ -292,8 +431,7 @@ describe("getOrdenesPendientesFacturacion", () => {
       id_orden: finalizadaConFactura.id_orden,
       num_factura: "F-1",
       tipo: "Factura",
-      neto: 1000,
-      alicuota_iva: 21,
+      fiscal: true,
     });
 
     const pendientes = await getOrdenesPendientesFacturacion();

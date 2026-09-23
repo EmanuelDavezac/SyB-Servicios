@@ -54,6 +54,7 @@ export async function crearCliente(datos: {
     num_calle?: number;
     localidad?: string;
 }) {
+    
     try {
         await requerirUsuario();
         const nuevoCliente = await prisma.cliente.create({
@@ -124,4 +125,4 @@ export async function eliminarCliente(id_cliente: number) {
         console.error("Error al eliminar cliente:", error);
         return { success: false, error: "No se pudo eliminar el cliente. Puede tener órdenes asociadas." };
     }
-}
+}

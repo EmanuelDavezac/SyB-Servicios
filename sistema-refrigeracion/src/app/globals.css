@@ -11,6 +11,17 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+/* Inputs numéricos sin flechitas de subir/bajar: los montos se tipean a mano */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Custom modal backdrop for glassmorphism */
 .modal-backdrop {
   @apply fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4;

@@ -22,6 +22,8 @@ type FilaComprobante = {
     total: number | null;
     saldo: number | null;
     estado_pago: string | null;
+    /** solo facturas: true = cargada en ARCA, false = interna; null en recibos */
+    fiscal: boolean | null;
 };
 
 export default async function FacturacionPage({
@@ -37,6 +39,7 @@ export default async function FacturacionPage({
     const filtroTipo = typeof params.tipo === "string" ? params.tipo : "";
     const filtroEstado = typeof params.estado === "string" ? params.estado.toUpperCase() : "";
     const soloConSaldo = params.conSaldo === "1";
+    const filtroFiscal = params.fiscal === "1" ? true : params.fiscal === "0" ? false : null;
 
     const [facturasOriginales, ordenesPendientes, clientesConDeuda, recibosOriginales] = await Promise.all([
         getFacturas(),
@@ -67,6 +70,8 @@ export default async function FacturacionPage({
             total: f.monto_total !== null ? Number(f.monto_total) : null,
             saldo: f.saldo_pendiente !== null ? Number(f.saldo_pendiente) : null,
             estado_pago: f.estado_pago,
+            // ARCA / interna solo aplica a facturas (los remitos no eligen)
+            fiscal: f.tipo === "Factura" ? f.fiscal : null,
         };
     });
 
@@ -85,6 +90,7 @@ export default async function FacturacionPage({
             total: Number(r.monto_total),
             saldo: null,
             estado_pago: null,
+            fiscal: null,
         };
     });
 
@@ -121,6 +127,12 @@ export default async function FacturacionPage({
 
         if (soloConSaldo) {
             if (!(fila.saldo !== null && fila.saldo > 0)) return false;
+        }
+
+        // Fiscal/interna es un eje de las facturas: con el filtro activo los
+        // recibos y remitos (fiscal = null) quedan afuera.
+        if (filtroFiscal !== null) {
+            if (fila.fiscal !== filtroFiscal) return false;
         }
 
         return true;
@@ -191,6 +203,16 @@ export default async function FacturacionPage({
                             }
                         }
 
+                        const badgeFiscal = fila.fiscal === null ? null : (
+                            <span className="inline-flex items-center mt-1">
+                                {fila.fiscal ? (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">ARCA</span>
+                                ) : (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Interna</span>
+                                )}
+                            </span>
+                        );
+
                         const acciones = fila.origen === "recibo" ? (
                             <>
                                 <BotonImprimirRecibo idRecibo={fila.id} />
@@ -213,6 +235,7 @@ export default async function FacturacionPage({
                                     <div className="flex justify-between items-start gap-2">
                                         <div>
                                             <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                            {badgeFiscal}
                                             <div className="text-gray-600">{fila.nombreCliente}</div>
                                         </div>
                                         <div className="text-right">
@@ -250,7 +273,10 @@ export default async function FacturacionPage({
                                         <div className="text-gray-900">{formatDate(fila.fecha)}</div>
                                         {vencioTag || <div className="text-xs text-gray-400 mt-1">{esFacturable && fila.fecha_vencimiento ? `Vence ${formatDate(fila.fecha_vencimiento)}` : ""}</div>}
                                     </div>
-                                    <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                    <div>
+                                        <div className="font-semibold text-gray-800">{fila.comprobante}</div>
+                                        {badgeFiscal}
+                                    </div>
                                     <div className="text-gray-600">{fila.nombreCliente}</div>
                                     <div className="font-bold text-blue-800">
                                         {fila.total !== null ? formatCurrency(fila.total) : "-"}

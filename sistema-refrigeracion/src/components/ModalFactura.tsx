@@ -5,7 +5,15 @@ import { crearFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
 import { esTipoFacturable } from "@/lib/estadoFactura";
-import { calcularImportes } from "@/lib/comprobantes";
+import {
+    calcularImportes,
+    formatearAlicuota,
+    alicuotaValida,
+    ALICUOTAS_IVA_SUGERIDAS,
+    ALICUOTA_IVA_DEFAULT,
+    type ImportesComprobante,
+    type LineaImporte,
+} from "@/lib/comprobantes";
 
 interface Cliente {
     id_cliente: number;
@@ -33,6 +41,15 @@ interface Props {
 const inputCls =
     "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
+const DATALIST_IVA_ID = "factura-alicuotas-iva";
+
+// Prefijo del número sugerido: A- para las que se cargan en ARCA, X- para las internas
+const prefijoNumero = (fiscal: boolean) => (fiscal ? "A-" : "X-");
+const cambiarPrefijo = (numero: string, fiscal: boolean) =>
+    /^[AX]-/.test(numero) ? numero.replace(/^[AX]-/, prefijoNumero(fiscal)) : numero;
+
+const fmt = (n: number) => `$${n.toFixed(2)}`;
+
 export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
@@ -40,10 +57,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
     const [idOrden, setIdOrden] = useState("");
     const [tipo, setTipo] = useState("Factura");
+    const [fiscal, setFiscal] = useState(true);
+    const [puntoVenta, setPuntoVenta] = useState("");
     const [letraNumero, setLetraNumero] = useState("");
-    const [neto, setNeto] = useState("");
-    const [netoTocado, setNetoTocado] = useState(false);
-    const [alicuotaIva, setAlicuotaIva] = useState("21");
     const [fechaVencimiento, setFechaVencimiento] = useState("");
     const [descripcion, setDescripcion] = useState("");
 
@@ -55,57 +71,88 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const facturable = esTipoFacturable(tipo);
     const mostrarPrecios = facturable;
     const mostrarInsumosYDescuento = facturable;
+    // Solo las facturas eligen ARCA / interna; los remitos quedan siempre fiscales
+    const esFactura = tipo === "Factura";
+    const fiscalEfectivo = esFactura ? fiscal : true;
+    const mostrarPuntoVenta = esFactura && fiscal;
 
-    const netoBrutoNum = neto ? parseFloat(neto) : 0;
+    /* Insumos */
+    const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
+    const [insumosSeleccionados, setInsumosSeleccionados] = useState<
+        { _key: string; id_insumo: number; nombre: string; cantidad: number; alicuota_iva: number }[]
+    >([]);
+    const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
+    const [cantidadInsumo, setCantidadInsumo] = useState("1");
+    const [ivaInsumo, setIvaInsumo] = useState(String(ALICUOTA_IVA_DEFAULT));
+
+    /* Insumos ya registrados en la orden (pre-cargados) */
+    const [insumosDeOrden, setInsumosDeOrden] = useState<
+        {
+            id_detalle_ins?: number;
+            id_detalle_ord_insumo?: number;
+            id_insumo: number | null;
+            cantidad_usada: number | string;
+            precio_aplicado: number | string;
+            alicuota_iva: number | string;
+            insumo: { nombre: string } | null;
+        }[]
+    >([]);
+
+    /* Servicios ya registrados en la orden */
+    const [serviciosDeOrden, setServiciosDeOrden] = useState<
+        { cantidad: number; precio_acordado: number | string; alicuota_iva: number | string }[]
+    >([]);
+
+    /* Líneas de la orden + insumos adicionales. Los adicionales que ya están
+       registrados en la orden se ignoran (igual que en crearFactura). */
+    const idsInsumosDeOrden = new Set(insumosDeOrden.map((d) => d.id_insumo));
+    const lineas: LineaImporte[] = [
+        ...serviciosDeOrden.map((s) => ({
+            neto: (s.cantidad || 1) * parseFloat(String(s.precio_acordado)),
+            alicuota: parseFloat(String(s.alicuota_iva)),
+        })),
+        ...insumosDeOrden.map((d) => ({
+            neto: parseFloat(String(d.cantidad_usada)) * parseFloat(String(d.precio_aplicado)),
+            alicuota: parseFloat(String(d.alicuota_iva)),
+        })),
+        ...insumosSeleccionados
+            .filter((item) => !idsInsumosDeOrden.has(item.id_insumo))
+            .map((item) => {
+                const insumo = insumosDisponibles.find((i) => i.id_insumo === item.id_insumo);
+                return { neto: item.cantidad * Number(insumo?.precio_venta ?? 0), alicuota: item.alicuota_iva };
+            }),
+    ];
 
     // Preview en vivo: mientras el usuario está tipeando, el descuento puede
     // estar incompleto (ej. tipo "PORCENTAJE" elegido pero el % todavía vacío).
     // calcularImportes tira error en esos casos porque son inválidos para
     // guardar la factura, pero acá solo queremos mostrar 0 de descuento.
-    let descuentoMontoNum = 0;
-    let netoGravadoNum = netoBrutoNum;
-    let montoTotalCalculado = netoBrutoNum + netoBrutoNum * (parseFloat(alicuotaIva || "0") / 100);
+    const sinDescuento = { lineas, facturable: true };
+    let importes: ImportesComprobante | null = null;
     try {
-        const importes = calcularImportes({
-            neto: netoBrutoNum,
-            alicuotaIva: parseFloat(alicuotaIva || "0"),
+        importes = calcularImportes({
+            ...sinDescuento,
             tipoDescuento: tipoDescuento === "PORCENTAJE" || tipoDescuento === "EQUIPO" ? tipoDescuento : null,
             descuentoPorcentaje: descuentoPorcentaje ? parseFloat(descuentoPorcentaje) : null,
             descuentoMontoEquipo: descuentoImporte ? parseFloat(descuentoImporte) : null,
             equipoDescripcion,
-            facturable: true,
         });
-        descuentoMontoNum = importes.descuentoMonto ?? 0;
-        netoGravadoNum = importes.netoGravado;
-        montoTotalCalculado = importes.montoTotal;
     } catch {
         // input incompleto/invalido todavia: se mantiene el preview sin descuento
+        try {
+            importes = calcularImportes(sinDescuento);
+        } catch {
+            importes = null;
+        }
     }
-    const montoIva = montoTotalCalculado - netoGravadoNum;
-
-    /* Insumos */
-    const [insumosDisponibles, setInsumosDisponibles] = useState<Insumo[]>([]);
-    const [insumosSeleccionados, setInsumosSeleccionados] = useState<
-        { _key: string; id_insumo: number; nombre: string; cantidad: number }[]
-    >([]);
-    const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
-    const [cantidadInsumo, setCantidadInsumo] = useState("1");
-
-    /* Insumos ya registrados en la orden (pre-cargados) */
-    const [insumosDeOrden, setInsumosDeOrden] = useState<
-        { id_detalle_ins?: number; id_detalle_ord_insumo?: number; cantidad_usada: number; precio_aplicado: number | string; insumo: { nombre: string } | null }[]
-    >([]);
-
-    /* Servicios ya registrados en la orden (para sugerir el subtotal) */
-    const [serviciosDeOrden, setServiciosDeOrden] = useState<
-        { cantidad: number; precio_acordado: number | string }[]
-    >([]);
+    const netoBrutoNum = importes?.netoBruto ?? 0;
+    const descuentoMontoNum = importes?.descuentoMonto ?? 0;
 
     /* Abrir con orden preseleccionada desde URL */
     useEffect(() => {
         if (openWithOrdenId) {
             setIdOrden(openWithOrdenId);
-            setLetraNumero(`A-${openWithOrdenId.padStart(4, "0")}`);
+            setLetraNumero(`${prefijoNumero(true)}${openWithOrdenId.padStart(4, "0")}`);
             setAbierto(true);
         }
     }, [openWithOrdenId]);
@@ -119,7 +166,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
     /* Cargar servicios e insumos de la orden al seleccionarla */
     useEffect(() => {
-        setNetoTocado(false);
         if (idOrden) {
             obtenerInsumosDeOrden(Number(idOrden)).then((data: any) => setInsumosDeOrden(data));
             obtenerServiciosDeOrden(Number(idOrden)).then((data: any) => setServiciosDeOrden(data));
@@ -129,44 +175,44 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         }
     }, [idOrden]);
 
-    /* Sugerir el subtotal como suma de servicios + insumos de la orden (más los
-       insumos adicionales que se vayan agregando), mientras el usuario no haya
-       tocado el campo a mano */
-    useEffect(() => {
-        if (!facturable || netoTocado) return;
-
-        const totalServicios = serviciosDeOrden.reduce(
-            (acc, s) => acc + (s.cantidad || 1) * parseFloat(String(s.precio_acordado)),
-            0
-        );
-        const totalInsumosOrden = insumosDeOrden.reduce(
-            (acc, d) => acc + (d.cantidad_usada || 1) * parseFloat(String(d.precio_aplicado)),
-            0
-        );
-        const totalInsumosAdicionales = insumosSeleccionados.reduce((acc, item) => {
-            const insumo = insumosDisponibles.find((i) => i.id_insumo === item.id_insumo);
-            return acc + item.cantidad * (insumo?.precio_venta ?? 0);
-        }, 0);
-
-        const sugerido = totalServicios + totalInsumosOrden + totalInsumosAdicionales;
-        setNeto(sugerido > 0 ? sugerido.toFixed(2) : "");
-    }, [facturable, netoTocado, serviciosDeOrden, insumosDeOrden, insumosSeleccionados, insumosDisponibles]);
-
     /* Orden seleccionada — se usa para autocompletar cliente y N° de orden */
     const ordenSeleccionada = ordenes.find((o) => String(o.id_orden) === idOrden);
 
+    function handleCambiarTipo(nuevoTipo: string) {
+        setTipo(nuevoTipo);
+        setLetraNumero((prev) => cambiarPrefijo(prev, nuevoTipo === "Factura" ? fiscal : true));
+    }
+
+    function handleCambiarFiscal(nuevoFiscal: boolean) {
+        setFiscal(nuevoFiscal);
+        setLetraNumero((prev) => cambiarPrefijo(prev, nuevoFiscal));
+    }
+
     function agregarInsumo() {
         if (!idInsumoSeleccionado) return;
+        const alicuota = parseFloat(ivaInsumo.replace(",", "."));
+        if (!alicuotaValida(alicuota)) {
+            setError("El IVA del insumo debe estar entre 0 y 100.");
+            return;
+        }
         const insumo = insumosDisponibles.find(
             (i) => i.id_insumo === Number(idInsumoSeleccionado)
         );
         if (insumo) {
             setInsumosSeleccionados((prev) => [
                 ...prev,
-                { _key: `${insumo.id_insumo}-${Date.now()}-${Math.random()}`, id_insumo: insumo.id_insumo, nombre: insumo.nombre, cantidad: Number(cantidadInsumo) },
+                {
+                    _key: `${insumo.id_insumo}-${Date.now()}-${Math.random()}`,
+                    id_insumo: insumo.id_insumo,
+                    nombre: insumo.nombre,
+                    cantidad: Number(cantidadInsumo),
+                    alicuota_iva: alicuota,
+                },
             ]);
             setIdInsumoSeleccionado("");
             setCantidadInsumo("1");
+            setIvaInsumo(String(ALICUOTA_IVA_DEFAULT));
+            setError(null);
         }
     }
 
@@ -177,15 +223,15 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     function resetForm() {
         setIdOrden("");
         setTipo("Factura");
+        setFiscal(true);
+        setPuntoVenta("");
         setLetraNumero("");
-        setNeto("");
-        setNetoTocado(false);
-        setAlicuotaIva("21");
         setFechaVencimiento("");
         setDescripcion("");
         setInsumosSeleccionados([]);
         setInsumosDeOrden([]);
         setServiciosDeOrden([]);
+        setIvaInsumo(String(ALICUOTA_IVA_DEFAULT));
         setTipoDescuento("");
         setDescuentoPorcentaje("");
         setDescuentoImporte("");
@@ -198,8 +244,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             setError("Completá la Orden y el Tipo antes de guardar.");
             return;
         }
-        if (mostrarPrecios && !neto) {
-            setError("Completá el Subtotal antes de guardar.");
+        if (mostrarPrecios && netoBrutoNum <= 0) {
+            setError("La orden no tiene servicios ni insumos con precio. Corregí los precios en la orden.");
             return;
         }
 
@@ -220,8 +266,17 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                 setError("El importe del equipo debe ser mayor a cero.");
                 return;
             }
-            if (imp >= parseFloat(neto)) {
+            if (imp >= netoBrutoNum) {
                 setError("El descuento no puede igualar o superar el subtotal.");
+                return;
+            }
+        }
+
+        let puntoVentaNum: number | null = null;
+        if (mostrarPuntoVenta && puntoVenta.trim()) {
+            puntoVentaNum = Number(puntoVenta);
+            if (!Number.isInteger(puntoVentaNum) || puntoVentaNum < 1 || puntoVentaNum > 99999) {
+                setError("El punto de venta debe ser un número entero entre 1 y 99999.");
                 return;
             }
         }
@@ -234,15 +289,16 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         const resultado = await crearFactura({
             id_orden: Number(idOrden),
             tipo,
+            fiscal: fiscalEfectivo,
+            punto_venta: puntoVentaNum,
             num_factura: `${tipo} ${letraNumero}`.trim(),
-            neto: mostrarPrecios ? parseFloat(neto) : 0,
-            alicuota_iva: mostrarPrecios ? parseFloat(alicuotaIva || "0") : 0,
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
             insumos: mostrarInsumosYDescuento
                 ? insumosSeleccionados.map((i) => ({
                     id_insumo: i.id_insumo,
                     cantidad: i.cantidad,
+                    alicuota_iva: i.alicuota_iva,
                 }))
                 : [],
             tipo_descuento: descuentoActivo ? (descuentoActivo as "PORCENTAJE" | "EQUIPO") : null,
@@ -273,6 +329,12 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             {abierto && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4">
                     <div className="bg-white md:rounded-2xl shadow-2xl w-full max-w-xl flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
+
+                        <datalist id={DATALIST_IVA_ID}>
+                            {ALICUOTAS_IVA_SUGERIDAS.map((a) => (
+                                <option key={a} value={a} />
+                            ))}
+                        </datalist>
 
                         {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white md:rounded-t-2xl shrink-0">
@@ -347,53 +409,70 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Tipo *</label>
                                         <select
                                             value={tipo}
-                                            onChange={(e) => setTipo(e.target.value)}
+                                            onChange={(e) => handleCambiarTipo(e.target.value)}
                                             className={inputCls}
                                         >
                                             <option value="Factura">Factura</option>
                                             <option value="Remito">Remito</option>
                                         </select>
                                     </div>
-                                    <div>
+                                    {esFactura ? (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Cargada en ARCA</label>
+                                            <label className="flex items-center gap-2 h-[38px] text-sm cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={fiscal}
+                                                    onChange={(e) => handleCambiarFiscal(e.target.checked)}
+                                                    className="accent-blue-600 w-4 h-4"
+                                                />
+                                                {fiscal ? (
+                                                    <span className="text-blue-700 font-semibold">Sí, fiscal</span>
+                                                ) : (
+                                                    <span className="text-amber-700 font-semibold">No, interna</span>
+                                                )}
+                                            </label>
+                                        </div>
+                                    ) : (
+                                        <div />
+                                    )}
+                                    <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Número (Ej: A-0001)
+                                            Número (Ej: {prefijoNumero(fiscalEfectivo)}0001)
                                         </label>
                                         <input
                                             type="text"
                                             value={letraNumero}
                                             onChange={(e) => setLetraNumero(e.target.value)}
-                                            placeholder="A-0001"
+                                            placeholder={`${prefijoNumero(fiscalEfectivo)}0001`}
                                             className={inputCls}
                                         />
                                     </div>
-                                    {mostrarPrecios && (
-                                        <div>
+                                    {mostrarPuntoVenta && (
+                                        <div className="col-span-2">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                                                Subtotal *
+                                                Punto de venta (Opcional)
                                             </label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
-                                                <input
-                                                    type="number"
-                                                    value={neto}
-                                                    onChange={(e) => { setNeto(e.target.value); setNetoTocado(true); }}
-                                                    placeholder="0.00"
-                                                    className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                                />
-                                            </div>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="99999"
+                                                step="1"
+                                                value={puntoVenta}
+                                                onChange={(e) => setPuntoVenta(e.target.value)}
+                                                placeholder="Ej: 2"
+                                                className={inputCls}
+                                            />
                                         </div>
                                     )}
                                     {mostrarPrecios && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-500 mb-1">
-                                                Alícuota IVA (%)
+                                                Subtotal
                                             </label>
-                                            <input
-                                                type="number"
-                                                value={alicuotaIva}
-                                                onChange={(e) => setAlicuotaIva(e.target.value)}
-                                                className={inputCls}
-                                            />
+                                            <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700">
+                                                {fmt(netoBrutoNum)}
+                                            </div>
                                         </div>
                                     )}
                                     {mostrarPrecios && (
@@ -409,11 +488,16 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         />
                                     </div>
                                     )}
-                                    {mostrarPrecios && neto && (
+                                    {mostrarPrecios && (
+                                        <p className="col-span-2 -mt-2 text-[11px] text-gray-400">
+                                            El subtotal y el IVA salen de las líneas de la orden. Para corregir precios o alícuotas, editá la orden.
+                                        </p>
+                                    )}
+                                    {mostrarPrecios && importes && netoBrutoNum > 0 && (
                                         <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1.5">
                                             <div className="flex justify-between text-blue-700">
                                                 <span>Subtotal</span>
-                                                <span>${netoBrutoNum.toFixed(2)}</span>
+                                                <span>{fmt(netoBrutoNum)}</span>
                                             </div>
                                             {tipoDescuento && descuentoMontoNum > 0 && (
                                                 <div className="flex justify-between text-orange-700">
@@ -422,22 +506,27 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                             ? `Bonificacion ${descuentoPorcentaje}%`
                                                             : "Equipo en parte de pago"}
                                                     </span>
-                                                    <span>- ${descuentoMontoNum.toFixed(2)}</span>
+                                                    <span>- {fmt(descuentoMontoNum)}</span>
                                                 </div>
                                             )}
                                             {tipoDescuento && descuentoMontoNum > 0 && (
                                                 <div className="flex justify-between text-blue-700 border-t border-blue-200 pt-1">
                                                     <span>Neto gravado</span>
-                                                    <span>${netoGravadoNum.toFixed(2)}</span>
+                                                    <span>{fmt(importes.netoGravado)}</span>
                                                 </div>
                                             )}
-                                            <div className="flex justify-between text-blue-700">
-                                                <span>IVA {alicuotaIva}%</span>
-                                                <span>${montoIva.toFixed(2)}</span>
-                                            </div>
+                                            {importes.desglose.map((d) => (
+                                                <div key={d.alicuota} className="flex justify-between text-blue-700">
+                                                    <span>
+                                                        IVA {formatearAlicuota(d.alicuota)}%
+                                                        <span className="text-blue-400 ml-1">(s/ {fmt(d.netoGravado)})</span>
+                                                    </span>
+                                                    <span>{fmt(d.montoIva)}</span>
+                                                </div>
+                                            ))}
                                             <div className="flex justify-between font-bold text-blue-800 border-t border-blue-200 pt-1">
                                                 <span>Total</span>
-                                                <span>${montoTotalCalculado.toFixed(2)}</span>
+                                                <span>{fmt(importes.montoTotal)}</span>
                                             </div>
                                         </div>
                                     )}
@@ -560,7 +649,9 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                                     <span className="font-medium text-orange-900">
                                                         {d.insumo?.nombre ?? "Insumo"}
                                                     </span>
-                                                    <span className="text-orange-600 text-xs font-semibold">x{d.cantidad_usada}</span>
+                                                    <span className="text-orange-600 text-xs font-semibold">
+                                                        x{d.cantidad_usada} · IVA {formatearAlicuota(parseFloat(String(d.alicuota_iva)))}%
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -568,11 +659,11 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 )}
 
                                 {/* Selector para insumos adicionales */}
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <select
                                         value={idInsumoSeleccionado}
                                         onChange={(e) => setIdInsumoSeleccionado(e.target.value)}
-                                        className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        className="flex-1 min-w-0 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     >
                                         <option value="">+ Insumo adicional...</option>
                                         {insumosDisponibles.map((insumo, idx) => (
@@ -589,6 +680,19 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                         min="0.001"
                                         step="0.001"
                                         placeholder="Cant."
+                                        title="Cantidad"
+                                    />
+                                    <input
+                                        type="number"
+                                        value={ivaInsumo}
+                                        onChange={(e) => setIvaInsumo(e.target.value)}
+                                        list={DATALIST_IVA_ID}
+                                        className="w-20 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        min="0"
+                                        max="100"
+                                        step="0.5"
+                                        placeholder="IVA %"
+                                        title="IVA %"
                                     />
                                     <button
                                         type="button"
@@ -601,25 +705,33 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
                                 {insumosSeleccionados.length > 0 && (
                                     <div className="mt-3 space-y-1">
-                                        {insumosSeleccionados.map((item) => (
-                                            <div
-                                                key={item._key}
-                                                className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm"
-                                            >
-                                                <span className="font-medium text-blue-900">
-                                                    {item.nombre}
-                                                    <span className="ml-2 text-blue-600 text-xs">× {item.cantidad}</span>
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => quitarInsumo(item._key)}
-                                                    className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
-                                                    title="Quitar"
+                                        {insumosSeleccionados.map((item) => {
+                                            const yaEnOrden = idsInsumosDeOrden.has(item.id_insumo);
+                                            return (
+                                                <div
+                                                    key={item._key}
+                                                    className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm"
                                                 >
-                                                    &times;
-                                                </button>
-                                            </div>
-                                        ))}
+                                                    <span className={`font-medium ${yaEnOrden ? "text-gray-400 line-through" : "text-blue-900"}`}>
+                                                        {item.nombre}
+                                                        <span className="ml-2 text-blue-600 text-xs">
+                                                            × {item.cantidad} · IVA {formatearAlicuota(item.alicuota_iva)}%
+                                                        </span>
+                                                    </span>
+                                                    {yaEnOrden && (
+                                                        <span className="text-[10px] text-gray-500 mx-2">ya está en la orden, se ignora</span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => quitarInsumo(item._key)}
+                                                        className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
+                                                        title="Quitar"
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </section>
