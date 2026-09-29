@@ -104,6 +104,10 @@ export default function ModalCobro({ clientes }: Props) {
             setError("Elegí un cliente.");
             return;
         }
+        if (!formaPago) {
+            setError("Elegí una forma de pago.");
+            return;
+        }
         if (lineas.length === 0) {
             setError("Cargá algún monto a imputar en al menos una factura.");
             return;

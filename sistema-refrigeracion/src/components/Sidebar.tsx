@@ -58,7 +58,7 @@ export default function Sidebar({ nombre }: { nombre: string }) {
   return (
     <>
       {/* BARRA SUPERIOR MÓVIL */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white flex items-center px-4 z-30 shadow-lg">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white flex items-center px-4 z-30 shadow-lg print:hidden">
         <button
           type="button"
           aria-label="Abrir menú"
@@ -85,6 +85,7 @@ export default function Sidebar({ nombre }: { nombre: string }) {
         className={`
           fixed lg:static top-0 left-0 h-dvh w-64 bg-slate-900 text-white shrink-0 flex flex-col z-50 shadow-2xl
           transition-transform duration-200 ease-in-out
+          print:hidden
           ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
         `}
       >

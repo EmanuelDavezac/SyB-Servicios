@@ -381,32 +381,18 @@ export async function imprimirRecibo(idRecibo: number) {
             text-align: center;
         }
 
-        /* ===== CORTE ENTRE COPIAS ===== */
-        .linea-corte {
-            border-top: 1.5px dashed #000;
-            margin: 14px auto;
-            max-width: 750px;
-            text-align: center;
-            position: relative;
-        }
-        .linea-corte span {
-            position: relative;
-            top: -8px;
-            background: #fff;
-            padding: 0 10px;
-            font-size: 9px;
-            color: #666;
-        }
+
 
         @media print {
-            body { padding: 5px 10px; }
+            @page { margin: 0; }
+            body { padding: 10mm; }
             .factura-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
 </head>
 <body>
     ${cuerpoRecibo("ORIGINAL")}
-    <div class="linea-corte"><span>&#9986; CORTAR AQUÍ</span></div>
+    <div style="page-break-before: always;"></div>
     ${cuerpoRecibo("DUPLICADO")}
 </body>
 </html>`;

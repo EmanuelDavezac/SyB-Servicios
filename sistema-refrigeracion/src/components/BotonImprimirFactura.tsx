@@ -347,7 +347,8 @@ export async function imprimirComprobante(idFactura: number) {
         }
 
         @media print {
-            body { padding: 5px 10px; }
+            @page { margin: 0; }
+            body { padding: 10mm; }
             .factura-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
@@ -634,7 +635,8 @@ function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFa
         .firma-linea { border-top: 1px solid #000; margin-bottom: 6px; }
         .footer-section { border-top: 1.5px solid #000; padding: 6px 16px; font-size: 9.5px; text-align: center; }
         @media print {
-            body { padding: 5px 10px; }
+            @page { margin: 0; }
+            body { padding: 10mm; }
             .factura-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>

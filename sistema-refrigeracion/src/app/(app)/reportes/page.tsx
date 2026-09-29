@@ -1,4 +1,6 @@
 import { obtenerReporteMensual, obtenerReporteServicios, obtenerPosicionIVA, obtenerReporteClientes, obtenerZonasClientes } from "@/actions/reportes";
+import BotonImprimirReporte from "@/components/BotonImprimirReporte";
+import BotonExportarExcel from "@/components/BotonExportarExcel";
 
 export default async function ReportesPage({
     searchParams,
@@ -66,23 +68,30 @@ export default async function ReportesPage({
     const mesActualNombre = meses.find(m => m.id === mesSeleccionado)?.nombre || '';
     const anios = Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - 2 + i); // Desde 2 años atras hasta 3 adelante
 
+    const excelData = tipoReporte === "ingresos-egresos" ? { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado, totalFacturadoFiscal, totalFacturadoInterno }
+                    : tipoReporte === "servicios" ? ordenesFinalizadas
+                    : tipoReporte === "clientes" ? clientesReporte
+                    : tipoReporte === "iva" ? posicionIva 
+                    : null;
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 print:space-y-4 print:block">
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold text-slate-800">Reportes y Alertas</h2>
-                <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded text-slate-600 hover:bg-gray-50 transition">
-                        <i className="fas fa-print"></i> Imprimir
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
-                        <i className="fas fa-file-excel"></i> Exportar Excel
-                    </button>
+                <div className="flex gap-3 print:hidden">
+                    <BotonImprimirReporte />
+                    <BotonExportarExcel 
+                        data={excelData} 
+                        tipoReporte={tipoReporte} 
+                        mes={mesActualNombre} 
+                        anio={anioSeleccionado.toString()} 
+                    />
                 </div>
             </div>
 
             {/* Filters */}
-            <form method="GET" action="/reportes" className="bg-white p-4 rounded shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
+            <form method="GET" action="/reportes" className="bg-white p-4 rounded shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 print:hidden">
                 <div className="flex-1">
                     <label className="block text-sm text-gray-600 mb-1">Tipo de Reporte</label>
                     <select name="tipo" defaultValue={tipoReporte} className="w-full border border-gray-200 rounded p-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
@@ -218,13 +227,13 @@ export default async function ReportesPage({
 
             {/* Table */}
             {tipoReporte === "clientes" && (
-            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden print:overflow-visible">
                 <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
                     <h3 className="text-sm font-semibold text-slate-700">
                         Clientes Activos ({clientesReporte.length})
                     </h3>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto print:overflow-visible print:w-full">
                     <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                         <thead className="border-b border-gray-100 text-slate-500">
                             <tr>
@@ -265,13 +274,13 @@ export default async function ReportesPage({
             </div>
             )}
             {tipoReporte !== "iva" && tipoReporte !== "clientes" && (
-            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded shadow-sm border border-gray-100 overflow-hidden print:overflow-visible">
                 <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
                     <h3 className="text-sm font-semibold text-slate-700">
                         {tipoReporte === "servicios" ? "Órdenes de Trabajo Finalizadas" : "Detalle de Movimientos"} - {mesActualNombre} {anioSeleccionado}
                     </h3>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto print:overflow-visible print:w-full">
                     {tipoReporte === "servicios" ? (
                         <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                             <thead className="border-b border-gray-100 text-slate-500">

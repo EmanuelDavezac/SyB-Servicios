@@ -224,7 +224,8 @@ export default function BotonImprimirPresupuesto({ idPresupuesto }: Props) {
         }
 
         @media print {
-            body { padding: 5px 10px; }
+            @page { margin: 0; }
+            body { padding: 10mm; }
             .presupuesto-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
