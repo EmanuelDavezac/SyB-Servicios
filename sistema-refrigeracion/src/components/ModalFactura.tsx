@@ -103,9 +103,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         { cantidad: number; precio_acordado: number | string; alicuota_iva: number | string }[]
     >([]);
 
-    /* Líneas de la orden + insumos adicionales. Los adicionales que ya están
-       registrados en la orden se ignoran (igual que en crearFactura). */
-    const idsInsumosDeOrden = new Set(insumosDeOrden.map((d) => d.id_insumo));
+    /* Líneas de la orden + insumos adicionales. */
     const lineas: LineaImporte[] = [
         ...serviciosDeOrden.map((s) => ({
             neto: (s.cantidad || 1) * parseFloat(String(s.precio_acordado)),
@@ -116,7 +114,6 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             alicuota: parseFloat(String(d.alicuota_iva)),
         })),
         ...insumosSeleccionados
-            .filter((item) => !idsInsumosDeOrden.has(item.id_insumo))
             .map((item) => {
                 const insumo = insumosDisponibles.find((i) => i.id_insumo === item.id_insumo);
                 return { neto: item.cantidad * Number(insumo?.precio_venta ?? 0), alicuota: item.alicuota_iva };
@@ -706,21 +703,17 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 {insumosSeleccionados.length > 0 && (
                                     <div className="mt-3 space-y-1">
                                         {insumosSeleccionados.map((item) => {
-                                            const yaEnOrden = idsInsumosDeOrden.has(item.id_insumo);
                                             return (
                                                 <div
                                                     key={item._key}
                                                     className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm"
                                                 >
-                                                    <span className={`font-medium ${yaEnOrden ? "text-gray-400 line-through" : "text-blue-900"}`}>
+                                                    <span className="font-medium text-blue-900">
                                                         {item.nombre}
                                                         <span className="ml-2 text-blue-600 text-xs">
                                                             × {item.cantidad} · IVA {formatearAlicuota(item.alicuota_iva)}%
                                                         </span>
                                                     </span>
-                                                    {yaEnOrden && (
-                                                        <span className="text-[10px] text-gray-500 mx-2">ya está en la orden, se ignora</span>
-                                                    )}
                                                     <button
                                                         type="button"
                                                         onClick={() => quitarInsumo(item._key)}

@@ -85,7 +85,7 @@ describe("crearFactura", () => {
     expect(Number(insumoFinal?.stock_actual)).toBe(7);
   });
 
-  it("insumos adicionales del payload que ya estan en la orden no se descuentan dos veces", async () => {
+  it("insumos adicionales del payload que ya estan en la orden se descuentan extra", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
@@ -99,7 +99,8 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
-    expect(Number(insumoFinal?.stock_actual)).toBe(8);
+    // 10 inicial - 2 de la orden = 8. Luego - 5 adicionales en factura = 3
+    expect(Number(insumoFinal?.stock_actual)).toBe(3);
   });
 
   it("comprobante no facturable: monto 0, saldo 0, estado NO_APLICA", async () => {
@@ -402,9 +403,7 @@ describe("crearFactura", () => {
     expect(ordenFinal?.estado_trabajo).toBe("Facturada");
   });
 
-  // Bug conocido con issue abierto: el tipo "Remito" es facturable y genera
-  // deuda del cliente, aunque documenta una entrega, no una venta.
-  test.fails("el Remito no deberia generar deuda del cliente", async () => {
+  it("el Remito no deberia generar deuda del cliente", async () => {
     const orden = await crearOrdenFinalizada();
 
     const resultado = await crearFactura({

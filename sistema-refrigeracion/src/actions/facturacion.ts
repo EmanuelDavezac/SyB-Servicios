@@ -138,13 +138,8 @@ export async function crearFactura(data: {
       }
 
       // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
-      //    Solo si NO están ya registrados en detalle_orden_insumo para evitar duplicados
-      const idsYaRegistrados = new Set(insumosDeOrden.map((d) => d.id_insumo));
-
       if (data.insumos && data.insumos.length > 0) {
         for (const item of data.insumos) {
-          if (idsYaRegistrados.has(item.id_insumo)) continue; // ya procesado arriba
-
           const insumo = await tx.insumo.findUnique({
             where: { id_insumo: item.id_insumo },
           });

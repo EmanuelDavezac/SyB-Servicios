@@ -80,7 +80,8 @@ export async function imprimirComprobante(idFactura: number) {
             : alicuotaUnica && alicuotaUnica > 0
             ? [{ alicuota: alicuotaUnica, neto: netoGravado, iva: netoGravado * alicuotaUnica / 100 }]
             : [];
-        const mostrarIva = !esInformeTecnico && factura.neto !== null && factura.neto !== undefined;
+        const noDiscriminarIva = esInterna; // Internas no discriminan el IVA por pedido
+        const mostrarIva = !esInformeTecnico && !noDiscriminarIva && factura.neto !== null && factura.neto !== undefined;
 
         // Alícuota a mostrar en cada línea: la de la línea, salvo en facturas
         // anteriores, donde la línea quedó con el default y manda la de la factura.
@@ -89,7 +90,7 @@ export async function imprimirComprobante(idFactura: number) {
                 ? alicuotaUnica
                 : parseFloat(String(valorLinea ?? 0));
 
-        const celdaIva = (alicuota: number) => esInformeTecnico
+        const celdaIva = (alicuota: number) => (esInformeTecnico || noDiscriminarIva)
             ? ""
             : `<td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${fmtAlicuota(alicuota)}%</td>`;
 
@@ -99,14 +100,16 @@ export async function imprimirComprobante(idFactura: number) {
         for (const ds of servicios) {
             const nombre = ds.descripcion_libre || ds.servicio?.nombre || "Servicio";
             const cant = ds.cantidad || 1;
-            const precio = parseFloat(ds.precio_acordado);
+            const alicuota = alicuotaLinea(ds.alicuota_iva);
+            let precio = parseFloat(ds.precio_acordado);
+            if (noDiscriminarIva) precio = precio * (1 + alicuota / 100);
             const subtotal = cant * precio;
             totalServicios += subtotal;
             serviciosHTML += `
                 <tr>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
-                    ${celdaIva(alicuotaLinea(ds.alicuota_iva))}
+                    ${celdaIva(alicuota)}
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
@@ -117,23 +120,30 @@ export async function imprimirComprobante(idFactura: number) {
         for (const di of insumos) {
             const nombre = di.insumo?.nombre || "Insumo";
             const cant = di.cantidad_usada || 1;
-            const precio = parseFloat(di.precio_aplicado);
+            const alicuota = alicuotaLinea(di.alicuota_iva);
+            let precio = parseFloat(di.precio_aplicado);
+            if (noDiscriminarIva) precio = precio * (1 + alicuota / 100);
             const subtotal = cant * precio;
             totalInsumos += subtotal;
             insumosHTML += `
                 <tr>
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
-                    ${celdaIva(alicuotaLinea(di.alicuota_iva))}
+                    ${celdaIva(alicuota)}
                     <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
                 </tr>`;
         }
-        const columnas = esInformeTecnico ? 2 : 4;
+        const columnas = esInformeTecnico ? 2 : (noDiscriminarIva ? 3 : 4);
 
         const montoTotal = parseFloat(factura.monto_total);
 
         const tipoDescuento: string | null = factura.tipo_descuento || null;
-        const descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
+        let descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
+        if (noDiscriminarIva && descuentoMonto > 0) {
+            // Si el comprobante es de consumidor final, el descuento mostrado incluye su IVA proporcional para cuadrar
+            descuentoMonto = (totalServicios + totalInsumos) - montoTotal;
+            if (descuentoMonto < 0) descuentoMonto = 0; // Evita -0 por float quirks
+        }
         const descuentoPct = factura.descuento_porcentaje ? parseFloat(factura.descuento_porcentaje) : 0;
         const equipoDesc: string = factura.equipo_descripcion || "";
         const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
@@ -418,7 +428,7 @@ export async function imprimirComprobante(idFactura: number) {
                 <tr>
                     <th class="center" style="width: 70px;">CANT.</th>
                     <th>DESCRIPCION</th>
-                    ${esInformeTecnico ? '' : '<th class="center" style="width: 60px;">IVA %</th><th class="right" style="width: 120px;">PRECIO</th>'}
+                    ${esInformeTecnico ? '' : (noDiscriminarIva ? '<th class="right" style="width: 120px;">PRECIO FINAL</th>' : '<th class="center" style="width: 60px;">IVA %</th><th class="right" style="width: 120px;">PRECIO</th>')}
                 </tr>
             </thead>
             <tbody>

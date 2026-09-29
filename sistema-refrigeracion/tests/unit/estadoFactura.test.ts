@@ -38,8 +38,8 @@ describe("esTipoFacturable", () => {
     expect(esTipoFacturable("Factura")).toBe(true);
   });
 
-  it('"Remito" devuelve true', () => {
-    expect(esTipoFacturable("Remito")).toBe(true);
+  it('"Remito" devuelve false', () => {
+    expect(esTipoFacturable("Remito")).toBe(false);
   });
 
   it('"Informe Tecnico" devuelve false', () => {
