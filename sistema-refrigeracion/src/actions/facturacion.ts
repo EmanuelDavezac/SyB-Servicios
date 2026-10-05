@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
 import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
 import { requerirUsuario } from "@/lib/sesion";
+import { fechaActualArgentina } from "@/lib/fechas";
 
 export async function getFacturas() {
   try {
+        await requerirUsuario();
     const facturas = await prisma.factura.findMany({
       include: {
         orden_trabajo: {
@@ -31,6 +33,7 @@ export async function getFacturas() {
 
 export async function getOrdenesPendientesFacturacion() {
   try {
+        await requerirUsuario();
     // Only fetch orders that are finished but don't have an invoice yet, or simply "Finalizada"
     const ordenes = await prisma.orden_trabajo.findMany({
       where: {
@@ -106,7 +109,7 @@ export async function crearFactura(data: {
       // 1. Calcular vencimiento por default si no se cargo a mano
       //    (fecha_emision + condicion_pago_dias del cliente). El campo manual
       //    manda si vino cargado: esto no se recalcula sobre facturas existentes.
-      const fechaEmision = new Date();
+      const fechaEmision = fechaActualArgentina();
       let fechaVencimiento = facturable ? data.fecha_vencimiento : null;
       if (facturable && !fechaVencimiento) {
         const orden = await tx.orden_trabajo.findUnique({
@@ -115,7 +118,8 @@ export async function crearFactura(data: {
         });
         const dias = orden?.cliente?.condicion_pago_dias ?? 30;
         fechaVencimiento = new Date(fechaEmision);
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
+        // Usamos setUTCDate para evitar corrimientos si el server está en UTC y fechaEmision en 00:00Z
+        fechaVencimiento.setUTCDate(fechaVencimiento.getUTCDate() + dias);
       }
 
       // 2. Descontar stock de los insumos ya registrados en la ORDEN
@@ -252,6 +256,7 @@ export async function crearFactura(data: {
 
 export async function getFacturaCompleta(id_factura: number) {
   try {
+        await requerirUsuario();
     const factura = await prisma.factura.findUnique({
       where: { id_factura },
       include: {

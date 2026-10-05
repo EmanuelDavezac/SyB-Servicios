@@ -7,6 +7,7 @@ import { requerirUsuario } from "@/lib/sesion";
 // 1. OBTENER (LEER)
 export async function obtenerInsumos() {
     try {
+        await requerirUsuario();
         const insumos = await prisma.insumo.findMany({
             // Le decimos a Prisma que además de traer el insumo, nos traiga los datos de su proveedor
             include: {

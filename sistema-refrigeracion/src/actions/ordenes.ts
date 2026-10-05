@@ -28,6 +28,7 @@ async function ordenYaFacturada(id_orden: number | null): Promise<boolean> {
 // Trae todas las órdenes con el nombre del cliente incluido
 export async function obtenerOrdenes() {
     try {
+        await requerirUsuario();
         const ordenes = await prisma.orden_trabajo.findMany({
             orderBy: {
                 fecha_creacion: "desc",
@@ -56,6 +57,7 @@ export async function obtenerOrdenes() {
 // Trae solo los clientes activos para el select del modal
 export async function obtenerClientesActivos() {
     try {
+        await requerirUsuario();
         const clientes = await prisma.cliente.findMany({
             where: { estado: true },
             orderBy: { apellido: "asc" },
@@ -265,6 +267,7 @@ export async function actualizarAlicuotaServicio(id_detalle_srv: number, alicuot
 // Obtiene los detalles de servicios de una orden
 export async function obtenerServiciosDeOrden(id_orden: number) {
     try {
+        await requerirUsuario();
         const detalles = await prisma.detalle_orden_servicio.findMany({
             where: { id_orden },
             include: { servicio: true },
@@ -350,6 +353,7 @@ export async function actualizarAlicuotaInsumo(id_detalle_ord_insumo: number, al
 /** Obtiene todos los insumos registrados para una orden */
 export async function obtenerInsumosDeOrden(id_orden: number) {
     try {
+        await requerirUsuario();
         const detalles = await prisma.detalle_orden_insumo.findMany({
             where: { id_orden },
             include: { insumo: true },

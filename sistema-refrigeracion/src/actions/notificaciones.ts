@@ -1,8 +1,10 @@
 "use server";
 
 import { Resend } from "resend";
+import { requerirUsuario } from "@/lib/sesion";
 import { prisma } from "@/lib/prisma";
 import { obtenerFacturasParaRecordatorio, tipoRecordatorio, inicioDelDiaUTC } from "@/lib/recordatorios";
+import { fechaActualArgentina } from "@/lib/fechas";
 
 const FROM = process.env.RESEND_FROM_EMAIL || "SyB Servicios <onboarding@resend.dev>";
 
@@ -32,9 +34,10 @@ function formatDate(d: Date) {
  */
 export async function enviarRecordatoriosPendientes(diasAnticipacion: number = 3) {
     try {
+        await requerirUsuario();
         const facturas = await obtenerFacturasParaRecordatorio(diasAnticipacion);
         const tipo = tipoRecordatorio(diasAnticipacion);
-        const hoy = inicioDelDiaUTC(new Date());
+        const hoy = fechaActualArgentina();
 
         let enviados = 0;
         let fallidos = 0;
@@ -147,6 +150,7 @@ export async function obtenerHistorialNotificaciones(filtros?: {
     estado?: string;
 }) {
     try {
+        await requerirUsuario();
         const notificaciones = await prisma.historial_notificaciones.findMany({
             where: {
                 id_cliente: filtros?.id_cliente,

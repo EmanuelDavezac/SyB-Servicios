@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { calcularTotales, calcularVencimiento } from "@/lib/presupuestos";
 import { requerirUsuario } from "@/lib/sesion";
+import { fechaActualArgentina } from "@/lib/fechas";
 
 interface Destinatario {
     id_cliente?: number | null;
@@ -48,7 +49,7 @@ export async function crearPresupuesto(data: DatosPresupuesto) {
                     destinatario_domicilio: data.destinatario.domicilio || null,
                     destinatario_localidad: data.destinatario.localidad || null,
                     destinatario_condicion_iva: data.destinatario.condicion_iva || null,
-                    fecha_emision: data.fecha_emision ?? new Date(),
+                    fecha_emision: data.fecha_emision ?? fechaActualArgentina(),
                     validez_dias: data.validez_dias ?? 5,
                     condicion_pago: data.condicion_pago || null,
                     alicuota_iva: data.alicuota_iva ?? 21,
@@ -130,6 +131,7 @@ export async function obtenerPresupuestos(filtros?: {
     fechaFin?: string;
 }) {
     try {
+        await requerirUsuario();
         const where: Record<string, unknown> = {};
 
         if (filtros?.estado) {
@@ -151,8 +153,7 @@ export async function obtenerPresupuestos(filtros?: {
             orderBy: { fecha_emision: "desc" },
         });
 
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
+        const hoy = fechaActualArgentina();
 
         const conCalculados = presupuestos.map((p) => {
             const { subtotal, monto_iva, total } = calcularTotales(p.detalle_presupuesto, p.alicuota_iva as unknown as number);
@@ -170,6 +171,7 @@ export async function obtenerPresupuestos(filtros?: {
 
 export async function obtenerPresupuestoCompleto(id_presupuesto: number) {
     try {
+        await requerirUsuario();
         const presupuesto = await prisma.presupuesto.findUnique({
             where: { id_presupuesto },
             include: {
@@ -185,8 +187,7 @@ export async function obtenerPresupuestoCompleto(id_presupuesto: number) {
 
         const { subtotal, monto_iva, total } = calcularTotales(presupuesto.detalle_presupuesto, presupuesto.alicuota_iva as unknown as number);
         const fecha_vencimiento = calcularVencimiento(presupuesto.fecha_emision, presupuesto.validez_dias);
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
+        const hoy = fechaActualArgentina();
         const vencido = fecha_vencimiento < hoy;
 
         return JSON.parse(JSON.stringify({ ...presupuesto, subtotal, monto_iva, total, fecha_vencimiento, vencido }));
@@ -253,6 +254,7 @@ export async function eliminarPresupuesto(id_presupuesto: number) {
 
 export async function buscarDestinatarios(query: string) {
     try {
+        await requerirUsuario();
         if (!query || query.trim().length < 2) return [];
         const texto = query.trim();
 

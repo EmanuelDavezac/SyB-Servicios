@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { crearCompra } from "@/actions/compras";
-import { obtenerInsumos } from "@/actions/insumos";
+import { obtenerInsumos, crearInsumo } from "@/actions/insumos";
 
 interface Proveedor {
     id_proveedor: number;
@@ -41,6 +41,14 @@ export default function ModalCompra({ proveedores }: Props) {
     const [idInsumoSeleccionado, setIdInsumoSeleccionado] = useState("");
     const [cantidadInsumo, setCantidadInsumo] = useState("1");
     const [precioUnitarioInsumo, setPrecioUnitarioInsumo] = useState("");
+
+    const [creandoInsumo, setCreandoInsumo] = useState(false);
+    const [nuevoInsumo, setNuevoInsumo] = useState({
+        nombre: "",
+        precio_costo: "",
+        precio_venta: "",
+    });
+    const [cargandoInsumo, setCargandoInsumo] = useState(false);
 
     const netoNum = insumosSeleccionados.reduce((acc, i) => acc + i.cantidad * i.precio_unitario, 0);
     const montoIva = netoNum * (parseFloat(alicuotaIva || "0") / 100);
@@ -89,7 +97,38 @@ export default function ModalCompra({ proveedores }: Props) {
         setIdInsumoSeleccionado("");
         setCantidadInsumo("1");
         setPrecioUnitarioInsumo("");
+        setCreandoInsumo(false);
+        setNuevoInsumo({ nombre: "", precio_costo: "", precio_venta: "" });
         setError(null);
+    }
+
+    async function handleCrearInsumoNuevo() {
+        if (!nuevoInsumo.nombre) {
+            setError("Indicá el nombre del nuevo insumo.");
+            return;
+        }
+        setCargandoInsumo(true);
+        setError(null);
+        const res = await crearInsumo({
+            nombre: nuevoInsumo.nombre,
+            stock_actual: 0,
+            stock_minimo: 0,
+            precio_costo: parseFloat(nuevoInsumo.precio_costo) || 0,
+            precio_venta: parseFloat(nuevoInsumo.precio_venta) || 0,
+            estado: true
+        });
+        setCargandoInsumo(false);
+
+        if (res.success && res.insumo) {
+            setInsumosDisponibles((prev) => [...prev, res.insumo as Insumo]);
+            setIdInsumoSeleccionado(String(res.insumo.id_insumo));
+            setPrecioUnitarioInsumo(nuevoInsumo.precio_costo);
+            setCantidadInsumo("1");
+            setCreandoInsumo(false);
+            setNuevoInsumo({ nombre: "", precio_costo: "", precio_venta: "" });
+        } else {
+            setError(res.error || "Error al crear producto nuevo.");
+        }
     }
 
     async function handleGuardar() {
@@ -233,13 +272,21 @@ export default function ModalCompra({ proveedores }: Props) {
                                     </span>
                                 </h4>
 
-                                <div className="flex gap-2 flex-wrap">
+                                <div className="flex gap-2 flex-wrap items-center">
                                     <select
                                         value={idInsumoSeleccionado}
-                                        onChange={(e) => setIdInsumoSeleccionado(e.target.value)}
+                                        onChange={(e) => {
+                                            if (e.target.value === "NUEVO") {
+                                                setCreandoInsumo(true);
+                                                setIdInsumoSeleccionado("");
+                                            } else {
+                                                setIdInsumoSeleccionado(e.target.value);
+                                            }
+                                        }}
                                         className="flex-1 min-w-[140px] border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                                     >
                                         <option value="">+ Insumo...</option>
+                                        <option value="NUEVO" className="font-bold text-orange-600">Crear Insumo Nuevo...</option>
                                         {insumosDisponibles.map((insumo, idx) => (
                                             <option key={insumo.id_insumo ?? `insumo-opt-${idx}`} value={insumo.id_insumo}>
                                                 {insumo.nombre} (Stock: {insumo.stock_actual ?? 0})
@@ -275,6 +322,54 @@ export default function ModalCompra({ proveedores }: Props) {
                                         +
                                     </button>
                                 </div>
+
+                                {creandoInsumo && (
+                                    <div className="bg-orange-50 border border-orange-200 mt-3 p-3 rounded-lg shadow-inner">
+                                        <h5 className="text-xs font-bold text-orange-800 mb-2">Crear Producto Nuevo</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Nombre del insumo"
+                                                value={nuevoInsumo.nombre}
+                                                onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, nombre: e.target.value })}
+                                                className={inputCls}
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Costo u. (Base)"
+                                                value={nuevoInsumo.precio_costo}
+                                                onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, precio_costo: e.target.value })}
+                                                className={inputCls}
+                                                step="0.01"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Precio Venta"
+                                                value={nuevoInsumo.precio_venta}
+                                                onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, precio_venta: e.target.value })}
+                                                className={inputCls}
+                                                step="0.01"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end gap-2 mt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCreandoInsumo(false)}
+                                                className="text-xs px-3 py-1 font-medium text-gray-500 hover:bg-gray-100 rounded transition"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleCrearInsumoNuevo}
+                                                disabled={cargandoInsumo}
+                                                className="text-xs bg-orange-600 hover:bg-orange-700 text-white font-bold px-3 py-1.5 rounded transition disabled:opacity-50"
+                                            >
+                                                {cargandoInsumo ? "Guardando..." : "Crear y Seleccionar"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {insumosSeleccionados.length > 0 && (
                                     <div className="mt-3 space-y-1">

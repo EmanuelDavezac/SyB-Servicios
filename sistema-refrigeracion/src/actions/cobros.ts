@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado } from "@/lib/estadoFactura";
 import type { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
+import { fechaActualArgentina } from "@/lib/fechas";
 
 type Tx = Prisma.TransactionClient;
 
@@ -80,7 +81,7 @@ export async function registrarCobro(data: {
       const recibo = await tx.recibo.create({
         data: {
           id_cliente: data.id_cliente,
-          fecha_pago: data.fecha_pago ?? new Date(),
+          fecha_pago: data.fecha_pago ?? fechaActualArgentina(),
           monto_total: montoTotal,
           forma_pago: data.forma_pago,
           observacion: data.observacion,
@@ -208,6 +209,7 @@ export async function anularFactura(id_factura: number) {
 
 export async function obtenerFacturasPendientesCliente(id_cliente: number) {
   try {
+        await requerirUsuario();
     const facturas = await prisma.factura.findMany({
       where: {
         estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
@@ -225,6 +227,7 @@ export async function obtenerFacturasPendientesCliente(id_cliente: number) {
 
 export async function obtenerClientesConDeuda() {
   try {
+        await requerirUsuario();
     const facturas = await prisma.factura.findMany({
       where: {
         estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
@@ -267,6 +270,7 @@ export async function obtenerClientesConDeuda() {
 
 export async function obtenerDeudaPorCliente(id_cliente: number) {
   try {
+        await requerirUsuario();
     const agregado = await prisma.factura.aggregate({
       where: {
         estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
@@ -284,6 +288,7 @@ export async function obtenerDeudaPorCliente(id_cliente: number) {
 
 export async function obtenerReciboCompleto(id_recibo: number) {
   try {
+        await requerirUsuario();
     const recibo = await prisma.recibo.findUnique({
       where: { id_recibo },
       include: {
@@ -322,6 +327,7 @@ export async function obtenerReciboCompleto(id_recibo: number) {
 
 export async function obtenerRetencionesDelMes(mes: number, anio: number) {
   try {
+        await requerirUsuario();
     const fechaInicio = new Date(anio, mes - 1, 1);
     const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
@@ -354,6 +360,7 @@ export async function obtenerRetencionesDelMes(mes: number, anio: number) {
 
 export async function obtenerCobros() {
   try {
+        await requerirUsuario();
     const recibos = await prisma.recibo.findMany({
       include: {
         cliente: true,

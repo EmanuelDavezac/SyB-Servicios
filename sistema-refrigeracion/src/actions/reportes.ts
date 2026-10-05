@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requerirUsuario } from "@/lib/sesion";
 import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
 
 export type Movimiento = {
@@ -14,6 +15,7 @@ export type Movimiento = {
 
 export async function obtenerReporteMensual(mes: number, anio: number) {
     try {
+        await requerirUsuario();
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
@@ -135,6 +137,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
 
 export async function obtenerDatosDashboard() {
     try {
+        await requerirUsuario();
         // 1. Trabajos en Curso (Latest 5 orders not finished)
         const ordenesEnCurso = await prisma.orden_trabajo.findMany({
             where: {
@@ -236,6 +239,7 @@ export async function obtenerDatosDashboard() {
 
 export async function obtenerPosicionIVA(mes: number, anio: number) {
     try {
+        await requerirUsuario();
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
@@ -316,6 +320,7 @@ export async function obtenerPosicionIVA(mes: number, anio: number) {
 
 export async function obtenerReporteServicios(mes: number, anio: number) {
     try {
+        await requerirUsuario();
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
@@ -353,6 +358,7 @@ export async function obtenerReporteClientes(filtros: {
     zona?: string;
 }) {
     try {
+        await requerirUsuario();
         const clientes = await prisma.cliente.findMany({
             where: {
                 estado: true,
@@ -378,6 +384,7 @@ export async function obtenerReporteClientes(filtros: {
 
 export async function obtenerZonasClientes() {
     try {
+        await requerirUsuario();
         const filas = await prisma.cliente.findMany({
             where: { estado: true, localidad: { not: null } },
             select: { localidad: true },

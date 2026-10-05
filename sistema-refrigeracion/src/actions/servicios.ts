@@ -6,6 +6,7 @@ import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerServicios() {
     try {
+        await requerirUsuario();
         const servicios = await prisma.servicio.findMany({
             orderBy: { nombre: "asc" },
             include: { servicio_insumo: { include: { insumo: true } } },

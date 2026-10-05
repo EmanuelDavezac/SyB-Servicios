@@ -7,6 +7,7 @@ import { requerirUsuario } from "@/lib/sesion";
 export async function obtenerProveedores(opciones?: { incluirInactivos?: boolean }) {
     const incluirInactivos = opciones?.incluirInactivos ?? false;
     try {
+        await requerirUsuario();
         return await prisma.proveedor.findMany({
             where: incluirInactivos ? undefined : { estado: true },
             orderBy: { razon_social: "asc" },

@@ -6,6 +6,7 @@ import { requerirUsuario } from "@/lib/sesion";
 
 export async function obtenerInformesTecnicos() {
   try {
+        await requerirUsuario();
     const informes = await prisma.informe_tecnico.findMany({
       include: { cliente: true },
       orderBy: { fecha: "desc" },

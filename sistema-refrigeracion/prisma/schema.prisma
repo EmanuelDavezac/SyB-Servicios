@@ -63,7 +63,7 @@ model detalle_compra {
   id_detalle_compra Int            @id @default(autoincrement())
   id_compra         Int?
   id_insumo         Int?
-  cantidad          Int
+  cantidad          Decimal        @db.Decimal(10, 3)
   precio_unitario   Decimal        @db.Decimal(10, 2)
   compra_insumo     compra_insumo? @relation(fields: [id_compra], references: [id_compra], onDelete: Restrict, onUpdate: NoAction)
   insumo            insumo?        @relation(fields: [id_insumo], references: [id_insumo], onDelete: Restrict, onUpdate: NoAction)

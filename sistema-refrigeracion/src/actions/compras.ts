@@ -3,9 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
+import { fechaActualArgentina } from "@/lib/fechas";
 
 export async function obtenerCompras() {
     try {
+        await requerirUsuario();
         const compras = await prisma.compra_insumo.findMany({
             include: {
                 proveedor: true,
@@ -46,7 +48,7 @@ export async function crearCompra(data: {
                     ...(data.id_proveedor
                         ? { proveedor: { connect: { id_proveedor: data.id_proveedor } } }
                         : {}),
-                    fecha_compra: data.fecha_compra ?? new Date(),
+                    fecha_compra: data.fecha_compra ?? fechaActualArgentina(),
                     costo_total: costoTotal,
                     descripcion: data.descripcion,
                     neto,

@@ -8,6 +8,7 @@ export async function obtenerClientes(filtros?: {
     estado?: string;
 }) {
     try {
+        await requerirUsuario();
         const nombre = filtros?.nombre?.trim();
         const cuit = filtros?.cuit?.trim();
         const estado = filtros?.estado;
