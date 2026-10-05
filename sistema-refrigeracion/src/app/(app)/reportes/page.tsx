@@ -285,7 +285,7 @@ export default async function ReportesPage({
                         <table className="w-full min-w-[700px] text-left text-sm text-slate-600">
                             <thead className="border-b border-gray-100 text-slate-500">
                                 <tr>
-                                    <th className="px-4 py-3 font-medium">Fecha</th>
+                                    <th className="px-4 py-3 font-medium">Fecha Facturado</th>
                                     <th className="px-4 py-3 font-medium">N° Orden</th>
                                     <th className="px-4 py-3 font-medium">Cliente</th>
                                     <th className="px-4 py-3 font-medium">Servicios Realizados</th>
@@ -300,7 +300,7 @@ export default async function ReportesPage({
                                 ) : (
                                     ordenesFinalizadas.map((orden) => (
                                         <tr key={orden.id_orden} className="hover:bg-slate-50">
-                                            <td className="px-4 py-4">{formatDate(orden.fecha_creacion)}</td>
+                                            <td className="px-4 py-4">{formatDate(orden.fecha_facturacion || orden.fecha_creacion)}</td>
                                             <td className="px-4 py-4 font-semibold">#{orden.id_orden}</td>
                                             <td className="px-4 py-4">{orden.cliente?.nombre} {orden.cliente?.apellido}</td>
                                             <td className="px-4 py-4">

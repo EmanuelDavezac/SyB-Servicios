@@ -324,26 +324,43 @@ export async function obtenerReporteServicios(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        const ordenes = await prisma.orden_trabajo.findMany({
+        const facturas = await prisma.factura.findMany({
             where: {
-                estado_trabajo: "Finalizado",
-                fecha_creacion: {
+                fecha_emision: {
                     gte: fechaInicio,
                     lte: fechaFin,
+                },
+                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+                orden_trabajo: {
+                    estado_trabajo: "Finalizado"
                 }
             },
             include: {
-                cliente: true,
-                detalle_orden_servicio: {
+                orden_trabajo: {
                     include: {
-                        servicio: true
+                        cliente: true,
+                        detalle_orden_servicio: {
+                            include: {
+                                servicio: true
+                            }
+                        }
                     }
                 }
             },
             orderBy: {
-                fecha_creacion: "asc"
+                fecha_emision: "asc"
             }
         });
+
+        const ordenes = facturas
+            .filter((f) => f.orden_trabajo !== null)
+            .map((f) => {
+                const orden = f.orden_trabajo!;
+                return {
+                    ...orden,
+                    fecha_facturacion: f.fecha_emision,
+                };
+            });
 
         return JSON.parse(JSON.stringify(ordenes));
     } catch (error) {
