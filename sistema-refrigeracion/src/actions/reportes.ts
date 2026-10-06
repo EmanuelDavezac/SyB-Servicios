@@ -28,7 +28,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                 },
             },
             include: {
-                cliente: true,
+                cliente: true, retencion: true,
                 pagos_parciales: {
                     include: { factura: true },
                 },
@@ -73,7 +73,8 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         let totalEgresos = 0;
 
         for (const r of recibos) {
-            const monto = Number(r.monto_total);
+            const sumRetenciones = r.retencion?.reduce((a: number, c: any) => a + Number(c.monto), 0) || 0;
+            const monto = Math.max(0, Number(r.monto_total) - sumRetenciones);
             totalIngresos += monto;
             const clienteNombre = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Sin Cliente";
             const facturasImputadas = r.pagos_parciales
