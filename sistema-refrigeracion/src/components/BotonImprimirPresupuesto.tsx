@@ -15,7 +15,7 @@ export default function BotonImprimirPresupuesto({ idPresupuesto }: Props) {
             return;
         }
 
-        const fechaEmision = new Date(presupuesto.fecha_emision).toLocaleDateString("es-AR");
+        const fechaEmision = new Date(presupuesto.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
         const numero = `0001 – ${String(presupuesto.numero).padStart(10, "0")}`;
 
         const formatMoney = (n: number) =>

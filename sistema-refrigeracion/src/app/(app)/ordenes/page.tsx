@@ -93,7 +93,7 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
 
                                     {/* Fecha */}
                                     <td className="p-4 text-gray-600">
-                                        {new Date(orden.fecha_creacion).toLocaleDateString("es-AR")}
+                                        {new Date(orden.fecha_creacion).toLocaleDateString("es-AR", { timeZone: "UTC" })}
                                     </td>
 
                                     {/* Notas */}

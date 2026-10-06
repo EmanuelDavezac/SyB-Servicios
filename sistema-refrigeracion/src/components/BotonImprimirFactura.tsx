@@ -45,7 +45,7 @@ export async function imprimirComprobante(idFactura: number) {
             : "—";
         const localidadCliente = cliente?.localidad || "—";
 
-        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR");
+        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
 
         // Número: si la factura fiscal tiene punto de venta, formato ARCA
         // PPPPP – NNNNNNNN (el número sale de los dígitos finales de num_factura)
@@ -538,7 +538,7 @@ function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFa
             : "—";
         const localidadCliente = cliente?.localidad || "—";
 
-        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR");
+        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
         const numeroRecibo = `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
 
         const formatMoney = (n: number) =>

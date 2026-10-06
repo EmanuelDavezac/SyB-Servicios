@@ -13,7 +13,7 @@ export default async function ComprasPage() {
         new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
 
     const formatDate = (dateString: string) =>
-        new Date(dateString).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+        new Date(dateString).toLocaleDateString("es-AR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" });
 
     return (
         <div>

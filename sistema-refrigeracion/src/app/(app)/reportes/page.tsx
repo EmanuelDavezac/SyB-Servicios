@@ -55,7 +55,7 @@ export default async function ReportesPage({
 
     const formatDate = (dateString: string) => {
         const d = new Date(dateString);
-        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return d.toLocaleDateString("es-AR", { timeZone: "UTC", day: "2-digit", month: '2-digit', year: 'numeric' });
     };
 
     const meses = [

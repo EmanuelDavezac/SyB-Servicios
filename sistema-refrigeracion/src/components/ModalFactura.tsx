@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { crearFactura } from "@/actions/facturacion";
+import { crearFactura, getSiguienteNumeroFactura } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
 import { esTipoFacturable } from "@/lib/estadoFactura";
@@ -42,11 +42,6 @@ const inputCls =
     "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
 
 const DATALIST_IVA_ID = "factura-alicuotas-iva";
-
-// Prefijo del número sugerido: A- para las que se cargan en ARCA, X- para las internas
-const prefijoNumero = (fiscal: boolean) => (fiscal ? "A-" : "X-");
-const cambiarPrefijo = (numero: string, fiscal: boolean) =>
-    /^[AX]-/.test(numero) ? numero.replace(/^[AX]-/, prefijoNumero(fiscal)) : numero;
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -149,10 +144,18 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     useEffect(() => {
         if (openWithOrdenId) {
             setIdOrden(openWithOrdenId);
-            setLetraNumero(`${prefijoNumero(true)}${openWithOrdenId.padStart(4, "0")}`);
             setAbierto(true);
         }
     }, [openWithOrdenId]);
+
+    /* Obtener numero sugerido al abrir o cambiar tipo/fiscal */
+    useEffect(() => {
+        if (abierto) {
+            getSiguienteNumeroFactura(tipo, fiscalEfectivo).then((num) => {
+                setLetraNumero(num);
+            });
+        }
+    }, [abierto, tipo, fiscalEfectivo]);
 
     /* Cargar insumos al abrir */
     useEffect(() => {
@@ -177,12 +180,10 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
     function handleCambiarTipo(nuevoTipo: string) {
         setTipo(nuevoTipo);
-        setLetraNumero((prev) => cambiarPrefijo(prev, nuevoTipo === "Factura" ? fiscal : true));
     }
 
     function handleCambiarFiscal(nuevoFiscal: boolean) {
         setFiscal(nuevoFiscal);
-        setLetraNumero((prev) => cambiarPrefijo(prev, nuevoFiscal));
     }
 
     function agregarInsumo() {
@@ -435,13 +436,13 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                     )}
                                     <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">
-                                            Número (Ej: {prefijoNumero(fiscalEfectivo)}0001)
+                                            Número (Ej: A-0001)
                                         </label>
                                         <input
                                             type="text"
                                             value={letraNumero}
                                             onChange={(e) => setLetraNumero(e.target.value)}
-                                            placeholder={`${prefijoNumero(fiscalEfectivo)}0001`}
+                                            placeholder={`A-0001`}
                                             className={inputCls}
                                         />
                                     </div>

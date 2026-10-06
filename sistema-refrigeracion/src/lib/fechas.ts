@@ -13,3 +13,9 @@ export function fechaActualArgentina(): Date {
     
     return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
 }
+
+export function formatFechaUTC(date: string | Date | null): string {
+    if (!date) return "-";
+    const d = new Date(date);
+    return d.toLocaleDateString("es-AR", { timeZone: "UTC" });
+}

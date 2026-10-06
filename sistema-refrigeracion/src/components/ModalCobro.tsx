@@ -283,7 +283,7 @@ export default function ModalCobro({ clientes }: Props) {
                                                             <div className="font-semibold text-gray-800">
                                                                 {f.num_factura || `Factura #${f.id_factura}`}
                                                                 <span className="ml-2 text-xs font-normal text-gray-400">
-                                                                    {new Date(f.fecha_emision).toLocaleDateString("es-AR")}
+                                                                    {new Date(f.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" })}
                                                                 </span>
                                                             </div>
                                                             <div className="text-xs text-gray-500">

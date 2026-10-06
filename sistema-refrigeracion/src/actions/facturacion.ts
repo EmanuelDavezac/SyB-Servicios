@@ -18,9 +18,10 @@ export async function getFacturas() {
           },
         },
       },
-      orderBy: {
-        fecha_emision: "desc",
-      },
+      orderBy: [
+        { fecha_emision: "desc" },
+        { id_factura: "desc" }
+      ],
     });
 
     // We do JSON stringify/parse to handle Decimals correctly if needed in client components
@@ -293,5 +294,39 @@ export async function getFacturaCompleta(id_factura: number) {
   } catch (error) {
     console.error("Error fetching factura completa:", error);
     return null;
+  }
+}
+
+export async function getSiguienteNumeroFactura(tipo: string, fiscal: boolean) {
+  try {
+    await requerirUsuario();
+    const prefix = tipo === "Factura" ? (fiscal ? "A-" : "X-") : "R-";
+    
+    // Solo buscamos facturas del mismo tipo general (Factura vs Remito) y subtipo (fiscal vs interna)
+    const facturas = await prisma.factura.findMany({
+      where: {
+        tipo,
+        fiscal: tipo === "Factura" ? fiscal : true,
+      },
+      select: { num_factura: true },
+    });
+
+    let maxNum = 0;
+    for (const f of facturas) {
+      if (f.num_factura) {
+        // Extraemos los ultimos digitos, pej de "Factura A-0005" o "X-0012"
+        const match = f.num_factura.match(/\d+$/);
+        if (match) {
+          const n = parseInt(match[0], 10);
+          if (n > maxNum) maxNum = n;
+        }
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    return `${prefix}${nextNum.toString().padStart(4, "0")}`;
+  } catch (error) {
+    console.error("Error generating siguiente numero:", error);
+    return tipo === "Factura" ? (fiscal ? "A-0001" : "X-0001") : "R-0001";
   }
 }

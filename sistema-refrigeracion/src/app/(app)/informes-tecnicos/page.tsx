@@ -12,7 +12,7 @@ export default async function InformesTecnicosPage() {
 
     const formatDate = (date: string | Date | null) => {
         if (!date) return "-";
-        return new Date(date).toLocaleDateString("es-AR");
+        return new Date(date).toLocaleDateString("es-AR", { timeZone: "UTC" });
     };
 
     return (

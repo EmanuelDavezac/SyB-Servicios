@@ -42,7 +42,7 @@ function imprimirHTML(html: string) {
 }
 
 function imprimirInforme(informe: Informe) {
-    const fechaEmision = new Date(informe.fecha).toLocaleDateString("es-AR");
+    const fechaEmision = new Date(informe.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
     const numeroInforme = informe.numero || String(informe.id_informe).padStart(4, "0");
     const direccion = informe.calle ? `${informe.calle} ${informe.num_calle || ""}`.trim() : "—";
     const localidad = informe.localidad || "—";

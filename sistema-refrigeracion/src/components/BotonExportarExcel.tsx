@@ -20,7 +20,7 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
     if (tipoReporte === "ingresos-egresos") {
       const { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado, totalFacturadoFiscal, totalFacturadoInterno } = data;
       const rows = movimientos.map((m: any) => ({
-        Fecha: new Date(m.fecha).toLocaleDateString("es-AR"),
+        Fecha: new Date(m.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" }),
         Comprobante: m.comprobante,
         Tipo: m.tipo_comprobante,
         Entidad: m.entidad,
@@ -40,7 +40,7 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
       ws = XLSX.utils.json_to_sheet(rows);
     } else if (tipoReporte === "servicios") {
       const rows = data.map((o: any) => ({
-        Fecha: new Date(o.fecha_creacion).toLocaleDateString("es-AR"),
+        Fecha: new Date(o.fecha_creacion).toLocaleDateString("es-AR", { timeZone: "UTC" }),
         Orden: `#${o.id_orden}`,
         Cliente: o.cliente ? `${o.cliente.nombre} ${o.cliente.apellido}` : "",
         Servicios: o.detalle_orden_servicio?.map((d:any) => d.servicio?.nombre).join(", ") || "",
@@ -54,7 +54,7 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
         Direccion: [c.calle ? `${c.calle} ${c.num_calle || ""}`.trim() : null, c.localidad].filter(Boolean).join(", "),
         Telefono: c.telefono || "",
         Email: c.email || "",
-        "Fecha Alta": c.fecha_alta ? new Date(c.fecha_alta).toLocaleDateString("es-AR") : ""
+        "Fecha Alta": c.fecha_alta ? new Date(c.fecha_alta).toLocaleDateString("es-AR", { timeZone: "UTC" }) : ""
       }));
       ws = XLSX.utils.json_to_sheet(rows);
       fileName = `Clientes_${mes}_${anio}.xlsx`;
