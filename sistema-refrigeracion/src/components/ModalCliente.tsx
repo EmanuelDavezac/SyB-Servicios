@@ -14,6 +14,7 @@ interface ClienteExistente {
     calle: string | null;
     num_calle: number | null;
     localidad: string | null;
+    condicion_pago_dias: number;
 }
 
 interface Props {
@@ -37,6 +38,7 @@ export default function ModalCliente({ cliente }: Props) {
     const [calle, setCalle] = useState("");
     const [numCalle, setNumCalle] = useState("");
     const [localidad, setLocalidad] = useState("");
+    const [condicionPagoDias, setCondicionPagoDias] = useState("30");
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -50,6 +52,7 @@ export default function ModalCliente({ cliente }: Props) {
         setCalle(cliente?.calle ?? "");
         setNumCalle(cliente?.num_calle != null ? String(cliente.num_calle) : "");
         setLocalidad(cliente?.localidad ?? "");
+        setCondicionPagoDias(cliente?.condicion_pago_dias != null ? String(cliente.condicion_pago_dias) : "30");
         setError(null);
         setErrores({});
         setIsOpen(true);
@@ -84,6 +87,7 @@ export default function ModalCliente({ cliente }: Props) {
             calle: calle.trim() || undefined,
             num_calle: numCalle ? parseInt(numCalle) : undefined,
             localidad: localidad.trim() || undefined,
+            condicion_pago_dias: condicionPagoDias ? parseInt(condicionPagoDias) : 30,
         };
 
         const res = esEdicion
@@ -230,6 +234,20 @@ export default function ModalCliente({ cliente }: Props) {
                                         placeholder="Ej: Recreo, Santa Fe"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
+                                </div>
+                                <div className="col-span-3 border-t pt-4 mt-2">
+                                    <h4 className="section-title">FACTURACIÓN</h4>
+                                    <div className="w-1/2">
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Condición de Pago (Días)</label>
+                                        <input
+                                            type="number"
+                                            value={condicionPagoDias}
+                                            onChange={(e) => setCondicionPagoDias(e.target.value)}
+                                            placeholder="30"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Días para el vencimiento de facturas.</p>
+                                    </div>
                                 </div>
                             </div>
                         </section>

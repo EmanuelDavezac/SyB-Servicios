@@ -56,7 +56,7 @@ describe("obtenerFacturasParaRecordatorio", () => {
     expect(ids).not.toContain(lejos.id_factura);
   });
 
-  it("no trae una que ya tiene recordatorio del mismo tipo registrado hoy", async () => {
+  it("no trae una que ya tiene recordatorio del mismo tipo registrado", async () => {
     const factura = await facturaConVencimiento({ estado_pago: "IMPAGA", diasVencimiento: 2 });
     await prisma.historial_notificaciones.create({
       data: {
@@ -84,7 +84,7 @@ describe("obtenerFacturasParaRecordatorio", () => {
     expect(facturas.map((f) => f.id_factura)).toContain(factura.id_factura);
   });
 
-  it("si la trae si el recordatorio registrado es de otro dia", async () => {
+  it("no la trae si el recordatorio registrado es de otro dia, evitando correos repetidos", async () => {
     const factura = await facturaConVencimiento({ estado_pago: "IMPAGA", diasVencimiento: 2 });
     const ayer = inicioDelDiaUTC(new Date());
     ayer.setUTCDate(ayer.getUTCDate() - 1);
@@ -97,6 +97,6 @@ describe("obtenerFacturasParaRecordatorio", () => {
     });
 
     const facturas = await obtenerFacturasParaRecordatorio(3);
-    expect(facturas.map((f) => f.id_factura)).toContain(factura.id_factura);
+    expect(facturas.map((f) => f.id_factura)).not.toContain(factura.id_factura);
   });
 });

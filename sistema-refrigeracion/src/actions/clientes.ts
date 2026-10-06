@@ -54,6 +54,7 @@ export async function crearCliente(datos: {
     calle?: string;
     num_calle?: number;
     localidad?: string;
+    condicion_pago_dias?: number;
 }) {
     
     try {
@@ -68,6 +69,7 @@ export async function crearCliente(datos: {
                 calle: datos.calle || null,
                 num_calle: datos.num_calle ?? null,
                 localidad: datos.localidad || null,
+                condicion_pago_dias: datos.condicion_pago_dias ?? 30,
             },
         });
 
@@ -90,6 +92,7 @@ export async function actualizarCliente(id_cliente: number, datos: {
     calle?: string;
     num_calle?: number;
     localidad?: string;
+    condicion_pago_dias?: number;
 }) {
     try {
         await requerirUsuario();
@@ -104,6 +107,7 @@ export async function actualizarCliente(id_cliente: number, datos: {
                 calle: datos.calle || null,
                 num_calle: datos.num_calle ?? null,
                 localidad: datos.localidad || null,
+                ...(datos.condicion_pago_dias !== undefined ? { condicion_pago_dias: datos.condicion_pago_dias } : {}),
             },
         });
 

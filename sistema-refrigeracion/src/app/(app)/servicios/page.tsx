@@ -1,5 +1,6 @@
 import { obtenerServicios } from "@/actions/servicios";
 import ModalServicio from "@/components/ModalServicio";
+import BotonEliminarServicio from "@/components/BotonEliminarServicio";
 
 export default async function ServiciosPage() {
     const servicios = await obtenerServicios();
@@ -61,23 +62,29 @@ export default async function ServiciosPage() {
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
-                                        <ModalServicio
-                                            servicioInicial={{
-                                                id_servicio: srv.id_servicio,
-                                                nombre: srv.nombre,
-                                                descripcion: srv.descripcion ?? null,
-                                                precio: Number(srv.precio),
-                                                servicio_insumo: srv.servicio_insumo,
-                                            }}
-                                            trigger={
-                                                <button
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Editar servicio"
-                                                >
-                                                    <i className="fas fa-edit" />
-                                                </button>
-                                            }
-                                        />
+                                        <div className="flex justify-center items-center">
+                                            <ModalServicio
+                                                servicioInicial={{
+                                                    id_servicio: srv.id_servicio,
+                                                    nombre: srv.nombre,
+                                                    descripcion: srv.descripcion ?? null,
+                                                    precio: Number(srv.precio),
+                                                    servicio_insumo: srv.servicio_insumo,
+                                                }}
+                                                trigger={
+                                                    <button
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                        title="Editar servicio"
+                                                    >
+                                                        <i className="fas fa-edit" />
+                                                    </button>
+                                                }
+                                            />
+                                            <BotonEliminarServicio
+                                                idServicio={srv.id_servicio}
+                                                nombreServicio={srv.nombre}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))

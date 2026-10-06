@@ -148,7 +148,7 @@ export default async function FacturacionPage({
     const formatDate = (date: string | Date | null) => {
         if (!date) return "-";
         const d = new Date(date);
-        return d.toLocaleDateString("es-AR");
+        return d.toLocaleDateString("es-AR", { timeZone: "UTC" });
     };
 
     return (

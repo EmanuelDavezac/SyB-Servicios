@@ -31,7 +31,6 @@ export async function obtenerFacturasParaRecordatorio(diasAnticipacion: number) 
             historial_notificaciones: {
                 none: {
                     tipo_notificacion: tipo,
-                    fecha_creacion: hoy,
                 },
             },
         },

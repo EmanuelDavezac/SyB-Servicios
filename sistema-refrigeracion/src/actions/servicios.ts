@@ -108,3 +108,36 @@ export async function toggleEstadoServicio(id_servicio: number, estadoActual: bo
         return { success: false };
     }
 }
+
+export async function eliminarServicio(id_servicio: number) {
+    try {
+        await requerirUsuario();
+        
+        // Validación upfront: revisar si el servicio está en uso en órdenes Activas
+        const ordenesConflictivas = await prisma.orden_trabajo.count({
+            where: {
+                estado_trabajo: { in: ["Pendiente", "En proceso"] },
+                detalle_orden_servicio: {
+                    some: { id_servicio }
+                }
+            }
+        });
+
+        if (ordenesConflictivas > 0) {
+            return { 
+                success: false, 
+                error: "No se puede eliminar el servicio porque se está usando en una orden que está Pendiente o En Proceso." 
+            };
+        }
+
+        await prisma.servicio.delete({
+            where: { id_servicio }
+        });
+        
+        revalidatePath("/servicios");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al eliminar el servicio:", error);
+        return { success: false, error: "No se pudo eliminar el servicio, es probable que ya esté asociado a órdenes." };
+    }
+}

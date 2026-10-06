@@ -16,6 +16,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const resultado = await enviarRecordatoriosPendientes();
-    return NextResponse.json(resultado);
+    const resultado3D = await enviarRecordatoriosPendientes(3);
+    const resultado0D = await enviarRecordatoriosPendientes(0);
+    return NextResponse.json({
+        resultado3D,
+        resultado0D
+    });
 }

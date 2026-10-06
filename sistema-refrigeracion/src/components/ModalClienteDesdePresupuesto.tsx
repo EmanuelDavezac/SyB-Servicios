@@ -34,6 +34,7 @@ export default function ModalClienteDesdePresupuesto({
     const [email, setEmail] = useState("");
     const [calle, setCalle] = useState(destinatarioDomicilio ?? "");
     const [localidad, setLocalidad] = useState(destinatarioLocalidad ?? "");
+    const [condicionPagoDias, setCondicionPagoDias] = useState("30");
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -55,6 +56,7 @@ export default function ModalClienteDesdePresupuesto({
             email: email.trim() || undefined,
             calle: calle.trim() || undefined,
             localidad: localidad.trim() || undefined,
+            condicion_pago_dias: condicionPagoDias ? parseInt(condicionPagoDias) : 30,
         });
 
         if (!resCliente.success || !resCliente.cliente) {
@@ -170,6 +172,19 @@ export default function ModalClienteDesdePresupuesto({
                                         onChange={(e) => setLocalidad(e.target.value)}
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
+                                </div>
+                                <div className="col-span-3 border-t pt-4 mt-2">
+                                    <h4 className="section-title">FACTURACIÓN</h4>
+                                    <div className="w-1/2">
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Condición de Pago (Días)</label>
+                                        <input
+                                            type="number"
+                                            value={condicionPagoDias}
+                                            onChange={(e) => setCondicionPagoDias(e.target.value)}
+                                            placeholder="30"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </section>
