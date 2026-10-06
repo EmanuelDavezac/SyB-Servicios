@@ -1,6 +1,7 @@
 import { describe, it, test, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { crearFactura, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
+import { anularFactura } from "@/actions/cobros";
 import { crearCliente, crearInsumo, crearOrdenFinalizada } from "./factories";
 
 describe("crearFactura", () => {
@@ -354,9 +355,7 @@ describe("crearFactura", () => {
     expect(resultado.success).toBe(false);
   });
 
-  // Bug conocido con issue abierto: crearFactura descuenta stock incluso para
-  // comprobantes no facturables (Informe Tecnico), que no deberian tocar stock.
-  test.fails("comprobante no facturable no deberia descontar stock", async () => {
+  it("comprobante no facturable no descuenta stock", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
@@ -369,6 +368,43 @@ describe("crearFactura", () => {
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(insumoFinal?.stock_actual)).toBe(10);
+  });
+
+  it("remito y despues factura en la misma orden: ambos se emiten y el stock se descuenta una sola vez", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
+
+    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    expect(remito.success).toBe(true);
+    const trasRemito = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(trasRemito?.stock_actual)).toBe(10);
+
+    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    expect(factura.success).toBe(true);
+    const trasFactura = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(trasFactura?.stock_actual)).toBe(7);
+  });
+
+  it("remito despues de la factura se permite", async () => {
+    const orden = await crearOrdenFinalizada();
+
+    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    expect(factura.success).toBe(true);
+    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    expect(remito.success).toBe(true);
+  });
+
+  it("factura anulada: la orden se puede volver a facturar", async () => {
+    const orden = await crearOrdenFinalizada();
+
+    const primera = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    expect(primera.success).toBe(true);
+    if (!primera.success) return;
+    const anulacion = await anularFactura(primera.factura.id_factura);
+    expect(anulacion.success).toBe(true);
+
+    const segunda = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-2", tipo: "Factura", fiscal: true });
+    expect(segunda.success).toBe(true);
   });
 
   // Bug conocido con issue abierto: no valida stock suficiente antes de

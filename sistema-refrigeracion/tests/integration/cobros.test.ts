@@ -1,7 +1,8 @@
 import { describe, it, test, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { registrarCobro, anularCobro, anularFactura, obtenerClientesConDeuda, obtenerDeudaPorCliente } from "@/actions/cobros";
-import { crearCliente, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
+import { crearFactura } from "@/actions/facturacion";
+import { crearCliente, crearInsumo, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
 
 async function facturaDeCliente(id_cliente: number, overrides: Parameters<typeof crearFacturaEmitida>[0] = {}) {
   const orden = await crearOrdenFinalizada({ id_cliente });
@@ -312,6 +313,34 @@ describe("anularFactura", () => {
 
     const resultado = await anularFactura(factura.id_factura);
     expect(resultado.success).toBe(false);
+  });
+
+  it("anular una factura devuelve el stock descontado", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
+    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    expect(factura.success).toBe(true);
+    if (!factura.success) return;
+
+    const resultado = await anularFactura(factura.factura.id_factura);
+    expect(resultado.success).toBe(true);
+
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(10);
+  });
+
+  it("anular un remito no toca el stock", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
+    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    expect(remito.success).toBe(true);
+    if (!remito.success) return;
+
+    const resultado = await anularFactura(remito.factura.id_factura);
+    expect(resultado.success).toBe(true);
+
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(10);
   });
 });
 

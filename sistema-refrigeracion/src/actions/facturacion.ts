@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
+import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, esTipoFacturable } from "@/lib/estadoFactura";
 import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
@@ -38,7 +38,13 @@ export async function getOrdenesPendientesFacturacion() {
     const ordenes = await prisma.orden_trabajo.findMany({
       where: {
         estado_trabajo: "Finalizado",
-        factura: { none: {} },   // ← excluye órdenes que ya tienen al menos una factura
+        // excluye órdenes con una Factura vigente; una anulada o un Remito no cuentan
+        factura: {
+          none: {
+            tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
+            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+          },
+        },
       },
       include: {
         cliente: true,
@@ -95,15 +101,19 @@ export async function crearFactura(data: {
 
     const nuevaFactura = await prisma.$transaction(async (tx) => {
       // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
-      //    setea el id directo desde la URL, sin validar si ya está facturada)
-      const facturaExistente = await tx.factura.findFirst({
-        where: {
-          id_orden: data.id_orden,
-          estado_pago: { not: ESTADOS_FACTURA.ANULADA },
-        },
-      });
-      if (facturaExistente) {
-        throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
+      //    setea el id directo desde la URL, sin validar si ya está facturada).
+      //    Solo una Factura vigente por orden; los Remitos no tienen limite.
+      if (facturable) {
+        const facturaExistente = await tx.factura.findFirst({
+          where: {
+            id_orden: data.id_orden,
+            tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
+            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+          },
+        });
+        if (facturaExistente) {
+          throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
+        }
       }
 
       // 1. Calcular vencimiento por default si no se cargo a mano
@@ -123,13 +133,14 @@ export async function crearFactura(data: {
       }
 
       // 2. Descontar stock de los insumos ya registrados en la ORDEN
-      //    (agregados desde ModalOrden durante el trabajo)
+      //    (agregados desde ModalOrden durante el trabajo). El stock se mueve
+      //    solo con la Factura: un Remito no descuenta.
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
         include: { insumo: true },
       });
 
-      for (const detalle of insumosDeOrden) {
+      for (const detalle of facturable ? insumosDeOrden : []) {
         if (detalle.id_insumo === null) continue; // id_insumo is nullable in schema; skip if missing
         await tx.insumo.update({
           where: { id_insumo: detalle.id_insumo },
@@ -152,15 +163,17 @@ export async function crearFactura(data: {
             throw new Error(`Insumo con ID ${item.id_insumo} no encontrado`);
           }
 
-          // Descontar stock
-          await tx.insumo.update({
-            where: { id_insumo: item.id_insumo },
-            data: {
-              stock_actual: {
-                decrement: item.cantidad,
+          // Descontar stock (solo Factura)
+          if (facturable) {
+            await tx.insumo.update({
+              where: { id_insumo: item.id_insumo },
+              data: {
+                stock_actual: {
+                  decrement: item.cantidad,
+                },
               },
-            },
-          });
+            });
+          }
 
           // Registrar en el detalle de la orden
           await tx.detalle_orden_insumo.create({

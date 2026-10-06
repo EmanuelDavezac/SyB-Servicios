@@ -2,6 +2,7 @@ import { obtenerOrdenes, obtenerClientesActivos } from "@/actions/ordenes";
 import ModalOrden from "@/components/ModalOrden";
 import FiltrosOrdenes from "@/components/FiltrosOrdenes";
 import Link from "next/link";
+import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
 
 // Colores por estado
 const ESTILOS_ESTADO: Record<string, string> = {
@@ -19,8 +20,8 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
         obtenerClientesActivos(),
     ]);
 
-    // Ocultar órdenes ya facturadas: pasan a vivir en la sección Facturación
-    let ordenes = todasLasOrdenes.filter((orden) => orden.factura.length === 0);
+    // Las órdenes facturadas se siguen mostrando, en modo solo lectura
+    let ordenes = todasLasOrdenes;
 
     // Filtro por nombre o apellido del cliente
     if (params.busqueda) {
@@ -70,7 +71,12 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                 </td>
                             </tr>
                         ) : (
-                            ordenes.map((orden) => (
+                            ordenes.map((orden) => {
+                                // Factura vigente: bloquea la edición. Los Remitos no cuentan.
+                                const facturaVigente = orden.factura.find(
+                                    (f) => esTipoFacturable(f.tipo) && f.estado_pago !== ESTADOS_FACTURA.ANULADA
+                                );
+                                return (
                                 <tr key={orden.id_orden} className="border-b hover:bg-gray-50">
 
                                     {/* Número de orden */}
@@ -100,11 +106,26 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${ESTILOS_ESTADO[orden.estado_trabajo ?? "Pendiente"] ?? "bg-gray-100 text-gray-800"}`}>
                                             {orden.estado_trabajo?.toUpperCase() ?? "PENDIENTE"}
                                         </span>
+                                        {facturaVigente && (
+                                            <span className="ml-1 px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-800">
+                                                FACTURADA
+                                            </span>
+                                        )}
                                     </td>
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
 
+                                        {facturaVigente ? (
+                                            <Link
+                                                href="/facturacion"
+                                                title={`Ver en Facturación (factura #${facturaVigente.id_factura})`}
+                                                className="text-blue-600 hover:text-blue-800"
+                                            >
+                                                <i className="fas fa-file-invoice" />
+                                            </Link>
+                                        ) : (
+                                        <>
                                         {/* Botón Editar → abre ModalOrden en modo edición */}
                                         <ModalOrden
                                             clientes={clientes}
@@ -142,11 +163,14 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                                 <i className="fas fa-file-invoice-dollar" />
                                             </button>
                                         )}
+                                        </>
+                                        )}
 
                                     </td>
 
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

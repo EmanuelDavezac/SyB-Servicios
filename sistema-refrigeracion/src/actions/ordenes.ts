@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoFactura";
 
 function validarAlicuota(alicuota: number | undefined): number {
     const valor = alicuota ?? ALICUOTA_IVA_DEFAULT;
@@ -14,15 +14,26 @@ function validarAlicuota(alicuota: number | undefined): number {
     return valor;
 }
 
-// Las lineas de una orden ya facturada no se tocan: su IVA ya quedo
-// congelado en factura_iva y no se recalculan facturas emitidas.
+// Una orden con una Factura vigente (no anulada) no se toca: su IVA ya quedo
+// congelado en factura_iva y no se recalculan facturas emitidas. Los
+// comprobantes no facturables (ej. Remito) no bloquean la orden.
 async function ordenYaFacturada(id_orden: number | null): Promise<boolean> {
     if (id_orden === null) return false;
     const factura = await prisma.factura.findFirst({
-        where: { id_orden, estado_pago: { not: ESTADOS_FACTURA.ANULADA } },
+        where: {
+            id_orden,
+            tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
+            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+        },
         select: { id_factura: true },
     });
     return !!factura;
+}
+
+async function asegurarOrdenEditable(id_orden: number | null): Promise<void> {
+    if (await ordenYaFacturada(id_orden)) {
+        throw new Error(`La orden #${id_orden} ya está facturada: anulá la factura para poder modificarla.`);
+    }
 }
 
 // Trae todas las órdenes con el nombre del cliente incluido
@@ -41,7 +52,7 @@ export async function obtenerOrdenes() {
                     },
                 },
                 factura: {
-                    select: { id_factura: true },
+                    select: { id_factura: true, estado_pago: true, tipo: true },
                 },
             },
         });
@@ -109,6 +120,7 @@ export async function editarOrden(id_orden: number, datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarOrdenEditable(id_orden);
         const ordenActualizada = await prisma.orden_trabajo.update({
             where: { id_orden },
             data: {
@@ -123,7 +135,7 @@ export async function editarOrden(id_orden: number, datos: {
 
     } catch (error) {
         console.error("Error al editar la orden:", error);
-        return { success: false, error: "No se pudo actualizar la orden" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar la orden" };
     }
 }
 
@@ -137,6 +149,7 @@ export async function agregarServicioAOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
@@ -151,7 +164,7 @@ export async function agregarServicioAOrden(datos: {
         return { success: true };
     } catch (error) {
         console.error("Error al agregar servicio a orden:", error);
-        return { success: false, error: "No se pudo agregar el servicio" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo agregar el servicio" };
     }
 }
 
@@ -165,6 +178,7 @@ export async function agregarServicioLibreAOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
@@ -180,7 +194,7 @@ export async function agregarServicioLibreAOrden(datos: {
         return { success: true };
     } catch (error) {
         console.error("Error al agregar descripcion libre a orden:", error);
-        return { success: false, error: "No se pudo agregar la descripcion" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo agregar la descripcion" };
     }
 }
 
@@ -195,6 +209,7 @@ export async function crearServicioYAgregarAOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         // Crear el servicio
         const nuevoServicio = await prisma.servicio.create({
@@ -221,7 +236,7 @@ export async function crearServicioYAgregarAOrden(datos: {
         return { success: true, servicio: JSON.parse(JSON.stringify(nuevoServicio)) };
     } catch (error) {
         console.error("Error al crear servicio y agregar a orden:", error);
-        return { success: false, error: "No se pudo crear el servicio" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo crear el servicio" };
     }
 }
 
@@ -229,6 +244,9 @@ export async function crearServicioYAgregarAOrden(datos: {
 export async function quitarServicioDeOrden(id_detalle_srv: number) {
     try {
         await requerirUsuario();
+        const detalle = await prisma.detalle_orden_servicio.findUnique({ where: { id_detalle_srv } });
+        if (!detalle) return { success: false, error: "La línea no existe." };
+        await asegurarOrdenEditable(detalle.id_orden);
         await prisma.detalle_orden_servicio.delete({
             where: { id_detalle_srv },
         });
@@ -236,7 +254,7 @@ export async function quitarServicioDeOrden(id_detalle_srv: number) {
         return { success: true };
     } catch (error) {
         console.error("Error al quitar servicio de orden:", error);
-        return { success: false, error: "No se pudo quitar el servicio" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo quitar el servicio" };
     }
 }
 
@@ -249,9 +267,7 @@ export async function actualizarAlicuotaServicio(id_detalle_srv: number, alicuot
         }
         const detalle = await prisma.detalle_orden_servicio.findUnique({ where: { id_detalle_srv } });
         if (!detalle) return { success: false, error: "La línea no existe." };
-        if (await ordenYaFacturada(detalle.id_orden)) {
-            return { success: false, error: "La orden ya está facturada: no se puede cambiar el IVA." };
-        }
+        await asegurarOrdenEditable(detalle.id_orden);
         await prisma.detalle_orden_servicio.update({
             where: { id_detalle_srv },
             data: { alicuota_iva },
@@ -260,7 +276,7 @@ export async function actualizarAlicuotaServicio(id_detalle_srv: number, alicuot
         return { success: true };
     } catch (error) {
         console.error("Error al actualizar alicuota de servicio:", error);
-        return { success: false, error: "No se pudo actualizar el IVA" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el IVA" };
     }
 }
 
@@ -293,6 +309,7 @@ export async function agregarInsumoAOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_insumo.create({
             data: {
@@ -307,7 +324,7 @@ export async function agregarInsumoAOrden(datos: {
         return { success: true };
     } catch (error) {
         console.error("Error al agregar insumo a la orden:", error);
-        return { success: false, error: "No se pudo agregar el insumo" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo agregar el insumo" };
     }
 }
 
@@ -315,6 +332,9 @@ export async function agregarInsumoAOrden(datos: {
 export async function quitarInsumoDeOrden(id_detalle_ord_insumo: number) {
     try {
         await requerirUsuario();
+        const detalle = await prisma.detalle_orden_insumo.findUnique({ where: { id_detalle_ins: id_detalle_ord_insumo } });
+        if (!detalle) return { success: false, error: "La línea no existe." };
+        await asegurarOrdenEditable(detalle.id_orden);
         await prisma.detalle_orden_insumo.delete({
             where: { id_detalle_ins: id_detalle_ord_insumo },
         });
@@ -322,7 +342,7 @@ export async function quitarInsumoDeOrden(id_detalle_ord_insumo: number) {
         return { success: true };
     } catch (error) {
         console.error("Error al quitar insumo de la orden:", error);
-        return { success: false, error: "No se pudo quitar el insumo" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo quitar el insumo" };
     }
 }
 
@@ -335,9 +355,7 @@ export async function actualizarAlicuotaInsumo(id_detalle_ord_insumo: number, al
         }
         const detalle = await prisma.detalle_orden_insumo.findUnique({ where: { id_detalle_ins: id_detalle_ord_insumo } });
         if (!detalle) return { success: false, error: "La línea no existe." };
-        if (await ordenYaFacturada(detalle.id_orden)) {
-            return { success: false, error: "La orden ya está facturada: no se puede cambiar el IVA." };
-        }
+        await asegurarOrdenEditable(detalle.id_orden);
         await prisma.detalle_orden_insumo.update({
             where: { id_detalle_ins: id_detalle_ord_insumo },
             data: { alicuota_iva },
@@ -346,7 +364,7 @@ export async function actualizarAlicuotaInsumo(id_detalle_ord_insumo: number, al
         return { success: true };
     } catch (error) {
         console.error("Error al actualizar alicuota de insumo:", error);
-        return { success: false, error: "No se pudo actualizar el IVA" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el IVA" };
     }
 }
 

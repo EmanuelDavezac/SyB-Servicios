@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado } from "@/lib/estadoFactura";
+import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoFactura";
 import type { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
@@ -172,11 +172,14 @@ export async function anularFactura(id_factura: number) {
       }
 
       // Devolver al stock los insumos que se descontaron al emitir la factura
-      // (crearFactura descuenta, en el paso 3, el stock de todo lo cargado en
-      // detalle_orden_insumo para la orden facturada).
-      const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
-        where: { id_orden: factura.id_orden },
-      });
+      // (crearFactura descuenta el stock de todo lo cargado en
+      // detalle_orden_insumo, pero solo para comprobantes facturables: un
+      // Remito no movio stock y por eso tampoco lo devuelve).
+      const insumosDeOrden = esTipoFacturable(factura.tipo)
+        ? await tx.detalle_orden_insumo.findMany({
+            where: { id_orden: factura.id_orden },
+          })
+        : [];
 
       for (const detalle of insumosDeOrden) {
         if (detalle.id_insumo === null) continue;
