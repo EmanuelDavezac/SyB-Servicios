@@ -1,9 +1,28 @@
+import Link from "next/link";
 import { obtenerServicios } from "@/actions/servicios";
 import ModalServicio from "@/components/ModalServicio";
 import BotonBajaServicio from "@/components/BotonBajaServicio";
+import FiltrosServicios from "@/components/FiltrosServicios";
 
-export default async function ServiciosPage() {
-    const servicios = await obtenerServicios({ incluirInactivos: true });
+export default async function ServiciosPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ nombre?: string; precioDesde?: string; precioHasta?: string; estado?: string }>;
+}) {
+    const params = await searchParams;
+    const nombre = params.nombre;
+    const precioDesde = params.precioDesde !== undefined ? parseFloat(params.precioDesde) : undefined;
+    const precioHasta = params.precioHasta !== undefined ? parseFloat(params.precioHasta) : undefined;
+    const estado = params.estado;
+
+    const servicios = await obtenerServicios({
+        incluirInactivos: true,
+        nombre,
+        precioDesde: precioDesde !== undefined && !Number.isNaN(precioDesde) ? precioDesde : undefined,
+        precioHasta: precioHasta !== undefined && !Number.isNaN(precioHasta) ? precioHasta : undefined,
+        estado,
+    });
+    const hayFiltrosActivos = !!(nombre || precioDesde !== undefined || precioHasta !== undefined || estado);
 
     return (
         <div>
@@ -12,6 +31,8 @@ export default async function ServiciosPage() {
                 <h2 className="text-3xl font-bold text-gray-800">Servicios</h2>
                 <ModalServicio />
             </div>
+
+            <FiltrosServicios />
 
             {/* Tabla */}
             <div className="bg-white rounded shadow overflow-hidden">
@@ -30,7 +51,16 @@ export default async function ServiciosPage() {
                         {servicios.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="p-8 text-center text-gray-500 bg-gray-50">
-                                    No hay servicios registrados. ¡Hacé clic en &quot;+ Nuevo Servicio&quot; para agregar el primero!
+                                    {hayFiltrosActivos ? (
+                                        <>
+                                            No se encontraron servicios que coincidan.{" "}
+                                            <Link href="/servicios" className="text-blue-600 hover:underline">
+                                                Limpiar filtros
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        <>No hay servicios registrados. ¡Hacé clic en &quot;+ Nuevo Servicio&quot; para agregar el primero!</>
+                                    )}
                                 </td>
                             </tr>
                         ) : (

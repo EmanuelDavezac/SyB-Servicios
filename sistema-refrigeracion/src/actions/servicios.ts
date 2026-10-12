@@ -5,12 +5,49 @@ import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { formatearListaConLimite } from "@/lib/formato";
 
-export async function obtenerServicios(opciones?: { incluirInactivos?: boolean }) {
+export async function obtenerServicios(opciones?: {
+    incluirInactivos?: boolean;
+    nombre?: string;
+    precioDesde?: number;
+    precioHasta?: number;
+    /** "Activo" o "Inactivo" manda por sobre incluirInactivos */
+    estado?: string;
+}) {
     const incluirInactivos = opciones?.incluirInactivos ?? false;
     try {
         await requerirUsuario();
+
+        const nombre = opciones?.nombre?.trim();
+        let precioDesde = opciones?.precioDesde;
+        let precioHasta = opciones?.precioHasta;
+        // Rango invertido: el filtro de precio no se aplica (CU25), se trae
+        // el resto de los filtros igual.
+        if (precioDesde !== undefined && precioHasta !== undefined && precioDesde > precioHasta) {
+            precioDesde = undefined;
+            precioHasta = undefined;
+        }
+
+        const where: Record<string, unknown> = {};
+        if (opciones?.estado === "Activo") {
+            where.estado = { not: false };
+        } else if (opciones?.estado === "Inactivo") {
+            where.estado = false;
+        } else if (!incluirInactivos) {
+            where.estado = { not: false };
+        }
+
+        if (nombre) {
+            where.nombre = { contains: nombre, mode: "insensitive" };
+        }
+        if (precioDesde !== undefined || precioHasta !== undefined) {
+            where.precio = {
+                ...(precioDesde !== undefined ? { gte: precioDesde } : {}),
+                ...(precioHasta !== undefined ? { lte: precioHasta } : {}),
+            };
+        }
+
         const servicios = await prisma.servicio.findMany({
-            where: incluirInactivos ? undefined : { estado: { not: false } },
+            where,
             orderBy: { nombre: "asc" },
             include: { servicio_insumo: { include: { insumo: true } } },
         });

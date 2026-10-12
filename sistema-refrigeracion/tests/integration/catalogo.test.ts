@@ -6,6 +6,7 @@ import {
   actualizarRecetaServicio,
   crearServicio as crearServicioAction,
   editarServicio,
+  obtenerServicios,
 } from "@/actions/servicios";
 import {
   darDeBajaInsumo,
@@ -18,6 +19,7 @@ import {
   reactivarProveedor,
   crearProveedor as crearProveedorAction,
   editarProveedor,
+  obtenerProveedores,
 } from "@/actions/proveedores";
 import { agregarServicioAOrden, agregarInsumoAOrden, crearOrden } from "@/actions/ordenes";
 import { crearCompra } from "@/actions/compras";
@@ -427,5 +429,154 @@ describe("crearProveedor / editarProveedor - CUIT duplicado con mensaje claro (C
     const resultado = await editarProveedor(proveedor.id_proveedor, { razon_social: "Nueva Razon Social", cuit: "30712345678" });
 
     expect(resultado.success).toBe(true);
+  });
+});
+
+describe("obtenerServicios - filtros (CU25)", () => {
+  it("filtra por nombre sin distinguir mayusculas", async () => {
+    await crearServicio({ nombre: "Carga de gas R410a" });
+    await crearServicio({ nombre: "Reparacion de compresor" });
+
+    const resultado = await obtenerServicios({ nombre: "CARGA DE GAS" });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Carga de gas R410a"]);
+  });
+
+  it("filtra por rango de precio: solo desde", async () => {
+    await crearServicio({ nombre: "Barato", precio: 100 });
+    await crearServicio({ nombre: "Caro", precio: 900 });
+
+    const resultado = await obtenerServicios({ precioDesde: 500 });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Caro"]);
+  });
+
+  it("filtra por rango de precio: solo hasta", async () => {
+    await crearServicio({ nombre: "Barato", precio: 100 });
+    await crearServicio({ nombre: "Caro", precio: 900 });
+
+    const resultado = await obtenerServicios({ precioHasta: 500 });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Barato"]);
+  });
+
+  it("filtra por rango de precio: desde y hasta", async () => {
+    await crearServicio({ nombre: "Barato", precio: 100 });
+    await crearServicio({ nombre: "Medio", precio: 500 });
+    await crearServicio({ nombre: "Caro", precio: 900 });
+
+    const resultado = await obtenerServicios({ precioDesde: 300, precioHasta: 700 });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Medio"]);
+  });
+
+  it("un rango invertido (desde > hasta) no se aplica: trae todo", async () => {
+    await crearServicio({ nombre: "Barato", precio: 100 });
+    await crearServicio({ nombre: "Caro", precio: 900 });
+
+    const resultado = await obtenerServicios({ precioDesde: 900, precioHasta: 100 });
+
+    expect(resultado).toHaveLength(2);
+  });
+
+  it("filtra por estado Activo", async () => {
+    await crearServicio({ nombre: "Activo uno", estado: true });
+    await crearServicio({ nombre: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerServicios({ estado: "Activo" });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Activo uno"]);
+  });
+
+  it("filtra por estado Inactivo", async () => {
+    await crearServicio({ nombre: "Activo uno", estado: true });
+    await crearServicio({ nombre: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerServicios({ estado: "Inactivo" });
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Inactivo uno"]);
+  });
+
+  it("sin filtros devuelve activos e inactivos", async () => {
+    await crearServicio({ nombre: "Activo uno", estado: true });
+    await crearServicio({ nombre: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerServicios({ incluirInactivos: true });
+
+    expect(resultado).toHaveLength(2);
+  });
+
+  it("una llamada sin parametros (selectores) devuelve solo los activos", async () => {
+    await crearServicio({ nombre: "Activo uno", estado: true });
+    await crearServicio({ nombre: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerServicios();
+
+    expect(resultado.map((s: { nombre: string }) => s.nombre)).toEqual(["Activo uno"]);
+  });
+});
+
+describe("obtenerProveedores - filtros (CU33)", () => {
+  it("filtra por razon social sin distinguir mayusculas", async () => {
+    await crearProveedor({ razon_social: "Distribuidora Frio Sur" });
+    await crearProveedor({ razon_social: "Repuestos del Centro" });
+
+    const resultado = await obtenerProveedores({ razonSocial: "frio sur" });
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Distribuidora Frio Sur"]);
+  });
+
+  it("filtra por nombre de contacto (nombre_proveedor)", async () => {
+    await crearProveedor({ razon_social: "Distribuidora SRL", nombre_proveedor: "Juan Garcia" });
+    await crearProveedor({ razon_social: "Repuestos SA", nombre_proveedor: "Maria Lopez" });
+
+    const resultado = await obtenerProveedores({ razonSocial: "Garcia" });
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Distribuidora SRL"]);
+  });
+
+  it("filtra por CUIT", async () => {
+    await crearProveedor({ razon_social: "Uno", cuit: "30712345678" });
+    await crearProveedor({ razon_social: "Dos", cuit: "30798765432" });
+
+    const resultado = await obtenerProveedores({ cuit: "712345" });
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Uno"]);
+  });
+
+  it("filtra por estado Activo", async () => {
+    await crearProveedor({ razon_social: "Activo uno", estado: true });
+    await crearProveedor({ razon_social: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerProveedores({ estado: "Activo" });
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Activo uno"]);
+  });
+
+  it("filtra por estado Inactivo", async () => {
+    await crearProveedor({ razon_social: "Activo uno", estado: true });
+    await crearProveedor({ razon_social: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerProveedores({ estado: "Inactivo" });
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Inactivo uno"]);
+  });
+
+  it("sin filtros devuelve activos e inactivos", async () => {
+    await crearProveedor({ razon_social: "Activo uno", estado: true });
+    await crearProveedor({ razon_social: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerProveedores({ incluirInactivos: true });
+
+    expect(resultado).toHaveLength(2);
+  });
+
+  it("una llamada sin parametros (selectores) devuelve solo los activos", async () => {
+    await crearProveedor({ razon_social: "Activo uno", estado: true });
+    await crearProveedor({ razon_social: "Inactivo uno", estado: false });
+
+    const resultado = await obtenerProveedores();
+
+    expect(resultado.map((p) => p.razon_social)).toEqual(["Activo uno"]);
   });
 });

@@ -1,9 +1,21 @@
+import Link from "next/link";
 import { obtenerProveedores } from "@/actions/proveedores";
 import ModalProveedor from "@/components/ModalProveedor";
 import BotonBajaProveedor from "@/components/BotonBajaProveedor";
+import FiltrosProveedores from "@/components/FiltrosProveedores";
 
-export default async function ProveedoresPage() {
-    const proveedores = await obtenerProveedores({ incluirInactivos: true });
+export default async function ProveedoresPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ razonSocial?: string; cuit?: string; estado?: string }>;
+}) {
+    const params = await searchParams;
+    const razonSocial = params.razonSocial;
+    const cuit = params.cuit;
+    const estado = params.estado;
+
+    const proveedores = await obtenerProveedores({ incluirInactivos: true, razonSocial, cuit, estado });
+    const hayFiltrosActivos = !!(razonSocial || cuit || estado);
 
     return (
         <div>
@@ -12,6 +24,8 @@ export default async function ProveedoresPage() {
                 <h2 className="text-3xl font-bold text-gray-800">Proveedores</h2>
                 <ModalProveedor />
             </div>
+
+            <FiltrosProveedores />
 
             {/* Tabla */}
             <div className="bg-white rounded shadow overflow-hidden">
@@ -31,7 +45,16 @@ export default async function ProveedoresPage() {
                         {proveedores.length === 0 ? (
                             <tr>
                                 <td colSpan={6} className="p-8 text-center text-gray-500 bg-gray-50">
-                                    No hay proveedores registrados. ¡Hacé clic en &quot;+ Nuevo Proveedor&quot; para agregar el primero!
+                                    {hayFiltrosActivos ? (
+                                        <>
+                                            No se encontraron proveedores que coincidan.{" "}
+                                            <Link href="/proveedores" className="text-blue-600 hover:underline">
+                                                Limpiar filtros
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        <>No hay proveedores registrados. ¡Hacé clic en &quot;+ Nuevo Proveedor&quot; para agregar el primero!</>
+                                    )}
                                 </td>
                             </tr>
                         ) : (

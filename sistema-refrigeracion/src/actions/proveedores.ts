@@ -16,12 +16,42 @@ function mensajeDeErrorProveedor(error: unknown, fallback: string): string {
     return fallback;
 }
 
-export async function obtenerProveedores(opciones?: { incluirInactivos?: boolean }) {
+export async function obtenerProveedores(opciones?: {
+    incluirInactivos?: boolean;
+    /** Busca en razon_social y tambien en nombre_proveedor (el contacto): en la tabla se muestran juntos */
+    razonSocial?: string;
+    cuit?: string;
+    /** "Activo" o "Inactivo" manda por sobre incluirInactivos */
+    estado?: string;
+}) {
     const incluirInactivos = opciones?.incluirInactivos ?? false;
     try {
         await requerirUsuario();
+
+        const razonSocial = opciones?.razonSocial?.trim();
+        const cuit = opciones?.cuit?.trim();
+
+        const where: Record<string, unknown> = {};
+        if (opciones?.estado === "Activo") {
+            where.estado = { not: false };
+        } else if (opciones?.estado === "Inactivo") {
+            where.estado = false;
+        } else if (!incluirInactivos) {
+            where.estado = { not: false };
+        }
+
+        if (razonSocial) {
+            where.OR = [
+                { razon_social: { contains: razonSocial, mode: "insensitive" } },
+                { nombre_proveedor: { contains: razonSocial, mode: "insensitive" } },
+            ];
+        }
+        if (cuit) {
+            where.cuit = { contains: cuit, mode: "insensitive" };
+        }
+
         return await prisma.proveedor.findMany({
-            where: incluirInactivos ? undefined : { estado: { not: false } },
+            where,
             orderBy: { razon_social: "asc" },
         });
     } catch (error) {
