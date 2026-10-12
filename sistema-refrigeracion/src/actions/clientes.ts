@@ -46,6 +46,7 @@ import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, TOLERANCIA_MONTO } from "@/lib/estadoFactura";
 import { obtenerDeudaCliente } from "@/lib/deudaCliente";
+import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 async function cuitYaExiste(cuit: string, idExcluir?: number) {
     const existente = await prisma.cliente.findFirst({
@@ -162,12 +163,8 @@ export async function actualizarCliente(id_cliente: number, datos: {
     }
 }
 
-// Estados de orden_trabajo que por si solos ya cuentan como "sin cerrar" para
-// bloquear la baja (todavia hay trabajo pendiente, mas alla de la plata).
-const ESTADOS_ORDEN_EN_CURSO = ["Pendiente", "En proceso"];
-
-// Una orden Finalizado sin factura vigente (ninguna factura/remito no
-// anulado) es trabajo ya entregado pero todavia no facturado: el cliente
+// Una orden Finalizado sin factura vigente (ninguna Factura no anulada; un
+// Remito no cuenta) es trabajo ya entregado pero todavia no facturado: el cliente
 // puede terminar debiendolo y hoy no aparece en obtenerDeudaCliente porque
 // esa cuenta solo mira facturas ya emitidas. Mismo chequeo que
 // ordenYaFacturada en ordenes.ts, en sentido inverso.
@@ -221,6 +218,8 @@ export async function darDeBajaCliente(id_cliente: number) {
             }
 
             const { saldo, cantidadFacturas } = await obtenerDeudaCliente(tx, id_cliente);
+            // Las ordenes en curso (ESTADOS_ORDEN_EN_CURSO) ya cuentan por si
+            // solas como "sin cerrar", mas alla de la plata.
             const ordenesSinCerrar = await tx.orden_trabajo.count({
                 where: {
                     OR: [

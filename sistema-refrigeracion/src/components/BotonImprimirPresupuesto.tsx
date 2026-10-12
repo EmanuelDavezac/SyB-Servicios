@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { obtenerPresupuestoCompleto } from "@/actions/presupuestos";
 
 interface Props {
@@ -7,11 +8,13 @@ interface Props {
 }
 
 export default function BotonImprimirPresupuesto({ idPresupuesto }: Props) {
+    const [error, setError] = useState<string | null>(null);
 
     async function handleImprimir() {
+        setError(null);
         const presupuesto = await obtenerPresupuestoCompleto(idPresupuesto);
         if (!presupuesto) {
-            alert("No se pudo obtener los datos del presupuesto.");
+            setError("No se pudo obtener los datos del presupuesto.");
             return;
         }
 
@@ -344,12 +347,19 @@ export default function BotonImprimirPresupuesto({ idPresupuesto }: Props) {
     }
 
     return (
-        <button
-            onClick={handleImprimir}
-            title="Imprimir Presupuesto"
-            className="hover:text-blue-600 transition"
-        >
-            <i className="fas fa-print"></i>
-        </button>
+        <span className="inline-flex items-center gap-1">
+            <button
+                onClick={handleImprimir}
+                title="Imprimir Presupuesto"
+                className="hover:text-blue-600 transition"
+            >
+                <i className="fas fa-print"></i>
+            </button>
+            {error && (
+                <span role="alert" title={error} className="text-xs text-red-600 font-medium whitespace-nowrap">
+                    No se pudo imprimir
+                </span>
+            )}
+        </span>
     );
 }

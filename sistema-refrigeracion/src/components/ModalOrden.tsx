@@ -68,8 +68,9 @@ interface InsumoCatalogo {
 /** Insumo ya guardado en la BD (modo edición) */
 interface DetalleInsumo {
     id_detalle_ord_insumo: number;
-    id_insumo: number;
-    cantidad_usada: number;
+    id_insumo: number | null;
+    // Decimal serializado: llega como string desde obtenerInsumosDeOrden
+    cantidad_usada: number | string;
     precio_aplicado: number | string;
     alicuota_iva: number | string;
     insumo: { nombre: string } | null;
@@ -161,6 +162,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
+    const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
     /* campos de la orden */
@@ -233,6 +235,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         }
         resetPanel();
         setServiciosPendientes([]);
+        setErrorGuardar(null);
         setAbierto(true);
 
         const [cat, srvs, catInsumos, insumos] = await Promise.all([
@@ -307,6 +310,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     async function handleGuardar() {
         if (!idCliente) return;
         setCargando(true);
+        setErrorGuardar(null);
 
         if (modoEdicion && ordenInicial) {
             const res = await editarOrden(ordenInicial.id_orden, {
@@ -317,7 +321,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             setCargando(false);
             if (res.success) {
                 setAbierto(false);
-            } else alert("Error al guardar los cambios. Intentá de nuevo.");
+            } else setErrorGuardar(res.error || "Error al guardar los cambios. Intentá de nuevo.");
         } else {
             const res = await crearOrden({
                 id_cliente: Number(idCliente),
@@ -327,7 +331,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
             if (!res.success || !res.orden) {
                 setCargando(false);
-                alert("Error al crear la orden. Intentá de nuevo.");
+                setErrorGuardar(res.error || "Error al crear la orden. Intentá de nuevo.");
                 return;
             }
 
@@ -618,13 +622,13 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         precio: number;
         alicuota: number;
         pendiente: boolean;
-        id_insumo: number;
+        id_insumo: number | null;
         item: DetalleInsumo | InsumoPendiente;
     }[] = [
         ...insumosGuardados.map((d) => ({
             key: `gi-${d.id_detalle_ord_insumo}`,
             nombre: d.insumo?.nombre || "Insumo",
-            cantidad: d.cantidad_usada,
+            cantidad: Number(d.cantidad_usada),
             precio: parseFloat(String(d.precio_aplicado)),
             alicuota: parseFloat(String(d.alicuota_iva)),
             pendiente: false,
@@ -645,7 +649,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     // Aviso (no bloqueante, en la orden el stock todavia no se descuenta) si
     // la cantidad cargada supera el stock actual del insumo.
-    function stockDisponibleDe(id_insumo: number): number | null {
+    function stockDisponibleDe(id_insumo: number | null): number | null {
+        if (id_insumo === null) return null;
         const insumo = catalogoInsumos.find((i) => i.id_insumo === id_insumo);
         return insumo ? Number(insumo.stock_actual ?? 0) : null;
     }
@@ -1057,6 +1062,14 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         )}
                     </section>
                 </div>
+
+                {errorGuardar && (
+                    <div className="px-6 pt-3">
+                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 font-bold">
+                            {errorGuardar}
+                        </div>
+                    </div>
+                )}
 
                 <div className="modal-footer">
                     <button onClick={() => setAbierto(false)} className="btn-outline">

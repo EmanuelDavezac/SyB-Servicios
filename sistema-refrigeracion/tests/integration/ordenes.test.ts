@@ -8,10 +8,12 @@ import {
   quitarServicioDeOrden,
   agregarInsumoAOrden,
   quitarInsumoDeOrden,
+  eliminarOrden,
 } from "@/actions/ordenes";
 import { crearFactura, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
 import { anularFactura } from "@/actions/cobros";
-import { crearInsumo, crearServicio, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
+import { crearPresupuesto, cambiarEstadoPresupuesto, crearOrdenDesdePresupuesto } from "@/actions/presupuestos";
+import { crearCliente, crearInsumo, crearServicio, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
 
 const MENSAJE_FACTURADA = "ya está facturada";
 
@@ -219,5 +221,77 @@ describe("getOrdenesPendientesFacturacion", () => {
     const pendientes = await getOrdenesPendientesFacturacion();
 
     expect(pendientes.map((o: { id_orden: number }) => o.id_orden)).toContain(orden.id_orden);
+  });
+});
+
+describe("eliminarOrden", () => {
+  it("borra una orden sin comprobantes junto con sus lineas, sin tocar el stock", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({
+      estado_trabajo: "Pendiente",
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }],
+    });
+    expect(await contarLineas(orden.id_orden)).toEqual({ servicios: 1, insumos: 1 });
+
+    const resultado = await eliminarOrden(orden.id_orden);
+
+    expect(resultado).toEqual({ success: true });
+    expect(await prisma.orden_trabajo.findUnique({ where: { id_orden: orden.id_orden } })).toBeNull();
+    expect(await contarLineas(orden.id_orden)).toEqual({ servicios: 0, insumos: 0 });
+    const insumoFinal = await prisma.insumo.findUniqueOrThrow({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal.stock_actual)).toBe(10);
+  });
+
+  it("devuelve error si la orden no existe", async () => {
+    expect(await eliminarOrden(999999)).toEqual({ success: false, error: "La orden no existe." });
+  });
+
+  it.each([
+    { caso: "una Factura vigente", tipo: "Factura", estado_pago: "IMPAGA" },
+    { caso: "una Factura anulada", tipo: "Factura", estado_pago: "ANULADA" },
+    { caso: "un Remito", tipo: "Remito", estado_pago: "NO_APLICA" },
+  ])("rechaza una orden con $caso y no borra nada", async ({ tipo, estado_pago }) => {
+    const orden = await crearOrdenFinalizada();
+    await crearFacturaEmitida({ id_orden: orden.id_orden, tipo, estado_pago });
+
+    const resultado = await eliminarOrden(orden.id_orden);
+
+    expect(resultado).toEqual({
+      success: false,
+      error: `La orden #${orden.id_orden} tiene comprobantes asociados y no se puede eliminar.`,
+    });
+    expect(await prisma.orden_trabajo.findUnique({ where: { id_orden: orden.id_orden } })).not.toBeNull();
+    expect(await contarLineas(orden.id_orden)).toEqual({ servicios: 1, insumos: 1 });
+    expect(await prisma.factura.count({ where: { id_orden: orden.id_orden } })).toBe(1);
+  });
+
+  it("desvincula el presupuesto y permite volver a generar la orden", async () => {
+    const cliente = await crearCliente();
+    const creado = await crearPresupuesto({
+      destinatario: { id_cliente: cliente.id_cliente, nombre: `${cliente.nombre} ${cliente.apellido}` },
+      alicuota_iva: 21,
+      lineas: [{ cantidad: 1, descripcion: "Instalacion split", precio_unitario: 1000 }],
+    });
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+    const id_presupuesto = creado.presupuesto.id_presupuesto;
+    await cambiarEstadoPresupuesto(id_presupuesto, "ACEPTADO");
+
+    const primera = await crearOrdenDesdePresupuesto(id_presupuesto);
+    expect(primera.success).toBe(true);
+    if (!primera.success) return;
+
+    expect(await eliminarOrden(primera.orden.id_orden)).toEqual({ success: true });
+
+    const presupuesto = await prisma.presupuesto.findUniqueOrThrow({ where: { id_presupuesto } });
+    expect(presupuesto.id_orden).toBeNull();
+    expect(presupuesto.estado).toBe("ACEPTADO");
+
+    const segunda = await crearOrdenDesdePresupuesto(id_presupuesto);
+    expect(segunda.success).toBe(true);
+    if (!segunda.success) return;
+    expect(segunda.orden.id_orden).not.toBe(primera.orden.id_orden);
+    const presupuestoFinal = await prisma.presupuesto.findUniqueOrThrow({ where: { id_presupuesto } });
+    expect(presupuestoFinal.id_orden).toBe(segunda.orden.id_orden);
   });
 });

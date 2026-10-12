@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cambiarEstadoPresupuesto, eliminarPresupuesto, crearOrdenDesdePresupuesto } from "@/actions/presupuestos";
 import ModalPresupuesto from "@/components/ModalPresupuesto";
 import BotonImprimirPresupuesto from "@/components/BotonImprimirPresupuesto";
 import ModalClienteDesdePresupuesto from "@/components/ModalClienteDesdePresupuesto";
+import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 interface PresupuestoParaEditar {
     id_presupuesto: number;
@@ -19,59 +20,136 @@ interface PresupuestoParaEditar {
     fecha_emision: string;
     validez_dias: number;
     condicion_pago: string | null;
-    alicuota_iva: number;
+    alicuota_iva: number | string;
     observaciones: string | null;
     estado: string;
-    detalle_presupuesto: { cantidad: number; descripcion: string; precio_unitario: number }[];
+    detalle_presupuesto: { cantidad: number | string; descripcion: string; precio_unitario: number | string }[];
 }
 
 interface Props {
     presupuesto: PresupuestoParaEditar;
 }
 
+// Confirmaciones que puede abrir esta fila; una sola a la vez.
+type Confirmacion = "generarOrden" | "aceptar" | "rechazar" | "eliminar" | "altaCliente";
+
+const TEXTOS_CONFIRMACION: Record<Confirmacion, {
+    titulo: string;
+    mensaje: string;
+    labelConfirmar: string;
+    labelCancelar?: string;
+    labelProcesando: string;
+    iconoConfirmar: string;
+    tono: "peligro" | "neutro";
+}> = {
+    generarOrden: {
+        titulo: "Generar orden de trabajo",
+        mensaje: "¿Generar una orden de trabajo a partir de este presupuesto?",
+        labelConfirmar: "Generar orden",
+        labelProcesando: "Generando...",
+        iconoConfirmar: "fa-clipboard-list",
+        tono: "neutro",
+    },
+    aceptar: {
+        titulo: "Aceptar presupuesto",
+        mensaje: "¿Confirmás aceptar este presupuesto?",
+        labelConfirmar: "Aceptar",
+        labelProcesando: "Aceptando...",
+        iconoConfirmar: "fa-check",
+        tono: "neutro",
+    },
+    rechazar: {
+        titulo: "Rechazar presupuesto",
+        mensaje: "¿Confirmás rechazar este presupuesto?",
+        labelConfirmar: "Rechazar",
+        labelProcesando: "Rechazando...",
+        iconoConfirmar: "fa-xmark",
+        tono: "peligro",
+    },
+    eliminar: {
+        titulo: "Eliminar presupuesto",
+        mensaje: "¿Eliminar este presupuesto? Esta acción no se puede deshacer.",
+        labelConfirmar: "Eliminar",
+        labelProcesando: "Eliminando...",
+        iconoConfirmar: "fa-trash",
+        tono: "peligro",
+    },
+    altaCliente: {
+        titulo: "Presupuesto aceptado",
+        mensaje: "¿Querés agregar el destinatario a tu base de clientes?",
+        labelConfirmar: "Agregar cliente",
+        labelCancelar: "No, gracias",
+        labelProcesando: "Abriendo...",
+        iconoConfirmar: "fa-user-plus",
+        tono: "neutro",
+    },
+};
+
 export default function AccionesPresupuesto({ presupuesto }: Props) {
     const [editando, setEditando] = useState(false);
-    const [procesando, setProcesando] = useState(false);
+    const [procesando, startTransition] = useTransition();
     const [ofreciendoAltaCliente, setOfreciendoAltaCliente] = useState(false);
+    const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const esPendiente = presupuesto.estado === "PENDIENTE";
     const esAceptado = presupuesto.estado === "ACEPTADO";
     const puedeGenerarOrden = esAceptado && !!presupuesto.id_cliente && !presupuesto.id_orden;
 
-    async function handleGenerarOrden() {
-        if (!confirm("¿Generar una orden de trabajo a partir de este presupuesto?")) return;
-        setProcesando(true);
-        const resultado = await crearOrdenDesdePresupuesto(presupuesto.id_presupuesto);
-        setProcesando(false);
-        if (!resultado.success) {
-            alert(resultado.error || "No se pudo generar la orden de trabajo.");
-        }
+    function abrirConfirmacion(tipo: Confirmacion) {
+        setError(null);
+        setConfirmacion(tipo);
     }
 
-    async function handleCambiarEstado(estado: "ACEPTADO" | "RECHAZADO") {
-        const verbo = estado === "ACEPTADO" ? "aceptar" : "rechazar";
-        if (!confirm(`¿Confirmás ${verbo} este presupuesto?`)) return;
-        setProcesando(true);
-        const resultado = await cambiarEstadoPresupuesto(presupuesto.id_presupuesto, estado);
-        setProcesando(false);
-        if (!resultado.success) {
-            alert(resultado.error || `No se pudo ${verbo} el presupuesto.`);
+    function cerrarConfirmacion() {
+        setError(null);
+        setConfirmacion(null);
+    }
+
+    function handleConfirmar() {
+        const tipo = confirmacion;
+        if (!tipo) return;
+
+        if (tipo === "altaCliente") {
+            setConfirmacion(null);
+            setOfreciendoAltaCliente(true);
             return;
         }
-        if (estado === "ACEPTADO" && !presupuesto.id_cliente) {
-            if (confirm("Presupuesto aceptado. ¿Querés agregar el destinatario a tu base de clientes?")) {
-                setOfreciendoAltaCliente(true);
+
+        startTransition(async () => {
+            if (tipo === "generarOrden") {
+                const resultado = await crearOrdenDesdePresupuesto(presupuesto.id_presupuesto);
+                if (!resultado.success) {
+                    setError(resultado.error || "No se pudo generar la orden de trabajo.");
+                    return;
+                }
+                setConfirmacion(null);
+                return;
             }
-        }
+
+            if (tipo === "aceptar" || tipo === "rechazar") {
+                const estado = tipo === "aceptar" ? "ACEPTADO" : "RECHAZADO";
+                const resultado = await cambiarEstadoPresupuesto(presupuesto.id_presupuesto, estado);
+                if (!resultado.success) {
+                    setError(resultado.error || `No se pudo ${tipo} el presupuesto.`);
+                    return;
+                }
+                // Si el destinatario no es cliente, se ofrece darlo de alta.
+                setError(null);
+                setConfirmacion(estado === "ACEPTADO" && !presupuesto.id_cliente ? "altaCliente" : null);
+                return;
+            }
+
+            const resultado = await eliminarPresupuesto(presupuesto.id_presupuesto);
+            if (!resultado.success) {
+                setError(resultado.error || "No se pudo eliminar el presupuesto.");
+                return;
+            }
+            setConfirmacion(null);
+        });
     }
 
-    async function handleEliminar() {
-        if (!confirm("¿Eliminar este presupuesto? Esta acción no se puede deshacer.")) return;
-        setProcesando(true);
-        const resultado = await eliminarPresupuesto(presupuesto.id_presupuesto);
-        setProcesando(false);
-        if (!resultado.success) alert(resultado.error || "No se pudo eliminar el presupuesto.");
-    }
+    const textos = confirmacion ? TEXTOS_CONFIRMACION[confirmacion] : null;
 
     return (
         <div className="flex justify-end gap-3 text-lg opacity-70">
@@ -92,7 +170,7 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                 <>
                     <button
                         title="Aceptar"
-                        onClick={() => handleCambiarEstado("ACEPTADO")}
+                        onClick={() => abrirConfirmacion("aceptar")}
                         className="hover:text-green-600"
                         disabled={procesando}
                     >
@@ -100,7 +178,7 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                     </button>
                     <button
                         title="Rechazar"
-                        onClick={() => handleCambiarEstado("RECHAZADO")}
+                        onClick={() => abrirConfirmacion("rechazar")}
                         className="hover:text-red-600"
                         disabled={procesando}
                     >
@@ -108,7 +186,7 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                     </button>
                     <button
                         title="Eliminar"
-                        onClick={handleEliminar}
+                        onClick={() => abrirConfirmacion("eliminar")}
                         className="hover:text-red-700"
                         disabled={procesando}
                     >
@@ -120,7 +198,7 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
             {puedeGenerarOrden && (
                 <button
                     title="Generar orden de trabajo a partir de este presupuesto"
-                    onClick={handleGenerarOrden}
+                    onClick={() => abrirConfirmacion("generarOrden")}
                     className="hover:text-blue-600"
                     disabled={procesando}
                 >
@@ -142,6 +220,23 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                 <ModalPresupuesto
                     presupuestoAEditar={presupuesto}
                     onCerrar={() => setEditando(false)}
+                />
+            )}
+
+            {textos && (
+                <ModalConfirmacion
+                    isOpen
+                    titulo={textos.titulo}
+                    mensaje={textos.mensaje}
+                    labelConfirmar={textos.labelConfirmar}
+                    labelCancelar={textos.labelCancelar}
+                    labelProcesando={textos.labelProcesando}
+                    iconoConfirmar={textos.iconoConfirmar}
+                    tono={textos.tono}
+                    procesando={procesando}
+                    error={error}
+                    onConfirmar={handleConfirmar}
+                    onCancelar={cerrarConfirmacion}
                 />
             )}
 

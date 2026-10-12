@@ -2,6 +2,7 @@
 
 import { Prisma, type insumo as InsumoModel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, esTipoFacturable } from "@/lib/estadoFactura";
 import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
@@ -51,8 +52,8 @@ export async function getFacturas() {
       ],
     });
 
-    // We do JSON stringify/parse to handle Decimals correctly if needed in client components
-    return JSON.parse(JSON.stringify(facturas));
+    // JSON stringify/parse convierte los Decimal para poder pasarlos a Client Components
+    return serializar(facturas);
   } catch (error) {
     console.error("Error fetching facturas:", error);
     return [];
@@ -62,7 +63,7 @@ export async function getFacturas() {
 export async function getOrdenesPendientesFacturacion() {
   try {
         await requerirUsuario();
-    // Only fetch orders that are finished but don't have an invoice yet, or simply "Finalizada"
+    // Órdenes Finalizado que todavía no tienen una Factura vigente
     const ordenes = await prisma.orden_trabajo.findMany({
       where: {
         estado_trabajo: "Finalizado",
@@ -83,7 +84,7 @@ export async function getOrdenesPendientesFacturacion() {
       },
     });
 
-    // You can filter out orders that already have an invoice if business rules dictate 1:1 relation
+    // JSON stringify/parse convierte los Decimal para poder pasarlos a Client Components
     return JSON.parse(JSON.stringify(ordenes));
   } catch (error) {
     console.error("Error fetching ordenes pendientes de facturación:", error);

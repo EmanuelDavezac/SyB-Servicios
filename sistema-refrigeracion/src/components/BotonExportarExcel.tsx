@@ -1,25 +1,47 @@
 "use client";
 
 import * as XLSX from "xlsx";
+import type {
+  Movimiento,
+  obtenerPosicionIVA,
+  obtenerReporteClientes,
+  obtenerReporteServicios,
+} from "@/actions/reportes";
+
+type ResumenMensual = {
+  movimientos: Movimiento[];
+  balanceGeneral: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  totalFacturado: number;
+  totalFacturadoFiscal: number;
+  totalFacturadoInterno: number;
+};
+
+/** Datos a exportar según el tipo de reporte que se está viendo */
+export type ReporteExcel =
+  | { tipoReporte: "ingresos-egresos"; data: ResumenMensual }
+  | { tipoReporte: "servicios"; data: Awaited<ReturnType<typeof obtenerReporteServicios>> }
+  | { tipoReporte: "clientes"; data: Awaited<ReturnType<typeof obtenerReporteClientes>> }
+  | { tipoReporte: "iva"; data: Awaited<ReturnType<typeof obtenerPosicionIVA>> };
 
 interface Props {
-  data: any;
-  tipoReporte: string;
+  reporte: ReporteExcel | null;
   mes: string;
   anio: string;
 }
 
-export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Props) {
+export default function BotonExportarExcel({ reporte, mes, anio }: Props) {
   const exportar = () => {
-    if (!data) return;
+    if (!reporte) return;
 
     let ws: XLSX.WorkSheet;
     const wb = XLSX.utils.book_new();
-    let fileName = `Reporte_${tipoReporte}_${mes}_${anio}.xlsx`;
+    let fileName = `Reporte_${reporte.tipoReporte}_${mes}_${anio}.xlsx`;
 
-    if (tipoReporte === "ingresos-egresos") {
-      const { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado, totalFacturadoFiscal, totalFacturadoInterno } = data;
-      const rows = movimientos.map((m: any) => ({
+    if (reporte.tipoReporte === "ingresos-egresos") {
+      const { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado } = reporte.data;
+      const rows: Record<string, string | number>[] = movimientos.map((m) => ({
         Fecha: new Date(m.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" }),
         Comprobante: m.comprobante,
         Tipo: m.tipo_comprobante,
@@ -27,10 +49,10 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
         Ingreso: m.tipo_comprobante === "Ingreso" ? m.monto : "",
         Egreso: m.tipo_comprobante === "Egreso" ? m.monto : "",
       }));
-      
+
       // Filas en blanco para separar
       rows.push({ Fecha: "", Comprobante: "", Tipo: "", Entidad: "", Ingreso: "", Egreso: "" });
-      
+
       // Resumen estadistico
       rows.push({ Fecha: "", Comprobante: "", Tipo: "", Entidad: "TOTAL INGRESOS COBRADOS", Ingreso: totalIngresos, Egreso: "" });
       rows.push({ Fecha: "", Comprobante: "", Tipo: "", Entidad: "TOTAL EGRESOS INSUMOS", Ingreso: "", Egreso: totalEgresos });
@@ -38,17 +60,17 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
       rows.push({ Fecha: "", Comprobante: "", Tipo: "", Entidad: "TOTAL FACTURADO EMITIDO", Ingreso: totalFacturado, Egreso: "" });
 
       ws = XLSX.utils.json_to_sheet(rows);
-    } else if (tipoReporte === "servicios") {
-      const rows = data.map((o: any) => ({
+    } else if (reporte.tipoReporte === "servicios") {
+      const rows = reporte.data.map((o) => ({
         Fecha: new Date(o.fecha_creacion).toLocaleDateString("es-AR", { timeZone: "UTC" }),
         Orden: `#${o.id_orden}`,
         Cliente: o.cliente ? `${o.cliente.nombre} ${o.cliente.apellido}` : "",
-        Servicios: o.detalle_orden_servicio?.map((d:any) => d.servicio?.nombre).join(", ") || "",
+        Servicios: o.detalle_orden_servicio?.map((d) => d.servicio?.nombre).join(", ") || "",
         Estado: o.estado_trabajo
       }));
       ws = XLSX.utils.json_to_sheet(rows);
-    } else if (tipoReporte === "clientes") {
-      const rows = data.map((c: any) => ({
+    } else if (reporte.tipoReporte === "clientes") {
+      const rows = reporte.data.map((c) => ({
         Nombre: `${c.apellido || ""}, ${c.nombre || ""}`,
         "DNI / CUIT": c.cuit || "",
         Direccion: [c.calle ? `${c.calle} ${c.num_calle || ""}`.trim() : null, c.localidad].filter(Boolean).join(", "),
@@ -58,8 +80,8 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
       }));
       ws = XLSX.utils.json_to_sheet(rows);
       fileName = `Clientes_${mes}_${anio}.xlsx`;
-    } else if (tipoReporte === "iva") {
-      const { ventas, compras, retenciones } = data;
+    } else if (reporte.tipoReporte === "iva") {
+      const { ventas, compras, retenciones } = reporte.data;
       const rows = [
         { Categoria: "VENTAS", Concepto: "Importe Ventas (neto)", Monto: ventas.neto },
         { Categoria: "VENTAS", Concepto: "IVA Ventas", Monto: ventas.iva },
@@ -82,8 +104,8 @@ export default function BotonExportarExcel({ data, tipoReporte, mes, anio }: Pro
   };
 
   return (
-    <button 
-      onClick={exportar} 
+    <button
+      onClick={exportar}
       className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
       title="Exportar información a planilla de cálculos"
     >

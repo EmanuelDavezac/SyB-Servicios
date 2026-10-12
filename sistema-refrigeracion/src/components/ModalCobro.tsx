@@ -36,6 +36,8 @@ export default function ModalCobro({ clientes }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Se muestra junto al botón: el modal ya se cerró cuando falla la impresión.
+    const [errorImpresion, setErrorImpresion] = useState<string | null>(null);
 
     const [idCliente, setIdCliente] = useState("");
     const [observacion, setObservacion] = useState("");
@@ -182,7 +184,11 @@ export default function ModalCobro({ clientes }: Props) {
             // nunca la factura imputada (esa se imprime aparte desde
             // Comprobantes si hace falta).
             if (resultado.recibo?.id_recibo) {
-                imprimirRecibo(resultado.recibo.id_recibo);
+                const idRecibo = resultado.recibo.id_recibo;
+                const ok = await imprimirRecibo(idRecibo);
+                if (!ok) {
+                    setErrorImpresion(`El cobro se registró, pero no se pudo imprimir el recibo #${idRecibo}. Podés imprimirlo desde la lista de cobros.`);
+                }
             }
         } else {
             setError(resultado.error || "Error al registrar el cobro.");
@@ -191,12 +197,19 @@ export default function ModalCobro({ clientes }: Props) {
 
     return (
         <>
-            <button
-                onClick={() => { resetForm(); setAbierto(true); }}
-                className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition font-medium"
-            >
-                + Registrar Cobro
-            </button>
+            <span className="inline-flex items-center gap-3">
+                {errorImpresion && (
+                    <span role="alert" className="text-sm text-red-600 font-medium">
+                        {errorImpresion}
+                    </span>
+                )}
+                <button
+                    onClick={() => { resetForm(); setErrorImpresion(null); setAbierto(true); }}
+                    className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition font-medium"
+                >
+                    + Registrar Cobro
+                </button>
+            </span>
 
             {abierto && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-stretch md:items-center z-[9999] p-0 md:p-4">

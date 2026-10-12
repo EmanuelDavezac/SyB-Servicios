@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { obtenerDatosDashboard } from "@/actions/reportes";
+import { diasHastaFecha, fechaActualArgentina } from "@/lib/fechas";
 
 export default async function DashboardPage() {
   const { ordenesEnCurso, alertasStock, facturasPorVencer, cuentasPorCobrar } = await obtenerDatosDashboard();
@@ -7,17 +8,11 @@ export default async function DashboardPage() {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
 
-  const getDiasFaltantes = (fecha: string) => {
-    const fv = new Date(fecha);
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    fv.setHours(0, 0, 0, 0);
-    const diff = fv.getTime() - hoy.getTime();
-    return Math.ceil(diff / (1000 * 3600 * 24));
-  };
+  const hoy = fechaActualArgentina();
 
-  const getTextoVencimiento = (fecha: string) => {
-    const dias = getDiasFaltantes(fecha);
+  const getTextoVencimiento = (fecha: string | Date | null) => {
+    if (!fecha) return { texto: "Sin vencimiento", clase: "text-gray-500" };
+    const dias = diasHastaFecha(fecha, hoy);
     if (dias < 0) return { texto: "VENCIDA", clase: "text-red-600 font-bold" };
     if (dias === 0) return { texto: "Vence hoy", clase: "text-orange-600 font-bold" };
     if (dias === 1) return { texto: "Vence mañana", clase: "text-orange-500 font-medium" };
@@ -37,7 +32,7 @@ export default async function DashboardPage() {
           </h3>
           <ul className="space-y-3 flex-1">
             {ordenesEnCurso.length > 0 ? (
-              ordenesEnCurso.map((o: any) => (
+              ordenesEnCurso.map((o) => (
                 <li key={o.id_orden} className="flex justify-between items-center border-b border-gray-100 pb-2">
                   <span className="font-medium text-gray-700 truncate mr-2" title={`${o.cliente?.nombre} ${o.cliente?.apellido}`}>
                     {o.cliente?.nombre} {o.cliente?.apellido}
@@ -52,7 +47,7 @@ export default async function DashboardPage() {
               <p className="text-gray-400 text-sm">No hay trabajos pendientes.</p>
             )}
           </ul>
-          <Link href="/ordenes?estado=En proceso" className="block w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-semibold text-right">
+          <Link href="/ordenes?estado=en-curso" className="block w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-semibold text-right">
             Ver todas las órdenes &rarr;
           </Link>
         </div>
@@ -64,7 +59,7 @@ export default async function DashboardPage() {
           </h3>
           <ul className="space-y-3 flex-1">
             {alertasStock.length > 0 ? (
-              alertasStock.map((i: any) => (
+              alertasStock.map((i) => (
                 <li key={i.id_insumo} className="flex justify-between items-center border-b border-gray-100 pb-2">
                   <span className="text-gray-700 truncate mr-2" title={i.nombre}>{i.nombre}</span>
                   <span className="text-red-600 font-bold whitespace-nowrap">
@@ -88,7 +83,7 @@ export default async function DashboardPage() {
           </h3>
           <ul className="space-y-3 flex-1">
             {facturasPorVencer.length > 0 ? (
-              facturasPorVencer.map((f: any) => {
+              facturasPorVencer.map((f) => {
                 const info = getTextoVencimiento(f.fecha_vencimiento);
                 return (
                   <li key={f.id_factura} className="flex flex-col border-b border-gray-100 pb-2">
@@ -119,7 +114,7 @@ export default async function DashboardPage() {
           <p className="text-2xl font-bold text-slate-800 mb-4">{formatCurrency(cuentasPorCobrar.total)}</p>
           <ul className="space-y-3 flex-1">
             {cuentasPorCobrar.topClientes.length > 0 ? (
-              cuentasPorCobrar.topClientes.map((c: any) => (
+              cuentasPorCobrar.topClientes.map((c) => (
                 <li key={c.id_cliente} className="flex justify-between items-center border-b border-gray-100 pb-2">
                   <span className="font-medium text-gray-700 truncate mr-2" title={`${c.nombre} ${c.apellido}`}>
                     {c.nombre} {c.apellido}

@@ -19,7 +19,7 @@ export default async function CobrosPage() {
         obtenerCobros(),
     ]);
 
-    const totalDeuda = clientesConDeuda.reduce((acc: number, c: any) => acc + c.saldo, 0);
+    const totalDeuda = clientesConDeuda.reduce((acc, c) => acc + c.saldo, 0);
 
     return (
         <div className="p-8 pb-20 font-sans max-w-7xl mx-auto">
@@ -46,7 +46,7 @@ export default async function CobrosPage() {
                     {clientesConDeuda.length === 0 ? (
                         <div className="p-8 text-center text-gray-500">No hay cuentas pendientes.</div>
                     ) : (
-                        clientesConDeuda.map((c: any) => (
+                        clientesConDeuda.map((c) => (
                             <div key={c.id_cliente} className="border-b hover:bg-gray-50 text-sm">
                                 {/* Tarjeta móvil */}
                                 <div className="flex justify-between items-center p-4 md:hidden">
@@ -85,8 +85,8 @@ export default async function CobrosPage() {
                     {cobros.length === 0 ? (
                         <div className="p-8 text-center text-gray-500">Todavía no se registraron cobros.</div>
                     ) : (
-                        cobros.map((r: any) => {
-                            const facturasImputadas = r.pagos_parciales.map((p: any) => p.factura?.num_factura || `#${p.id_factura}`).join(", ");
+                        cobros.map((r) => {
+                            const facturasImputadas = r.pagos_parciales.map((p) => p.factura?.num_factura || `#${p.id_factura}`).join(", ");
                             const medioPago = formatearMediosDePago(r.recibo_medio_pago || [], r.forma_pago);
                             return (
                                 <div key={r.id_recibo} className="border-b hover:bg-gray-50 text-sm">

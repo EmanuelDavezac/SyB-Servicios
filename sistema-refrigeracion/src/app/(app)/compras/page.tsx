@@ -44,7 +44,7 @@ export default async function ComprasPage() {
                                 </td>
                             </tr>
                         ) : (
-                            compras.map((c: any) => {
+                            compras.map((c) => {
                                 const neto = c.neto !== null ? Number(c.neto) : null;
                                 const alicuota = c.alicuota_iva !== null ? Number(c.alicuota_iva) : null;
                                 const iva = neto !== null && alicuota !== null ? (neto * alicuota) / 100 : null;
@@ -57,7 +57,7 @@ export default async function ComprasPage() {
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-wrap gap-1">
-                                                {c.detalle_compra?.map((d: any) => (
+                                                {c.detalle_compra?.map((d) => (
                                                     <span key={d.id_detalle_compra} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">
                                                         {d.insumo?.nombre ?? "Insumo"} x{d.cantidad}
                                                     </span>

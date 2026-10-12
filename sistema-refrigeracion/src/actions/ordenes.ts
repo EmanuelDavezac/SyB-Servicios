@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
@@ -177,6 +178,49 @@ export async function editarOrden(id_orden: number, datos: {
     }
 }
 
+/**
+ * Borra una orden (por ejemplo, una cargada por error). Se rechaza si tiene
+ * cualquier comprobante en la tabla factura (Factura, Remito, Informe
+ * Tecnico, incluso anulados): la FK es onDelete: Restrict y esos comprobantes
+ * conservan su historial. Los presupuestos que la generaron se desvinculan
+ * (id_orden = null) para poder volver a generarla desde el presupuesto. Las
+ * lineas de detalle se borran en cascada y no se toca stock: las ordenes no
+ * lo mueven, solo la factura.
+ */
+export async function eliminarOrden(id_orden: number) {
+    try {
+        await requerirUsuario();
+
+        await prisma.$transaction(async (tx) => {
+            const orden = await tx.orden_trabajo.findUnique({
+                where: { id_orden },
+                select: { id_orden: true, _count: { select: { factura: true } } },
+            });
+            if (!orden) {
+                throw new Error("La orden no existe.");
+            }
+            if (orden._count.factura > 0) {
+                throw new Error(`La orden #${id_orden} tiene comprobantes asociados y no se puede eliminar.`);
+            }
+
+            await tx.presupuesto.updateMany({
+                where: { id_orden },
+                data: { id_orden: null },
+            });
+            await tx.orden_trabajo.delete({ where: { id_orden } });
+        });
+
+        revalidatePath("/ordenes");
+        revalidatePath("/");
+        revalidatePath("/presupuestos");
+        return { success: true };
+
+    } catch (error) {
+        console.error("Error al eliminar la orden:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo eliminar la orden" };
+    }
+}
+
 // Agrega un servicio existente a una orden (detalle_orden_servicio)
 export async function agregarServicioAOrden(datos: {
     id_orden: number;
@@ -332,7 +376,7 @@ export async function obtenerServiciosDeOrden(id_orden: number) {
             include: { servicio: true },
             orderBy: { id_detalle_srv: "asc" },
         });
-        return JSON.parse(JSON.stringify(detalles));
+        return serializar(detalles);
     } catch (error) {
         console.error("Error al obtener servicios de orden:", error);
         return [];
@@ -421,8 +465,8 @@ export async function obtenerInsumosDeOrden(id_orden: number) {
             include: { insumo: true },
             orderBy: { id_detalle_ins: "asc" },
         });
-        const detallesJson = JSON.parse(JSON.stringify(detalles));
-        return detallesJson.map((d: { id_detalle_ins: number }) => ({
+        const detallesJson = serializar(detalles);
+        return detallesJson.map((d) => ({
             ...d,
             id_detalle_ord_insumo: d.id_detalle_ins,
         }));

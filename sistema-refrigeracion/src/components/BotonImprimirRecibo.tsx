@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { obtenerReciboCompleto } from "@/actions/cobros";
 import { montoALetras } from "@/lib/numeroALetras";
 import { formatearMediosDePago } from "@/lib/cobros";
@@ -10,11 +11,11 @@ interface Props {
 
 const TOLERANCIA = 0.001;
 
-export async function imprimirRecibo(idRecibo: number) {
+/** Devuelve false si no se pudieron obtener los datos (el que llama muestra el error). */
+export async function imprimirRecibo(idRecibo: number): Promise<boolean> {
     const recibo = await obtenerReciboCompleto(idRecibo);
     if (!recibo) {
-        alert("No se pudo obtener los datos del recibo.");
-        return;
+        return false;
     }
 
     const cliente = recibo.cliente;
@@ -420,16 +421,32 @@ export async function imprimirRecibo(idRecibo: number) {
             }, 300);
         };
     }
+    return true;
 }
 
 export default function BotonImprimirRecibo({ idRecibo }: Props) {
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleImprimir() {
+        setError(null);
+        const ok = await imprimirRecibo(idRecibo);
+        if (!ok) setError("No se pudo obtener los datos del recibo.");
+    }
+
     return (
-        <button
-            onClick={() => imprimirRecibo(idRecibo)}
-            title="Imprimir Recibo"
-            className="hover:text-blue-600 transition"
-        >
-            <i className="fas fa-print"></i>
-        </button>
+        <span className="inline-flex items-center gap-1">
+            <button
+                onClick={handleImprimir}
+                title="Imprimir Recibo"
+                className="hover:text-blue-600 transition"
+            >
+                <i className="fas fa-print"></i>
+            </button>
+            {error && (
+                <span role="alert" title={error} className="text-xs text-red-600 font-medium whitespace-nowrap">
+                    No se pudo imprimir
+                </span>
+            )}
+        </span>
     );
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { calcularTotales, calcularVencimiento } from "@/lib/presupuestos";
 import { requerirUsuario } from "@/lib/sesion";
@@ -166,7 +167,7 @@ export async function obtenerPresupuestos(filtros?: {
             return { ...p, subtotal, monto_iva, total, fecha_vencimiento, vencido };
         });
 
-        return JSON.parse(JSON.stringify(conCalculados));
+        return serializar(conCalculados);
     } catch (error) {
         console.error("Error fetching presupuestos:", error);
         return [];

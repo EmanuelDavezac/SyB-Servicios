@@ -30,9 +30,9 @@ interface PresupuestoExistente {
     fecha_emision: string;
     validez_dias: number;
     condicion_pago: string | null;
-    alicuota_iva: number;
+    alicuota_iva: number | string;
     observaciones: string | null;
-    detalle_presupuesto: { cantidad: number; descripcion: string; precio_unitario: number }[];
+    detalle_presupuesto: { cantidad: number | string; descripcion: string; precio_unitario: number | string }[];
 }
 
 interface Props {

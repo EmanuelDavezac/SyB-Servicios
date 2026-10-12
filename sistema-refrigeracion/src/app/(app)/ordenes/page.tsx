@@ -1,8 +1,10 @@
 import { obtenerOrdenes, obtenerClientesActivos } from "@/actions/ordenes";
 import ModalOrden from "@/components/ModalOrden";
 import FiltrosOrdenes from "@/components/FiltrosOrdenes";
+import BotonEliminarOrden from "@/components/BotonEliminarOrden";
 import Link from "next/link";
 import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
+import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 // Colores por estado
 const ESTILOS_ESTADO: Record<string, string> = {
@@ -33,8 +35,10 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
         });
     }
 
-    // Filtro por estado
-    if (params.estado) {
+    // Filtro por estado ("en-curso" = Pendiente + En proceso, el link del dashboard)
+    if (params.estado === "en-curso") {
+        ordenes = ordenes.filter((orden) => ESTADOS_ORDEN_EN_CURSO.includes(orden.estado_trabajo || "Pendiente"));
+    } else if (params.estado) {
         ordenes = ordenes.filter((orden) => (orden.estado_trabajo || "Pendiente") === params.estado);
     }
 
@@ -86,12 +90,13 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                 const facturaVigente = orden.factura.find(
                                     (f) => esTipoFacturable(f.tipo) && f.estado_pago !== ESTADOS_FACTURA.ANULADA
                                 );
+                                const numeroOrden = String(orden.id_orden).padStart(5, "0");
                                 return (
                                 <tr key={orden.id_orden} className="border-b hover:bg-gray-50">
 
                                     {/* Número de orden */}
                                     <td className="p-4 font-bold text-gray-700">
-                                        #{String(orden.id_orden).padStart(5, "0")}
+                                        #{numeroOrden}
                                     </td>
 
                                     {/* Cliente */}
@@ -175,6 +180,17 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         )}
                                         </>
                                         )}
+
+                                        {/* Botón Eliminar → deshabilitado si la orden tiene cualquier comprobante (incluso anulado) */}
+                                        <BotonEliminarOrden
+                                            idOrden={orden.id_orden}
+                                            numeroOrden={numeroOrden}
+                                            motivoDeshabilitado={
+                                                orden.factura.length > 0
+                                                    ? "No se puede eliminar: la orden tiene comprobantes asociados (facturas, remitos o informes, incluso anulados)"
+                                                    : undefined
+                                            }
+                                        />
 
                                     </td>
 

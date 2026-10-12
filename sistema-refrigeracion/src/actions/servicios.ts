@@ -1,9 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { formatearListaConLimite } from "@/lib/formato";
+import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 export async function obtenerServicios(opciones?: {
     incluirInactivos?: boolean;
@@ -52,7 +54,7 @@ export async function obtenerServicios(opciones?: {
             include: { servicio_insumo: { include: { insumo: true } } },
         });
         // JSON round-trip convierte Decimal → number plano (serializable para Client Components)
-        return JSON.parse(JSON.stringify(servicios));
+        return serializar(servicios);
     } catch (error) {
         console.error("Error al obtener servicios:", error);
         return [];
@@ -190,8 +192,6 @@ function revalidarListadosDeServicios() {
     revalidatePath("/ordenes");
 }
 
-const ESTADOS_ORDEN_BLOQUEAN_SERVICIO = ["Pendiente", "En proceso"];
-
 /**
  * Baja logica (estado = false), nunca un delete. Se rechaza si el servicio
  * esta cargado en detalle_orden_servicio de alguna orden Pendiente o En
@@ -213,7 +213,7 @@ export async function darDeBajaServicio(id_servicio: number) {
 
             const ordenes = await tx.orden_trabajo.findMany({
                 where: {
-                    estado_trabajo: { in: ESTADOS_ORDEN_BLOQUEAN_SERVICIO },
+                    estado_trabajo: { in: ESTADOS_ORDEN_EN_CURSO },
                     detalle_orden_servicio: { some: { id_servicio } },
                 },
                 select: { id_orden: true },

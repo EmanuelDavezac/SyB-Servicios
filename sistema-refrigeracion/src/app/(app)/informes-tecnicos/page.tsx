@@ -41,7 +41,7 @@ export default async function InformesTecnicosPage() {
                         Todavía no se cargaron informes técnicos.
                     </div>
                 ) : (
-                    informes.map((informe: any) => {
+                    informes.map((informe) => {
                         const anulado = informe.estado === "ANULADO";
                         const numero = (
                             <>

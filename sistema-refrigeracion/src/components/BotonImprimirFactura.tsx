@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { getFacturaCompleta } from "@/actions/facturacion";
 import { montoALetras } from "@/lib/numeroALetras";
 
@@ -7,16 +8,16 @@ interface Props {
     idFactura: number;
 }
 
-export async function imprimirComprobante(idFactura: number) {
+/** Devuelve false si no se pudieron obtener los datos (el que llama muestra el error). */
+export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         const factura = await getFacturaCompleta(idFactura);
         if (!factura) {
-            alert("No se pudo obtener los datos de la factura.");
-            return;
+            return false;
         }
 
         if (factura.tipo === "Recibo") {
             imprimirComoRecibo(factura);
-            return;
+            return true;
         }
 
         const esInformeTecnico = factura.tipo === "Informe Tecnico";
@@ -497,6 +498,7 @@ export async function imprimirComprobante(idFactura: number) {
 </html>`;
 
         imprimirHTML(html);
+        return true;
 }
 
 function imprimirHTML(html: string) {
@@ -733,13 +735,28 @@ function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFa
 }
 
 export default function BotonImprimirFactura({ idFactura }: Props) {
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleImprimir() {
+        setError(null);
+        const ok = await imprimirComprobante(idFactura);
+        if (!ok) setError("No se pudo obtener los datos de la factura.");
+    }
+
     return (
-        <button
-            onClick={() => imprimirComprobante(idFactura)}
-            title="Imprimir Comprobante"
-            className="hover:text-blue-600 transition"
-        >
-            <i className="fas fa-print"></i>
-        </button>
+        <span className="inline-flex items-center gap-1">
+            <button
+                onClick={handleImprimir}
+                title="Imprimir Comprobante"
+                className="hover:text-blue-600 transition"
+            >
+                <i className="fas fa-print"></i>
+            </button>
+            {error && (
+                <span role="alert" title={error} className="text-xs text-red-600 font-medium whitespace-nowrap">
+                    No se pudo imprimir
+                </span>
+            )}
+        </span>
     );
 }

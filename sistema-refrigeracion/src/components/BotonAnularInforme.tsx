@@ -1,35 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { anularInformeTecnico } from "@/actions/informesTecnicos";
+import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 interface Props {
     idInforme: number;
 }
 
 export default function BotonAnularInforme({ idInforme }: Props) {
-    const [cargando, setCargando] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    async function handleAnular() {
-        if (!confirm("¿Anular este informe técnico?")) return;
+    function handleAbrir() {
+        setError(null);
+        setShowConfirm(true);
+    }
 
-        setCargando(true);
-        const resultado = await anularInformeTecnico(idInforme);
-        setCargando(false);
+    function handleCancelar() {
+        setError(null);
+        setShowConfirm(false);
+    }
 
-        if (!resultado.success) {
-            alert(resultado.error || "Error al anular el informe.");
-        }
+    function handleConfirmar() {
+        startTransition(async () => {
+            const resultado = await anularInformeTecnico(idInforme);
+            if (!resultado.success) {
+                setError(resultado.error || "Error al anular el informe.");
+                return;
+            }
+            setShowConfirm(false);
+        });
     }
 
     return (
-        <button
-            onClick={handleAnular}
-            disabled={cargando}
-            title="Anular informe"
-            className="text-red-500 hover:text-red-700 transition disabled:opacity-50"
-        >
-            {cargando ? "..." : <i className="fas fa-ban"></i>}
-        </button>
+        <>
+            <button
+                onClick={handleAbrir}
+                disabled={isPending}
+                title="Anular informe"
+                className="text-red-500 hover:text-red-700 transition disabled:opacity-50"
+            >
+                {isPending ? "..." : <i className="fas fa-ban"></i>}
+            </button>
+
+            <ModalConfirmacion
+                isOpen={showConfirm}
+                titulo="Anular informe técnico"
+                mensaje="¿Anular este informe técnico?"
+                labelConfirmar="Anular informe"
+                labelProcesando="Anulando..."
+                iconoConfirmar="fa-ban"
+                procesando={isPending}
+                error={error}
+                onConfirmar={handleConfirmar}
+                onCancelar={handleCancelar}
+            />
+        </>
     );
 }

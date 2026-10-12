@@ -1,35 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { anularFactura } from "@/actions/cobros";
+import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 interface Props {
     idFactura: number;
 }
 
 export default function BotonAnularFactura({ idFactura }: Props) {
-    const [cargando, setCargando] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    async function handleAnular() {
-        if (!confirm("¿Anular este comprobante? Se devolverá al stock los insumos descontados.")) return;
+    function handleAbrir() {
+        setError(null);
+        setShowConfirm(true);
+    }
 
-        setCargando(true);
-        const resultado = await anularFactura(idFactura);
-        setCargando(false);
+    function handleCancelar() {
+        setError(null);
+        setShowConfirm(false);
+    }
 
-        if (!resultado.success) {
-            alert(resultado.error || "Error al anular el comprobante.");
-        }
+    function handleConfirmar() {
+        startTransition(async () => {
+            const resultado = await anularFactura(idFactura);
+            if (!resultado.success) {
+                setError(resultado.error || "Error al anular el comprobante.");
+                return;
+            }
+            setShowConfirm(false);
+        });
     }
 
     return (
-        <button
-            onClick={handleAnular}
-            disabled={cargando}
-            title="Anular comprobante"
-            className="text-red-500 hover:text-red-700 transition disabled:opacity-50"
-        >
-            {cargando ? "..." : <i className="fas fa-ban"></i>}
-        </button>
+        <>
+            <button
+                onClick={handleAbrir}
+                disabled={isPending}
+                title="Anular comprobante"
+                className="text-red-500 hover:text-red-700 transition disabled:opacity-50"
+            >
+                {isPending ? "..." : <i className="fas fa-ban"></i>}
+            </button>
+
+            <ModalConfirmacion
+                isOpen={showConfirm}
+                titulo="Anular comprobante"
+                mensaje="¿Anular este comprobante? Se devolverá al stock los insumos descontados."
+                labelConfirmar="Anular comprobante"
+                labelProcesando="Anulando..."
+                iconoConfirmar="fa-ban"
+                procesando={isPending}
+                error={error}
+                onConfirmar={handleConfirmar}
+                onCancelar={handleCancelar}
+            />
+        </>
     );
 }

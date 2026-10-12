@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 
@@ -12,7 +13,7 @@ export async function obtenerInformesTecnicos() {
       orderBy: { fecha: "desc" },
     });
 
-    return JSON.parse(JSON.stringify(informes));
+    return serializar(informes);
   } catch (error) {
     console.error("Error obteniendo informes técnicos:", error);
     return [];

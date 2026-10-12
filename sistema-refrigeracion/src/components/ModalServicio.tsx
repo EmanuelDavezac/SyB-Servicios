@@ -10,7 +10,7 @@ interface ServicioInicial {
     nombre: string;
     descripcion: string | null;
     precio: number;
-    servicio_insumo?: { id_insumo: number; cantidad: number; insumo: { nombre: string } | null }[];
+    servicio_insumo?: { id_insumo: number; cantidad: number | string; insumo: { nombre: string } | null }[];
 }
 
 interface InsumoCatalogo {
@@ -38,6 +38,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [errores, setErrores] = useState<{ nombre?: string }>({});
+    const [error, setError] = useState<string | null>(null);
 
     const [nombre, setNombre] = useState(servicioInicial?.nombre ?? "");
     const [descripcion, setDescripcion] = useState(servicioInicial?.descripcion ?? "");
@@ -68,6 +69,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
             setReceta([]);
         }
         setErrores({});
+        setError(null);
         obtenerInsumos().then((data) => setInsumosDisponibles(data as InsumoCatalogo[]));
         setAbierto(true);
     }
@@ -97,6 +99,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
     async function handleGuardar() {
         if (!nombre.trim() || !precio) return;
         setErrores({});
+        setError(null);
         setCargando(true);
 
         const datos = {
@@ -114,7 +117,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
             if (resultado.error?.toLowerCase().includes("nombre")) {
                 setErrores({ nombre: resultado.error });
             } else {
-                alert(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio."));
+                setError(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio."));
             }
             return;
         }
@@ -164,6 +167,12 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
 
                 {/* Cuerpo */}
                 <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 font-bold">
+                            {error}
+                        </div>
+                    )}
 
                     {/* ── Datos del servicio ── */}
                     <section>

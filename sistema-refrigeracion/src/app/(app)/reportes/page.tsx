@@ -1,6 +1,6 @@
-import { obtenerReporteMensual, obtenerReporteServicios, obtenerPosicionIVA, obtenerReporteClientes, obtenerZonasClientes } from "@/actions/reportes";
+import { obtenerReporteMensual, obtenerReporteServicios, obtenerPosicionIVA, obtenerReporteClientes, obtenerZonasClientes, type Movimiento } from "@/actions/reportes";
 import BotonImprimirReporte from "@/components/BotonImprimirReporte";
-import BotonExportarExcel from "@/components/BotonExportarExcel";
+import BotonExportarExcel, { type ReporteExcel } from "@/components/BotonExportarExcel";
 
 export default async function ReportesPage({
     searchParams,
@@ -18,16 +18,16 @@ export default async function ReportesPage({
     const zonaSeleccionada = params?.zona || "";
 
     // Cargar datos de DB
-    let movimientos: any[] = [];
+    let movimientos: Movimiento[] = [];
     let totalIngresos = 0;
     let totalEgresos = 0;
     let balanceGeneral = 0;
     let totalFacturado = 0;
     let totalFacturadoFiscal = 0;
     let totalFacturadoInterno = 0;
-    let ordenesFinalizadas: any[] = [];
+    let ordenesFinalizadas: Awaited<ReturnType<typeof obtenerReporteServicios>> = [];
     let posicionIva: Awaited<ReturnType<typeof obtenerPosicionIVA>> | null = null;
-    let clientesReporte: any[] = [];
+    let clientesReporte: Awaited<ReturnType<typeof obtenerReporteClientes>> = [];
     let zonasDisponibles: string[] = [];
 
     if (tipoReporte === "servicios") {
@@ -68,11 +68,12 @@ export default async function ReportesPage({
     const mesActualNombre = meses.find(m => m.id === mesSeleccionado)?.nombre || '';
     const anios = Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - 2 + i); // Desde 2 años atras hasta 3 adelante
 
-    const excelData = tipoReporte === "ingresos-egresos" ? { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado, totalFacturadoFiscal, totalFacturadoInterno }
-                    : tipoReporte === "servicios" ? ordenesFinalizadas
-                    : tipoReporte === "clientes" ? clientesReporte
-                    : tipoReporte === "iva" ? posicionIva 
-                    : null;
+    const reporteExcel: ReporteExcel | null =
+        tipoReporte === "ingresos-egresos" ? { tipoReporte: "ingresos-egresos", data: { movimientos, balanceGeneral, totalIngresos, totalEgresos, totalFacturado, totalFacturadoFiscal, totalFacturadoInterno } }
+        : tipoReporte === "servicios" ? { tipoReporte: "servicios", data: ordenesFinalizadas }
+        : tipoReporte === "clientes" ? { tipoReporte: "clientes", data: clientesReporte }
+        : tipoReporte === "iva" && posicionIva ? { tipoReporte: "iva", data: posicionIva }
+        : null;
 
     return (
         <div className="space-y-6 print:space-y-4 print:block">
@@ -82,8 +83,7 @@ export default async function ReportesPage({
                 <div className="flex gap-3 print:hidden">
                     <BotonImprimirReporte />
                     <BotonExportarExcel 
-                        data={excelData} 
-                        tipoReporte={tipoReporte} 
+                        reporte={reporteExcel}
                         mes={mesActualNombre} 
                         anio={anioSeleccionado.toString()} 
                     />
@@ -250,7 +250,7 @@ export default async function ReportesPage({
                                     <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No hay clientes con los filtros actuales.</td>
                                 </tr>
                             ) : (
-                                clientesReporte.map((c: any) => {
+                                clientesReporte.map((c) => {
                                     const direccion = [c.calle ? `${c.calle} ${c.num_calle || ""}`.trim() : null, c.localidad]
                                         .filter(Boolean)
                                         .join(", ") || "—";
@@ -305,7 +305,7 @@ export default async function ReportesPage({
                                             <td className="px-4 py-4">{orden.cliente?.nombre} {orden.cliente?.apellido}</td>
                                             <td className="px-4 py-4">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {orden.detalle_orden_servicio?.map((d: any) => (
+                                                    {orden.detalle_orden_servicio?.map((d) => (
                                                         <span key={d.id_detalle_srv} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">
                                                             {d.servicio?.nombre}
                                                         </span>

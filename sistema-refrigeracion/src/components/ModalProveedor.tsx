@@ -25,6 +25,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [errores, setErrores] = useState<{ cuit?: string; email?: string }>({});
+    const [error, setError] = useState<string | null>(null);
 
     const [razonSocial, setRazonSocial] = useState(proveedorInicial?.razon_social ?? "");
     const [nombreProveedor, setNombreProveedor] = useState(proveedorInicial?.nombre_proveedor ?? "");
@@ -42,6 +43,8 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
             setTelefono(proveedorInicial.telefono ?? "");
             setEmail(proveedorInicial.email ?? "");
         }
+        setError(null);
+        setErrores({});
         setAbierto(true);
     }
 
@@ -53,6 +56,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
             return;
         }
         setErrores({});
+        setError(null);
         setCargando(true);
 
         const datos = {
@@ -79,7 +83,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
         } else if (resultado.error?.toLowerCase().includes("email")) {
             setErrores({ email: resultado.error });
         } else {
-            alert(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el proveedor."));
+            setError(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el proveedor."));
         }
     }
 
@@ -111,6 +115,12 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
 
                 {/* Cuerpo */}
                 <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 font-bold">
+                            {error}
+                        </div>
+                    )}
 
                     {/* ── Datos del proveedor ── */}
                     <section>

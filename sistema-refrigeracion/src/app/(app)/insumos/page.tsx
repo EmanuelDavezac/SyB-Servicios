@@ -159,7 +159,7 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                                                     (ModalInsumo lo marca "(inactivo)") para no perder el dato
                                                     al guardar sin tocar ese campo. */}
                                                 <ModalInsumo
-                                                    insumoAEditar={insumo as any}
+                                                    insumoAEditar={insumo}
                                                     proveedores={
                                                         insumo.proveedor && insumo.proveedor.estado === false && !proveedoresActivos.some((p) => p.id_proveedor === insumo.proveedor!.id_proveedor)
                                                             ? [...proveedoresActivos, insumo.proveedor]

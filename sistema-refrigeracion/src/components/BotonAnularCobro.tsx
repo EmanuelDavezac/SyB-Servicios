@@ -1,35 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { anularCobro } from "@/actions/cobros";
+import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 interface Props {
     idRecibo: number;
 }
 
 export default function BotonAnularCobro({ idRecibo }: Props) {
-    const [cargando, setCargando] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    async function handleAnular() {
-        if (!confirm("¿Anular este recibo? Se recalculará el saldo de las facturas imputadas.")) return;
+    function handleAbrir() {
+        setError(null);
+        setShowConfirm(true);
+    }
 
-        setCargando(true);
-        const resultado = await anularCobro(idRecibo);
-        setCargando(false);
+    function handleCancelar() {
+        setError(null);
+        setShowConfirm(false);
+    }
 
-        if (!resultado.success) {
-            alert(resultado.error || "Error al anular el cobro.");
-        }
+    function handleConfirmar() {
+        startTransition(async () => {
+            const resultado = await anularCobro(idRecibo);
+            if (!resultado.success) {
+                setError(resultado.error || "Error al anular el cobro.");
+                return;
+            }
+            setShowConfirm(false);
+        });
     }
 
     return (
-        <button
-            onClick={handleAnular}
-            disabled={cargando}
-            title="Anular recibo"
-            className="text-red-500 hover:text-red-700 transition disabled:opacity-50 text-sm font-medium"
-        >
-            {cargando ? "..." : "Anular"}
-        </button>
+        <>
+            <button
+                onClick={handleAbrir}
+                disabled={isPending}
+                title="Anular recibo"
+                className="text-red-500 hover:text-red-700 transition disabled:opacity-50 text-sm font-medium"
+            >
+                {isPending ? "..." : "Anular"}
+            </button>
+
+            <ModalConfirmacion
+                isOpen={showConfirm}
+                titulo="Anular recibo"
+                mensaje="¿Anular este recibo? Se recalculará el saldo de las facturas imputadas."
+                labelConfirmar="Anular recibo"
+                labelProcesando="Anulando..."
+                iconoConfirmar="fa-ban"
+                procesando={isPending}
+                error={error}
+                onConfirmar={handleConfirmar}
+                onCancelar={handleCancelar}
+            />
+        </>
     );
 }

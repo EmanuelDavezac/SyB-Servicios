@@ -49,7 +49,7 @@ export default async function PresupuestosPage({
                         No se encontraron presupuestos con los filtros actuales.
                     </div>
                 ) : (
-                    presupuestos.map((p: any) => {
+                    presupuestos.map((p) => {
                         let badgeColor = "bg-gray-200 text-gray-800";
                         switch (p.estado) {
                             case "PENDIENTE": badgeColor = "bg-yellow-100 text-yellow-800 border border-yellow-200"; break;

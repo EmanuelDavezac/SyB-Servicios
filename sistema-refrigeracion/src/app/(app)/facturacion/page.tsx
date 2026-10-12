@@ -16,7 +16,7 @@ type FilaComprobante = {
     tipo: string | null;
     fecha: string | Date;
     fecha_vencimiento: string | Date | null;
-    comprobante: string;
+    comprobante: string | null;
     nombreCliente: string;
     textoBusqueda: string;
     total: number | null;
@@ -51,8 +51,8 @@ export default async function FacturacionPage({
     // Los informes técnicos son solo texto (no se cobran, no generan deuda):
     // tienen su propia sección en /informes-tecnicos y no aparecen acá.
     const filasFactura: FilaComprobante[] = facturasOriginales
-        .filter((f: any) => f.tipo !== "Informe Tecnico")
-        .map((f: any) => {
+        .filter((f) => f.tipo !== "Informe Tecnico")
+        .map((f) => {
         const cliente = f.orden_trabajo?.cliente;
         const nombreCliente = cliente
             ? `${cliente.nombre} ${cliente.apellido}`
@@ -75,7 +75,7 @@ export default async function FacturacionPage({
         };
     });
 
-    const filasRecibo: FilaComprobante[] = recibosOriginales.map((r: any) => {
+    const filasRecibo: FilaComprobante[] = recibosOriginales.map((r) => {
         const nombreCliente = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Desconocido";
         return {
             key: `recibo-${r.id_recibo}`,

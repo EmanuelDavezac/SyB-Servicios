@@ -1,8 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
+import type { insumo } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
 import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 export type Movimiento = {
     id: string;
@@ -73,7 +76,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         let totalEgresos = 0;
 
         for (const r of recibos) {
-            const sumRetenciones = r.retencion?.reduce((a: number, c: any) => a + Number(c.monto), 0) || 0;
+            const sumRetenciones = r.retencion?.reduce((a, c) => a + Number(c.monto), 0) || 0;
             const monto = Math.max(0, Number(r.monto_total) - sumRetenciones);
             totalIngresos += monto;
             const clienteNombre = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Sin Cliente";
@@ -139,11 +142,11 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
 export async function obtenerDatosDashboard() {
     try {
         await requerirUsuario();
-        // 1. Trabajos en Curso (Latest 5 orders not finished)
+        // 1. Trabajos en Curso (las 5 órdenes Pendiente/En proceso más recientes)
         const ordenesEnCurso = await prisma.orden_trabajo.findMany({
             where: {
                 estado_trabajo: {
-                    notIn: ["Finalizado", "Entregado", "Anulado"]
+                    in: ESTADOS_ORDEN_EN_CURSO
                 }
             },
             include: {
@@ -157,7 +160,7 @@ export async function obtenerDatosDashboard() {
 
         // 2. Alertas de Stock Bajo (Insumos where stock_actual <= stock_minimo)
         // Usamos queryRaw para comparar dos columnas directamente en la DB
-        const alertasStock = await prisma.$queryRaw<any[]>`
+        const alertasStock = await prisma.$queryRaw<insumo[]>`
             SELECT * FROM insumo 
             WHERE stock_actual <= stock_minimo 
             AND estado = true 
@@ -219,9 +222,9 @@ export async function obtenerDatosDashboard() {
             .slice(0, 5);
 
         return {
-            ordenesEnCurso: JSON.parse(JSON.stringify(ordenesEnCurso)),
-            alertasStock: JSON.parse(JSON.stringify(alertasStock)),
-            facturasPorVencer: JSON.parse(JSON.stringify(facturasPorVencer)),
+            ordenesEnCurso: serializar(ordenesEnCurso),
+            alertasStock: serializar(alertasStock),
+            facturasPorVencer: serializar(facturasPorVencer),
             cuentasPorCobrar: {
                 total: totalCuentasPorCobrar,
                 topClientes: topClientesConDeuda,
@@ -363,7 +366,7 @@ export async function obtenerReporteServicios(mes: number, anio: number) {
                 };
             });
 
-        return JSON.parse(JSON.stringify(ordenes));
+        return serializar(ordenes);
     } catch (error) {
         console.error("Error al obtener reporte de servicios:", error);
         return [];
@@ -393,7 +396,7 @@ export async function obtenerReporteClientes(filtros: {
             orderBy: { apellido: "asc" },
         });
 
-        return JSON.parse(JSON.stringify(clientes));
+        return serializar(clientes);
     } catch (error) {
         console.error("Error al obtener reporte de clientes:", error);
         return [];

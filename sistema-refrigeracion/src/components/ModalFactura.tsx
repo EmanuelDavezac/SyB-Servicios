@@ -194,8 +194,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     /* Cargar servicios e insumos de la orden al seleccionarla */
     useEffect(() => {
         if (idOrden) {
-            obtenerInsumosDeOrden(Number(idOrden)).then((data: any) => setInsumosDeOrden(data));
-            obtenerServiciosDeOrden(Number(idOrden)).then((data: any) => setServiciosDeOrden(data));
+            obtenerInsumosDeOrden(Number(idOrden)).then((data) => setInsumosDeOrden(data));
+            obtenerServiciosDeOrden(Number(idOrden)).then((data) => setServiciosDeOrden(data));
         } else {
             setInsumosDeOrden([]);
             setServiciosDeOrden([]);

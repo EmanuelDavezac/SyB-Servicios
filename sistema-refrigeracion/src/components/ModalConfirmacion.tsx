@@ -8,6 +8,13 @@ interface ModalConfirmacionProps {
     titulo?: string;
     mensaje: string;
     labelConfirmar?: string;
+    labelCancelar?: string;
+    /** Texto junto al spinner mientras se procesa */
+    labelProcesando?: string;
+    /** Clase de Font Awesome del botón de confirmar (ej. "fa-ban", "fa-check") */
+    iconoConfirmar?: string;
+    /** "peligro" (rojo, para eliminar/anular) o "neutro" (azul, para confirmar una acción no destructiva) */
+    tono?: "peligro" | "neutro";
     onConfirmar: () => void;
     onCancelar: () => void;
     /** Muestra un spinner en el botón de confirmar mientras se procesa */
@@ -16,16 +23,34 @@ interface ModalConfirmacionProps {
     error?: string | null;
 }
 
+const ESTILOS_TONO = {
+    peligro: {
+        fondoIcono: "#fef2f2",
+        icono: "fas fa-exclamation-triangle text-red-500",
+        boton: "bg-red-500 hover:bg-red-600 active:bg-red-700",
+    },
+    neutro: {
+        fondoIcono: "#eff6ff",
+        icono: "fas fa-question-circle text-blue-500",
+        boton: "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+    },
+};
+
 export default function ModalConfirmacion({
     isOpen,
     titulo = "Confirmar acción",
     mensaje,
     labelConfirmar = "Eliminar",
+    labelCancelar = "Cancelar",
+    labelProcesando = "Eliminando...",
+    iconoConfirmar = "fa-trash",
+    tono = "peligro",
     onConfirmar,
     onCancelar,
     procesando = false,
     error = null,
 }: ModalConfirmacionProps) {
+    const estilos = ESTILOS_TONO[tono];
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -52,9 +77,9 @@ export default function ModalConfirmacion({
                 <div className="flex flex-col items-center pt-7 pb-4 px-6 text-center">
                     <div
                         className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-                        style={{ backgroundColor: "#fef2f2" }}
+                        style={{ backgroundColor: estilos.fondoIcono }}
                     >
-                        <i className="fas fa-exclamation-triangle text-red-500 text-2xl" />
+                        <i className={`${estilos.icono} text-2xl`} />
                     </div>
 
                     <h3 className="text-lg font-bold text-gray-800 mb-2">{titulo}</h3>
@@ -74,22 +99,22 @@ export default function ModalConfirmacion({
                         disabled={procesando}
                         className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Cancelar
+                        {labelCancelar}
                     </button>
                     <button
                         type="button"
                         onClick={onConfirmar}
                         disabled={procesando}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold text-sm transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={`flex-1 px-4 py-2.5 rounded-xl ${estilos.boton} text-white font-semibold text-sm transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed`}
                     >
                         {procesando ? (
                             <>
                                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Eliminando...
+                                {labelProcesando}
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-trash text-xs" />
+                                <i className={`fas ${iconoConfirmar} text-xs`} />
                                 {labelConfirmar}
                             </>
                         )}

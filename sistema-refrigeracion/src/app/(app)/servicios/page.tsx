@@ -64,7 +64,7 @@ export default async function ServiciosPage({
                                 </td>
                             </tr>
                         ) : (
-                            servicios.map((srv: any) => (
+                            servicios.map((srv) => (
                                 <tr key={srv.id_servicio} className={`border-b hover:bg-gray-50 ${!srv.estado ? "bg-gray-50 text-gray-400" : ""}`}>
                                     {/* Nombre */}
                                     <td className="p-4 font-bold text-gray-800">

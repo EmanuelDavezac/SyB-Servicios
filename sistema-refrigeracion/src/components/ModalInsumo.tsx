@@ -11,10 +11,9 @@ type Insumo = {
     descripcion: string | null;
     stock_actual: number | null;
     stock_minimo: number | null;
-    precio_costo: any;
-    precio_venta: any;
-    estado?: boolean;
-    proveedor?: any;
+    precio_costo: number;
+    precio_venta: number;
+    estado?: boolean | null;
 };
 
 type Proveedor = {

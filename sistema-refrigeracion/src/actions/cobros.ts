@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoFactura";
 import type { Prisma } from "@prisma/client";
@@ -399,7 +400,7 @@ export async function obtenerCobros() {
       orderBy: { fecha_pago: "desc" },
     });
 
-    return JSON.parse(JSON.stringify(recibos));
+    return serializar(recibos);
   } catch (error) {
     console.error("Error obteniendo cobros:", error);
     return [];

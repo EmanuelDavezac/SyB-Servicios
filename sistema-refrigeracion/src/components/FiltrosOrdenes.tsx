@@ -39,6 +39,7 @@ export default function FiltrosOrdenes() {
                 className="border p-2 rounded w-full md:w-1/4 outline-none focus:border-blue-500"
             >
                 <option value="">Todos los Estados</option>
+                <option value="en-curso">En curso (Pendiente + En proceso)</option>
                 <option value="Pendiente">Pendiente</option>
                 <option value="En proceso">En proceso</option>
                 <option value="Finalizado">Finalizado</option>

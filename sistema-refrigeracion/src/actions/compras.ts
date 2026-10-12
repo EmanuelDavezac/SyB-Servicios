@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
@@ -17,7 +18,7 @@ export async function obtenerCompras() {
             orderBy: { fecha_compra: "desc" },
         });
 
-        return JSON.parse(JSON.stringify(compras));
+        return serializar(compras);
     } catch (error) {
         console.error("Error al obtener compras:", error);
         return [];
