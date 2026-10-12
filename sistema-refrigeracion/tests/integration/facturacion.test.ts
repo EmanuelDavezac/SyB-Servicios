@@ -407,22 +407,6 @@ describe("crearFactura", () => {
     expect(segunda.success).toBe(true);
   });
 
-  // Bug conocido con issue abierto: no valida stock suficiente antes de
-  // descontar, dejando stock_actual negativo.
-  test.fails("stock insuficiente deberia rechazar la factura", async () => {
-    const insumo = await crearInsumo({ stock_actual: 1 });
-    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
-
-    const resultado = await crearFactura({
-      id_orden: orden.id_orden,
-      num_factura: "F-1",
-      tipo: "Factura",
-      fiscal: true,
-    });
-
-    expect(resultado.success).toBe(false);
-  });
-
   // Bug conocido con issue abierto: crearFactura no pasa la orden a estado
   // "Facturada" (queda en "Finalizado").
   test.fails("crearFactura deberia pasar la orden a estado Facturada", async () => {
@@ -453,6 +437,154 @@ describe("crearFactura", () => {
     if (!resultado.success) return;
     expect(resultado.factura.estado_pago).toBe("NO_APLICA");
     expect(Number(resultado.factura.saldo_pendiente)).toBe(0);
+  });
+});
+
+describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
+  it("stock suficiente: factura normal, sin aviso", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.stockInsuficiente).toBeUndefined();
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(7);
+  });
+
+  it("stock insuficiente sin confirmar: no crea la factura, no toca el stock, devuelve el detalle", async () => {
+    const insumo = await crearInsumo({ stock_actual: 1, nombre: "Gas R410a", descripcion: "kg" });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error).toContain("Stock insuficiente");
+    expect(resultado.stockInsuficiente).toEqual([
+      {
+        id_insumo: insumo.id_insumo,
+        nombre: "Gas R410a",
+        unidad: "kg",
+        disponible: 1,
+        requerido: 5,
+        faltante: 4,
+      },
+    ]);
+
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(1);
+    const facturaCreada = await prisma.factura.findFirst({ where: { id_orden: orden.id_orden } });
+    expect(facturaCreada).toBeNull();
+  });
+
+  it("el mismo insumo en dos lineas de la orden: se suman para el chequeo", async () => {
+    const insumo = await crearInsumo({ stock_actual: 3 });
+    const orden = await crearOrdenFinalizada({
+      insumos: [
+        { id_insumo: insumo.id_insumo, cantidad_usada: 2 },
+        { id_insumo: insumo.id_insumo, cantidad_usada: 2 },
+      ],
+    });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.stockInsuficiente).toHaveLength(1);
+    expect(resultado.stockInsuficiente?.[0]).toMatchObject({ id_insumo: insumo.id_insumo, disponible: 3, requerido: 4, faltante: 1 });
+  });
+
+  it("un insumo adicional del modal que hace faltar stock: se detecta", async () => {
+    const insumo = await crearInsumo({ stock_actual: 4 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad: 3 }],
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    // 2 de la orden + 3 adicionales = 5 requerido contra 4 disponibles
+    expect(resultado.stockInsuficiente?.[0]).toMatchObject({ disponible: 4, requerido: 5, faltante: 1 });
+  });
+
+  it("confirmarStockInsuficiente: true crea la factura y deja el stock en negativo", async () => {
+    const insumo = await crearInsumo({ stock_actual: 1 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      confirmarStockInsuficiente: true,
+    });
+
+    expect(resultado.success).toBe(true);
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(-4);
+  });
+
+  it("un Remito con stock insuficiente se crea sin aviso y no toca el stock", async () => {
+    const insumo = await crearInsumo({ stock_actual: 1 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "R-1",
+      tipo: "Remito",
+      fiscal: true,
+    });
+
+    expect(resultado.success).toBe(true);
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(1);
+  });
+
+  it("anular una factura confirmada con stock negativo devuelve el stock al valor anterior", async () => {
+    const insumo = await crearInsumo({ stock_actual: 1 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
+
+    const resultado = await crearFactura({
+      id_orden: orden.id_orden,
+      num_factura: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      confirmarStockInsuficiente: true,
+    });
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    const trasFacturar = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(trasFacturar?.stock_actual)).toBe(-4);
+
+    const anulacion = await anularFactura(resultado.factura.id_factura);
+    expect(anulacion.success).toBe(true);
+
+    const trasAnular = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(trasAnular?.stock_actual)).toBe(1);
   });
 });
 

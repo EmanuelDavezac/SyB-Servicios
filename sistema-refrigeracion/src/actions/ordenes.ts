@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
 import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoFactura";
+import { nombreDeServicioYaExiste } from "@/actions/servicios";
 
 function validarAlicuota(alicuota: number | undefined): number {
     const valor = alicuota ?? ALICUOTA_IVA_DEFAULT;
@@ -33,6 +34,34 @@ async function ordenYaFacturada(id_orden: number | null): Promise<boolean> {
 async function asegurarOrdenEditable(id_orden: number | null): Promise<void> {
     if (await ordenYaFacturada(id_orden)) {
         throw new Error(`La orden #${id_orden} ya está facturada: anulá la factura para poder modificarla.`);
+    }
+}
+
+// Una orden ya existente de un cliente dado de baja se puede seguir viendo
+// (no se toca su id_cliente al mostrarla); lo que se bloquea es crear una
+// orden nueva o reasignarle el cliente de una orden existente a uno inactivo.
+async function asegurarClienteActivo(id_cliente: number): Promise<void> {
+    const cliente = await prisma.cliente.findUnique({ where: { id_cliente }, select: { estado: true } });
+    if (!cliente || !cliente.estado) {
+        throw new Error("El cliente seleccionado no existe o está dado de baja");
+    }
+}
+
+// agregarServicioAOrden/agregarInsumoAOrden siempre agregan una linea nueva
+// (nunca reasignan una linea ya existente), asi que a diferencia del cliente
+// de la orden no hace falta excepcion para "ya lo tenia asignado": si esta
+// inactivo, no se agrega.
+async function asegurarServicioActivo(id_servicio: number): Promise<void> {
+    const servicio = await prisma.servicio.findUnique({ where: { id_servicio }, select: { estado: true } });
+    if (!servicio || servicio.estado === false) {
+        throw new Error("El servicio seleccionado no existe o está dado de baja");
+    }
+}
+
+async function asegurarInsumoActivo(id_insumo: number): Promise<void> {
+    const insumo = await prisma.insumo.findUnique({ where: { id_insumo }, select: { estado: true } });
+    if (!insumo || insumo.estado === false) {
+        throw new Error("El insumo seleccionado no existe o está dado de baja");
     }
 }
 
@@ -95,6 +124,7 @@ export async function crearOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        await asegurarClienteActivo(datos.id_cliente);
         const nuevaOrden = await prisma.orden_trabajo.create({
             data: {
                 id_cliente: datos.id_cliente,
@@ -108,7 +138,7 @@ export async function crearOrden(datos: {
 
     } catch (error) {
         console.error("Error al crear la orden:", error);
-        return { success: false, error: "No se pudo crear la orden" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo crear la orden" };
     }
 }
 
@@ -121,6 +151,14 @@ export async function editarOrden(id_orden: number, datos: {
     try {
         await requerirUsuario();
         await asegurarOrdenEditable(id_orden);
+        // Una orden ya asignada a un cliente que despues se dio de baja se
+        // sigue pudiendo editar (notas, estado_trabajo): no se revalida el
+        // cliente si no cambia. Lo que se bloquea es reasignarle el cliente
+        // de la orden a uno inactivo.
+        const ordenActual = await prisma.orden_trabajo.findUnique({ where: { id_orden }, select: { id_cliente: true } });
+        if (ordenActual?.id_cliente !== datos.id_cliente) {
+            await asegurarClienteActivo(datos.id_cliente);
+        }
         const ordenActualizada = await prisma.orden_trabajo.update({
             where: { id_orden },
             data: {
@@ -150,6 +188,7 @@ export async function agregarServicioAOrden(datos: {
     try {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
+        await asegurarServicioActivo(datos.id_servicio);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
@@ -211,10 +250,14 @@ export async function crearServicioYAgregarAOrden(datos: {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
+        const nombre = datos.nombre.trim();
+        if (await nombreDeServicioYaExiste(nombre)) {
+            throw new Error("Ya existe un servicio con ese nombre");
+        }
         // Crear el servicio
         const nuevoServicio = await prisma.servicio.create({
             data: {
-                nombre: datos.nombre,
+                nombre,
                 descripcion: datos.descripcion,
                 precio: datos.precio,
             },
@@ -310,6 +353,7 @@ export async function agregarInsumoAOrden(datos: {
     try {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
+        await asegurarInsumoActivo(datos.id_insumo);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_insumo.create({
             data: {

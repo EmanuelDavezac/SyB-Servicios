@@ -6,6 +6,7 @@ import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } f
 import type { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
+import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,7 +33,14 @@ async function recalcularFactura(tx: Tx, id_factura: number) {
 
 export async function registrarCobro(data: {
   id_cliente: number;
-  forma_pago?: string;
+  /**
+   * Medios de pago que componen el cobro (ej. [{forma_pago:"Efectivo",
+   * monto:500}, {forma_pago:"Transferencia", monto:300}]). La suma tiene que
+   * dar igual a lo imputado menos las retenciones: eso es lo que realmente
+   * entró en efectivo/banco, el resto quedó en poder del fisco. Opcional
+   * para no romper un cobro informal sin desglose.
+   */
+  formasPago?: { forma_pago: string; monto: number }[];
   observacion?: string;
   fecha_pago?: Date;
   imputaciones: { id_factura: number; monto: number }[];
@@ -48,6 +56,21 @@ export async function registrarCobro(data: {
     }
     if (data.retenciones?.some((r) => r.monto <= 0)) {
       return { success: false, error: "Los montos de retención deben ser mayores a cero." };
+    }
+    if (data.formasPago?.some((f) => f.monto <= 0)) {
+      return { success: false, error: "Los montos por medio de pago deben ser mayores a cero." };
+    }
+    if (data.formasPago && data.formasPago.length > 0) {
+      const montoImputado = data.imputaciones.reduce((acc, i) => acc + i.monto, 0);
+      const montoRetenido = (data.retenciones ?? []).reduce((acc, r) => acc + r.monto, 0);
+      const montoEnMediosDePago = data.formasPago.reduce((acc, f) => acc + f.monto, 0);
+      const montoEsperado = montoImputado - montoRetenido;
+      if (Math.abs(montoEnMediosDePago - montoEsperado) > TOLERANCIA_MONTO) {
+        return {
+          success: false,
+          error: `Los medios de pago suman ${montoEnMediosDePago.toFixed(2)} y deberían sumar ${montoEsperado.toFixed(2)} (lo imputado menos las retenciones).`,
+        };
+      }
     }
 
     const nuevoRecibo = await prisma.$transaction(async (tx) => {
@@ -83,8 +106,10 @@ export async function registrarCobro(data: {
           id_cliente: data.id_cliente,
           fecha_pago: data.fecha_pago ?? fechaActualArgentina(),
           monto_total: montoTotal,
-          forma_pago: data.forma_pago,
           observacion: data.observacion,
+          recibo_medio_pago: data.formasPago && data.formasPago.length > 0
+            ? { create: data.formasPago.map((f) => ({ forma_pago: f.forma_pago, monto: f.monto })) }
+            : undefined,
         },
       });
 
@@ -274,15 +299,8 @@ export async function obtenerClientesConDeuda() {
 export async function obtenerDeudaPorCliente(id_cliente: number) {
   try {
         await requerirUsuario();
-    const agregado = await prisma.factura.aggregate({
-      where: {
-        estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
-        orden_trabajo: { id_cliente },
-      },
-      _sum: { saldo_pendiente: true },
-    });
-
-    return Number(agregado._sum.saldo_pendiente ?? 0);
+    const { saldo } = await obtenerDeudaCliente(prisma, id_cliente);
+    return saldo;
   } catch (error) {
     console.error("Error obteniendo deuda del cliente:", error);
     return 0;
@@ -297,6 +315,7 @@ export async function obtenerReciboCompleto(id_recibo: number) {
       include: {
         cliente: true,
         pagos_parciales: { include: { factura: true } },
+        recibo_medio_pago: true,
       },
     });
 
@@ -307,6 +326,11 @@ export async function obtenerReciboCompleto(id_recibo: number) {
     const resultado = {
       ...recibo,
       monto_total: Number(recibo.monto_total),
+      recibo_medio_pago: recibo.recibo_medio_pago.map((m) => ({
+        id_medio_pago: m.id_medio_pago,
+        forma_pago: m.forma_pago,
+        monto: Number(m.monto),
+      })),
       pagos_parciales: recibo.pagos_parciales.map((p) => ({
         id_pago: p.id_pago,
         id_factura: p.id_factura,
@@ -370,6 +394,7 @@ export async function obtenerCobros() {
         pagos_parciales: {
           include: { factura: true },
         },
+        recibo_medio_pago: true,
       },
       orderBy: { fecha_pago: "desc" },
     });

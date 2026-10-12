@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
+import { formatearListaConLimite } from "@/lib/formato";
 
 export async function obtenerCompras() {
     try {
@@ -37,6 +38,28 @@ export async function crearCompra(data: {
         }
         if (data.insumos.some((i) => i.cantidad <= 0 || i.precio_unitario <= 0)) {
             return { success: false, error: "Las cantidades y precios deben ser mayores a cero." };
+        }
+
+        if (data.id_proveedor) {
+            const proveedor = await prisma.proveedor.findUnique({
+                where: { id_proveedor: data.id_proveedor },
+                select: { estado: true },
+            });
+            if (!proveedor || proveedor.estado === false) {
+                return { success: false, error: "El proveedor seleccionado no existe o está dado de baja." };
+            }
+        }
+
+        const idsInsumo = [...new Set(data.insumos.map((i) => i.id_insumo))];
+        const insumosInactivos = await prisma.insumo.findMany({
+            where: { id_insumo: { in: idsInsumo }, estado: false },
+            select: { nombre: true },
+            orderBy: { nombre: "asc" },
+        });
+        if (insumosInactivos.length > 0) {
+            const nombres = insumosInactivos.map((i) => i.nombre);
+            const verbo = insumosInactivos.length === 1 ? "está dado de baja" : "están dados de baja";
+            return { success: false, error: `No se puede comprar: ${formatearListaConLimite(nombres)} ${verbo}.` };
         }
 
         const neto = data.insumos.reduce((acc, i) => acc + i.cantidad * i.precio_unitario, 0);

@@ -44,6 +44,30 @@ export async function obtenerClientes(filtros?: {
 // Next.js nos da esta herramienta para actualizar la pantalla automáticamente
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
+import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, TOLERANCIA_MONTO } from "@/lib/estadoFactura";
+import { obtenerDeudaCliente } from "@/lib/deudaCliente";
+
+async function cuitYaExiste(cuit: string, idExcluir?: number) {
+    const existente = await prisma.cliente.findFirst({
+        where: {
+            cuit: { equals: cuit, mode: "insensitive" },
+            ...(idExcluir ? { id_cliente: { not: idExcluir } } : {}),
+        },
+        select: { id_cliente: true },
+    });
+    return !!existente;
+}
+
+async function emailYaExiste(email: string, idExcluir?: number) {
+    const existente = await prisma.cliente.findFirst({
+        where: {
+            email: { equals: email, mode: "insensitive" },
+            ...(idExcluir ? { id_cliente: { not: idExcluir } } : {}),
+        },
+        select: { id_cliente: true },
+    });
+    return !!existente;
+}
 
 export async function crearCliente(datos: {
     nombre: string;
@@ -56,9 +80,18 @@ export async function crearCliente(datos: {
     localidad?: string;
     condicion_pago_dias?: number;
 }) {
-    
+
     try {
         await requerirUsuario();
+        const cuit = datos.cuit?.trim();
+        if (cuit && (await cuitYaExiste(cuit))) {
+            return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };
+        }
+        const email = datos.email?.trim();
+        if (email && (await emailYaExiste(email))) {
+            return { success: false, error: "Ya existe un cliente con ese email" };
+        }
+
         const nuevoCliente = await prisma.cliente.create({
             data: {
                 nombre: datos.nombre,
@@ -96,6 +129,15 @@ export async function actualizarCliente(id_cliente: number, datos: {
 }) {
     try {
         await requerirUsuario();
+        const cuit = datos.cuit?.trim();
+        if (cuit && (await cuitYaExiste(cuit, id_cliente))) {
+            return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };
+        }
+        const email = datos.email?.trim();
+        if (email && (await emailYaExiste(email, id_cliente))) {
+            return { success: false, error: "Ya existe un cliente con ese email" };
+        }
+
         const cliente = await prisma.cliente.update({
             where: { id_cliente },
             data: {
@@ -120,14 +162,118 @@ export async function actualizarCliente(id_cliente: number, datos: {
     }
 }
 
-export async function eliminarCliente(id_cliente: number) {
+// Estados de orden_trabajo que por si solos ya cuentan como "sin cerrar" para
+// bloquear la baja (todavia hay trabajo pendiente, mas alla de la plata).
+const ESTADOS_ORDEN_EN_CURSO = ["Pendiente", "En proceso"];
+
+// Una orden Finalizado sin factura vigente (ninguna factura/remito no
+// anulado) es trabajo ya entregado pero todavia no facturado: el cliente
+// puede terminar debiendolo y hoy no aparece en obtenerDeudaCliente porque
+// esa cuenta solo mira facturas ya emitidas. Mismo chequeo que
+// ordenYaFacturada en ordenes.ts, en sentido inverso.
+function ordenFinalizadaSinFacturar(id_cliente: number) {
+    return {
+        id_cliente,
+        estado_trabajo: "Finalizado",
+        factura: {
+            none: {
+                tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
+                estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+            },
+        },
+    };
+}
+
+function revalidarListadosDeClientes() {
+    // /clientes es el listado en si; los demas son pantallas que arman un
+    // selector o buscador de clientes y no deben seguir ofreciendo a uno que
+    // se acaba de dar de baja (o dejar de ofrecer a uno recien reactivado).
+    revalidatePath("/clientes");
+    revalidatePath("/ordenes");
+    revalidatePath("/presupuestos");
+    revalidatePath("/informes-tecnicos");
+}
+
+function formatCurrency(n: number) {
+    return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
+}
+
+/**
+ * Baja logica (estado = false), nunca un delete: un cliente dado de baja
+ * sigue existiendo con todo su historial (ordenes, facturas), solo deja de
+ * poder vincularse a operaciones nuevas (ver crearOrden/editarOrden,
+ * buscarDestinatarios). Se rechaza si tiene deuda pendiente (facturas IMPAGA
+ * o PARCIAL) o trabajo sin cerrar (ordenes Pendiente/En proceso, o
+ * Finalizado todavia sin facturar), juntando todos los motivos en un solo
+ * mensaje.
+ */
+export async function darDeBajaCliente(id_cliente: number) {
     try {
         await requerirUsuario();
-        await prisma.cliente.delete({ where: { id_cliente } });
-        revalidatePath("/clientes");
+
+        await prisma.$transaction(async (tx) => {
+            const cliente = await tx.cliente.findUnique({ where: { id_cliente } });
+            if (!cliente) {
+                throw new Error("El cliente no existe");
+            }
+            if (!cliente.estado) {
+                throw new Error("El cliente ya está dado de baja");
+            }
+
+            const { saldo, cantidadFacturas } = await obtenerDeudaCliente(tx, id_cliente);
+            const ordenesSinCerrar = await tx.orden_trabajo.count({
+                where: {
+                    OR: [
+                        { id_cliente, estado_trabajo: { in: ESTADOS_ORDEN_EN_CURSO } },
+                        ordenFinalizadaSinFacturar(id_cliente),
+                    ],
+                },
+            });
+
+            const motivos: string[] = [];
+            if (saldo > TOLERANCIA_MONTO) {
+                motivos.push(
+                    `adeuda ${formatCurrency(saldo)} en ${cantidadFacturas} comprobante${cantidadFacturas === 1 ? "" : "s"}`
+                );
+            }
+            if (ordenesSinCerrar > 0) {
+                motivos.push(
+                    `tiene ${ordenesSinCerrar} orden${ordenesSinCerrar === 1 ? "" : "es"} de trabajo sin cerrar (en curso o finalizada sin facturar)`
+                );
+            }
+            if (motivos.length > 0) {
+                throw new Error(
+                    `No se puede dar de baja a ${cliente.nombre} ${cliente.apellido}: ${motivos.join(" y ")}.`
+                );
+            }
+
+            await tx.cliente.update({ where: { id_cliente }, data: { estado: false } });
+        });
+
+        revalidarListadosDeClientes();
         return { success: true };
     } catch (error) {
-        console.error("Error al eliminar cliente:", error);
-        return { success: false, error: "No se pudo eliminar el cliente. Puede tener órdenes asociadas." };
+        console.error("Error al dar de baja cliente:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo dar de baja al cliente" };
+    }
+}
+
+export async function reactivarCliente(id_cliente: number) {
+    try {
+        await requerirUsuario();
+        const cliente = await prisma.cliente.findUnique({ where: { id_cliente } });
+        if (!cliente) {
+            return { success: false, error: "El cliente no existe" };
+        }
+        if (cliente.estado) {
+            return { success: false, error: "El cliente ya está activo" };
+        }
+
+        await prisma.cliente.update({ where: { id_cliente }, data: { estado: true } });
+        revalidarListadosDeClientes();
+        return { success: true };
+    } catch (error) {
+        console.error("Error al reactivar cliente:", error);
+        return { success: false, error: "No se pudo reactivar el cliente" };
     }
 }

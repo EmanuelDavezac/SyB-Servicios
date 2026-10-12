@@ -7,7 +7,7 @@ import BotonAnularInforme from "@/components/BotonAnularInforme";
 export default async function InformesTecnicosPage() {
     const [informes, clientes] = await Promise.all([
         obtenerInformesTecnicos(),
-        obtenerClientes(),
+        obtenerClientes({ estado: "Activo" }),
     ]);
 
     const formatDate = (date: string | Date | null) => {

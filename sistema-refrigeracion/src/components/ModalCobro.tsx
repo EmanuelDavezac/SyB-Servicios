@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { registrarCobro, obtenerFacturasPendientesCliente } from "@/actions/cobros";
 import { imprimirRecibo } from "@/components/BotonImprimirRecibo";
-import { imprimirComprobante } from "@/components/BotonImprimirFactura";
 import { distribuirCobro } from "@/lib/cobros";
 
 interface Cliente {
@@ -39,13 +38,19 @@ export default function ModalCobro({ clientes }: Props) {
     const [error, setError] = useState<string | null>(null);
 
     const [idCliente, setIdCliente] = useState("");
-    const [formaPago, setFormaPago] = useState("");
     const [observacion, setObservacion] = useState("");
     const [fechaPago, setFechaPago] = useState("");
 
     const [facturasPendientes, setFacturasPendientes] = useState<FacturaPendiente[]>([]);
     const [montoEntregado, setMontoEntregado] = useState("");
     const [imputaciones, setImputaciones] = useState<Record<number, string>>({});
+
+    // Medios de pago que componen el cobro (ej. una parte en efectivo y otra
+    // por transferencia). Cada uno con su propio monto; la suma tiene que
+    // coincidir con lo imputado menos las retenciones.
+    const [medios, setMedios] = useState<{ _key: string; forma_pago: string; monto: string }[]>([]);
+    const [nuevoMedioPago, setNuevoMedioPago] = useState("Efectivo");
+    const [nuevoMedioMonto, setNuevoMedioMonto] = useState("");
 
     const [mostrarRetenciones, setMostrarRetenciones] = useState(false);
     const [retenciones, setRetenciones] = useState<Record<string, string>>({
@@ -77,15 +82,45 @@ export default function ModalCobro({ clientes }: Props) {
     }
 
     const totalImputado = Object.values(imputaciones).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    const totalRetenido = Object.values(retenciones).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    // Lo que realmente entra en mano/banco: lo imputado menos lo retenido.
+    const totalARepartirEnMedios = Math.max(0, totalImputado - totalRetenido);
+    const totalEnMedios = medios.reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
+    const diferenciaMedios = totalARepartirEnMedios - totalEnMedios;
+
+    function agregarMedioDePago() {
+        const monto = parseFloat(nuevoMedioMonto);
+        if (!monto || monto <= 0) {
+            setError("Indicá un monto mayor a cero para el medio de pago.");
+            return;
+        }
+        setMedios((prev) => [
+            ...prev,
+            { _key: `${Date.now()}-${Math.random()}`, forma_pago: nuevoMedioPago, monto: monto.toFixed(2) },
+        ]);
+        setNuevoMedioMonto("");
+        setError(null);
+    }
+
+    function completarMedioConRestante() {
+        const restante = Math.max(0, diferenciaMedios);
+        setNuevoMedioMonto(restante > 0 ? restante.toFixed(2) : "");
+    }
+
+    function quitarMedioDePago(key: string) {
+        setMedios((prev) => prev.filter((m) => m._key !== key));
+    }
 
     function resetForm() {
         setIdCliente("");
-        setFormaPago("");
         setObservacion("");
         setFechaPago("");
         setFacturasPendientes([]);
         setMontoEntregado("");
         setImputaciones({});
+        setMedios([]);
+        setNuevoMedioPago("Efectivo");
+        setNuevoMedioMonto("");
         setMostrarRetenciones(false);
         setRetenciones({ IVA: "", GANANCIAS: "", IIBB: "", SUSS: "" });
         setError(null);
@@ -104,12 +139,20 @@ export default function ModalCobro({ clientes }: Props) {
             setError("Elegí un cliente.");
             return;
         }
-        if (!formaPago) {
-            setError("Elegí una forma de pago.");
+        if (medios.length === 0) {
+            setError("Agregá al menos un medio de pago.");
             return;
         }
         if (lineas.length === 0) {
             setError("Cargá algún monto a imputar en al menos una factura.");
+            return;
+        }
+        if (Math.abs(diferenciaMedios) > 0.01) {
+            setError(
+                diferenciaMedios > 0
+                    ? `Faltan ${formatCurrency(diferenciaMedios)} por repartir entre los medios de pago.`
+                    : `Los medios de pago suman ${formatCurrency(-diferenciaMedios)} de más.`
+            );
             return;
         }
 
@@ -122,7 +165,7 @@ export default function ModalCobro({ clientes }: Props) {
 
         const resultado = await registrarCobro({
             id_cliente: Number(idCliente),
-            forma_pago: formaPago || undefined,
+            formasPago: medios.map((m) => ({ forma_pago: m.forma_pago, monto: parseFloat(m.monto) || 0 })),
             observacion: observacion || undefined,
             fecha_pago: fechaPago ? new Date(fechaPago) : undefined,
             imputaciones: lineas,
@@ -132,16 +175,13 @@ export default function ModalCobro({ clientes }: Props) {
         setCargando(false);
 
         if (resultado.success) {
-            const facturasPagadas = lineas
-                .map((l) => facturasPendientes.find((f) => f.id_factura === l.id_factura))
-                .filter((f): f is FacturaPendiente => !!f);
-
             setAbierto(false);
             resetForm();
 
-            if (facturasPagadas.length === 1 && facturasPagadas[0].tipo !== "Recibo") {
-                imprimirComprobante(facturasPagadas[0].id_factura);
-            } else if (resultado.recibo?.id_recibo) {
+            // Imprimir siempre el recibo del cobro que se acaba de registrar,
+            // nunca la factura imputada (esa se imprime aparte desde
+            // Comprobantes si hace falta).
+            if (resultado.recibo?.id_recibo) {
                 imprimirRecibo(resultado.recibo.id_recibo);
             }
         } else {
@@ -209,18 +249,6 @@ export default function ModalCobro({ clientes }: Props) {
                                         Datos del Cobro
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Forma de Pago</label>
-                                            <select
-                                                value={formaPago}
-                                                onChange={(e) => setFormaPago(e.target.value)}
-                                                className={inputCls}
-                                            >
-                                                <option value="">Seleccioná...</option>
-                                                <option value="Efectivo">Efectivo</option>
-                                                <option value="Transferencia">Transferencia</option>
-                                            </select>
-                                        </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Fecha (Opcional)</label>
                                             <input
@@ -349,6 +377,96 @@ export default function ModalCobro({ clientes }: Props) {
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+
+                            {idCliente && (
+                                <section>
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-green-600 mb-3 border-b pb-1">
+                                        Medios de Pago
+                                        <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-gray-400">
+                                            (se puede combinar, ej. una parte en efectivo y otra por transferencia)
+                                        </span>
+                                    </h4>
+
+                                    {medios.length > 0 && (
+                                        <div className="space-y-1 mb-3">
+                                            {medios.map((m) => (
+                                                <div
+                                                    key={m._key}
+                                                    className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-sm"
+                                                >
+                                                    <span className="font-medium text-green-900">{m.forma_pago}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-bold text-gray-800">{formatCurrency(parseFloat(m.monto) || 0)}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => quitarMedioDePago(m._key)}
+                                                            className="text-red-400 hover:text-red-600 transition font-bold text-base leading-none"
+                                                            title="Quitar"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={nuevoMedioPago}
+                                            onChange={(e) => setNuevoMedioPago(e.target.value)}
+                                            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                                        >
+                                            <option value="Efectivo">Efectivo</option>
+                                            <option value="Transferencia">Transferencia</option>
+                                            <option value="Tarjeta de débito">Tarjeta de débito</option>
+                                            <option value="Tarjeta de crédito">Tarjeta de crédito</option>
+                                            <option value="Cheque">Cheque</option>
+                                            <option value="Otro">Otro</option>
+                                        </select>
+                                        <div className="relative w-32">
+                                            <span className="absolute left-3 top-2 text-gray-400 text-xs">$</span>
+                                            <input
+                                                type="number"
+                                                value={nuevoMedioMonto}
+                                                onChange={(e) => setNuevoMedioMonto(e.target.value)}
+                                                placeholder="0.00"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-full border rounded-lg pl-6 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={agregarMedioDePago}
+                                            className="bg-green-50 text-green-700 hover:bg-green-100 font-bold px-4 py-2 rounded-lg text-sm transition"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+
+                                    {totalARepartirEnMedios > 0 && (
+                                        <div className="mt-2 flex items-center justify-between text-xs">
+                                            <span className={Math.abs(diferenciaMedios) > 0.01 ? "text-amber-600 font-semibold" : "text-green-600 font-semibold"}>
+                                                {Math.abs(diferenciaMedios) <= 0.01
+                                                    ? "Medios de pago completos"
+                                                    : diferenciaMedios > 0
+                                                    ? `Falta repartir ${formatCurrency(diferenciaMedios)}`
+                                                    : `Sobran ${formatCurrency(-diferenciaMedios)}`}
+                                            </span>
+                                            {diferenciaMedios > 0.01 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={completarMedioConRestante}
+                                                    className="text-green-700 hover:underline font-semibold"
+                                                >
+                                                    Completar con el resto
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </section>

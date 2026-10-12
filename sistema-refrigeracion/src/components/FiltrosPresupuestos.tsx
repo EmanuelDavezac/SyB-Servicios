@@ -10,10 +10,12 @@ export default function FiltrosPresupuestos() {
     const inicialFechaInicio = searchParams.get("fechaInicio") || "";
     const inicialFechaFin = searchParams.get("fechaFin") || "";
     const inicialEstado = searchParams.get("estado") || "";
+    const inicialCliente = searchParams.get("cliente") || "";
 
     const [fechaInicio, setFechaInicio] = useState(inicialFechaInicio);
     const [fechaFin, setFechaFin] = useState(inicialFechaFin);
     const [estado, setEstado] = useState(inicialEstado);
+    const [cliente, setCliente] = useState(inicialCliente);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -21,6 +23,7 @@ export default function FiltrosPresupuestos() {
             if (fechaInicio) params.set("fechaInicio", fechaInicio);
             if (fechaFin) params.set("fechaFin", fechaFin);
             if (estado) params.set("estado", estado);
+            if (cliente.trim()) params.set("cliente", cliente.trim());
 
             const newQueryString = params.toString();
 
@@ -30,10 +33,18 @@ export default function FiltrosPresupuestos() {
         }, 400);
 
         return () => clearTimeout(timer);
-    }, [fechaInicio, fechaFin, estado, router, searchParams]);
+    }, [fechaInicio, fechaFin, estado, cliente, router, searchParams]);
 
     return (
         <div className="bg-white p-4 rounded shadow mb-6 flex flex-col md:flex-row gap-4 text-black md:items-center">
+            <input
+                type="text"
+                placeholder="Buscar por cliente/destinatario..."
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
+                className="border p-2 rounded w-full md:w-1/4 outline-none focus:border-blue-500"
+            />
+
             <input
                 type="date"
                 title="Fecha Inicio"
@@ -61,12 +72,13 @@ export default function FiltrosPresupuestos() {
                 <option value="RECHAZADO">RECHAZADO</option>
             </select>
 
-            {(fechaInicio || fechaFin || estado) && (
+            {(fechaInicio || fechaFin || estado || cliente) && (
                 <button
                     onClick={() => {
                         setFechaInicio("");
                         setFechaFin("");
                         setEstado("");
+                        setCliente("");
                     }}
                     className="w-full md:w-auto bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded hover:bg-red-100 transition text-sm flex items-center justify-center gap-2"
                     title="Limpiar todos los filtros"

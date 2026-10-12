@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { crearFactura, getSiguienteNumeroFactura } from "@/actions/facturacion";
+import { crearFactura, getSiguienteNumeroFactura, type StockInsuficienteItem } from "@/actions/facturacion";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
 import { esTipoFacturable } from "@/lib/estadoFactura";
@@ -29,6 +29,7 @@ interface Orden {
 interface Insumo {
     id_insumo: number;
     nombre: string;
+    descripcion?: string | null;
     stock_actual: number | null;
     precio_venta: number;
 }
@@ -49,6 +50,8 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const [stockInsuficiente, setStockInsuficiente] = useState<StockInsuficienteItem[] | null>(null);
 
     const [idOrden, setIdOrden] = useState("");
     const [tipo, setTipo] = useState("Factura");
@@ -114,6 +117,30 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                 return { neto: item.cantidad * Number(insumo?.precio_venta ?? 0), alicuota: item.alicuota_iva };
             }),
     ];
+
+    // Aviso previo, no bloqueante: mismo criterio que el servidor (suma por
+    // insumo entre las lineas de la orden y las adicionales), pero con los
+    // datos que ya estan en pantalla. El bloqueo real con la confirmacion lo
+    // decide crearFactura; esto es solo para que no haga falta ni guardar
+    // para enterarse.
+    const requeridoPorInsumo = new Map<number, number>();
+    if (mostrarInsumosYDescuento) {
+        for (const d of insumosDeOrden) {
+            if (d.id_insumo === null) continue;
+            const cantidad = parseFloat(String(d.cantidad_usada)) || 0;
+            requeridoPorInsumo.set(d.id_insumo, (requeridoPorInsumo.get(d.id_insumo) ?? 0) + cantidad);
+        }
+        for (const item of insumosSeleccionados) {
+            requeridoPorInsumo.set(item.id_insumo, (requeridoPorInsumo.get(item.id_insumo) ?? 0) + item.cantidad);
+        }
+    }
+    const avisoStock = [...requeridoPorInsumo.entries()]
+        .map(([id_insumo, requerido]) => {
+            const insumo = insumosDisponibles.find((i) => i.id_insumo === id_insumo);
+            const disponible = Number(insumo?.stock_actual ?? 0);
+            return { id_insumo, nombre: insumo?.nombre ?? "Insumo", disponible, requerido, faltante: requerido - disponible };
+        })
+        .filter((a) => a.faltante > 0.0005);
 
     // Preview en vivo: mientras el usuario está tipeando, el descuento puede
     // estar incompleto (ej. tipo "PORCENTAJE" elegido pero el % todavía vacío).
@@ -235,9 +262,10 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         setDescuentoImporte("");
         setEquipoDescripcion("");
         setError(null);
+        setStockInsuficiente(null);
     }
 
-    async function handleGuardar() {
+    async function handleGuardar(confirmarStockInsuficiente = false) {
         if (!idOrden || !tipo) {
             setError("Completá la Orden y el Tipo antes de guardar.");
             return;
@@ -303,6 +331,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             descuento_porcentaje: descuentoActivo === "PORCENTAJE" ? parseFloat(descuentoPorcentaje) : null,
             descuento_monto_equipo: descuentoActivo === "EQUIPO" ? parseFloat(descuentoImporte) : null,
             equipo_descripcion: descuentoActivo === "EQUIPO" ? equipoDescripcion.trim() : null,
+            confirmarStockInsuficiente: confirmarStockInsuficiente || undefined,
         });
 
         setCargando(false);
@@ -310,6 +339,11 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
         if (resultado.success) {
             setAbierto(false);
             resetForm();
+        } else if (resultado.stockInsuficiente && resultado.stockInsuficiente.length > 0) {
+            // Bloqueo con confirmacion: el form queda abierto detras, el
+            // usuario elige "Revisar orden" (cancela) o "Facturar igual"
+            // (reenvia con confirmarStockInsuficiente: true).
+            setStockInsuficiente(resultado.stockInsuficiente);
         } else {
             setError(resultado.error || "Error al crear la factura.");
         }
@@ -730,6 +764,14 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 )}
                             </section>
                             )}
+
+                            {/* Aviso previo, no bloqueante: mismo criterio que usa el servidor */}
+                            {mostrarInsumosYDescuento && avisoStock.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-2">
+                                    <span className="font-bold">⚠ Stock insuficiente</span> para {avisoStock.length} insumo{avisoStock.length === 1 ? "" : "s"}: {avisoStock.map((a) => a.nombre).join(", ")}.
+                                    Se puede facturar igual confirmándolo al guardar.
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -741,7 +783,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleGuardar}
+                                onClick={() => handleGuardar()}
                                 disabled={cargando}
                                 className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
@@ -753,6 +795,67 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                                 ) : (
                                     "Guardar Comprobante"
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Confirmacion de stock insuficiente ── */}
+            {stockInsuficiente && (
+                <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[10000] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[calc(100vh-2rem)]">
+                        <div className="px-6 py-4 border-b bg-gradient-to-r from-amber-500 to-amber-600 text-white shrink-0">
+                            <h3 className="text-lg font-bold tracking-wide">Stock insuficiente</h3>
+                            <p className="text-amber-100 text-xs mt-0.5">
+                                Si facturás igual, el stock de estos insumos va a quedar en negativo.
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-left text-gray-400 text-[10px] font-bold uppercase">
+                                        <th className="pb-2">Insumo</th>
+                                        <th className="pb-2 text-right">Disponible</th>
+                                        <th className="pb-2 text-right">Requerido</th>
+                                        <th className="pb-2 text-right">Faltante</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {stockInsuficiente.map((it) => (
+                                        <tr key={it.id_insumo} className="border-t border-gray-100">
+                                            <td className="py-1.5 font-medium text-gray-800 pr-2">{it.nombre}</td>
+                                            <td className="py-1.5 text-right text-gray-600 whitespace-nowrap">
+                                                {it.disponible} {it.unidad ?? ""}
+                                            </td>
+                                            <td className="py-1.5 text-right text-gray-600 whitespace-nowrap">
+                                                {it.requerido} {it.unidad ?? ""}
+                                            </td>
+                                            <td className="py-1.5 text-right font-bold text-red-600 whitespace-nowrap">
+                                                {it.faltante} {it.unidad ?? ""}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 shrink-0">
+                            <button
+                                onClick={() => setStockInsuficiente(null)}
+                                disabled={cargando}
+                                className="px-5 py-2 text-sm border rounded-lg text-gray-600 hover:bg-gray-100 font-medium transition disabled:opacity-50"
+                            >
+                                Revisar orden
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setStockInsuficiente(null);
+                                    handleGuardar(true);
+                                }}
+                                disabled={cargando}
+                                className="px-5 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold transition disabled:opacity-50"
+                            >
+                                Facturar igual
                             </button>
                         </div>
                     </div>

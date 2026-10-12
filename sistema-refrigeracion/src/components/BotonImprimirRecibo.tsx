@@ -2,6 +2,7 @@
 
 import { obtenerReciboCompleto } from "@/actions/cobros";
 import { montoALetras } from "@/lib/numeroALetras";
+import { formatearMediosDePago } from "@/lib/cobros";
 
 interface Props {
     idRecibo: number;
@@ -36,7 +37,7 @@ export async function imprimirRecibo(idRecibo: number) {
 
     const montoTotal = Number(recibo.monto_total);
     const montoEnLetras = montoALetras(montoTotal);
-    const formaPago = recibo.forma_pago || "No especificada";
+    const formaPago = formatearMediosDePago(recibo.recibo_medio_pago || [], recibo.forma_pago) || "No especificada";
     const concepto = recibo.observacion
         ? `Pago a cuenta de facturas pendientes – ${recibo.observacion}`
         : "Pago a cuenta de facturas pendientes";

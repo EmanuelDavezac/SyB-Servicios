@@ -9,13 +9,17 @@ export default function FiltrosOrdenes() {
     // Leemos los valores actuales de la URL
     const busqueda = searchParams.get("busqueda") || "";
     const estado = searchParams.get("estado") || "";
+    const fechaInicio = searchParams.get("fechaInicio") || "";
+    const fechaFin = searchParams.get("fechaFin") || "";
 
-    function navegar(nuevos: { busqueda?: string; estado?: string }) {
-        const valores = { busqueda, estado, ...nuevos };
+    function navegar(nuevos: { busqueda?: string; estado?: string; fechaInicio?: string; fechaFin?: string }) {
+        const valores = { busqueda, estado, fechaInicio, fechaFin, ...nuevos };
         const params = new URLSearchParams();
         if (valores.busqueda?.trim()) params.set("busqueda", valores.busqueda.trim());
         if (valores.estado) params.set("estado", valores.estado);
-        
+        if (valores.fechaInicio) params.set("fechaInicio", valores.fechaInicio);
+        if (valores.fechaFin) params.set("fechaFin", valores.fechaFin);
+
         router.push(`/ordenes?${params.toString()}`);
     }
 
@@ -39,6 +43,22 @@ export default function FiltrosOrdenes() {
                 <option value="En proceso">En proceso</option>
                 <option value="Finalizado">Finalizado</option>
             </select>
+
+            <input
+                type="date"
+                title="Creada desde"
+                defaultValue={fechaInicio}
+                onChange={(e) => navegar({ fechaInicio: e.target.value })}
+                className="border p-2 rounded w-full md:w-1/5 outline-none focus:border-blue-500 text-sm text-gray-600"
+            />
+
+            <input
+                type="date"
+                title="Creada hasta"
+                defaultValue={fechaFin}
+                onChange={(e) => navegar({ fechaFin: e.target.value })}
+                className="border p-2 rounded w-full md:w-1/5 outline-none focus:border-blue-500 text-sm text-gray-600"
+            />
         </div>
     );
 }

@@ -3,12 +3,15 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
+import { formatearListaConLimite } from "@/lib/formato";
 
 // 1. OBTENER (LEER)
-export async function obtenerInsumos() {
+export async function obtenerInsumos(opciones?: { incluirInactivos?: boolean }) {
+    const incluirInactivos = opciones?.incluirInactivos ?? false;
     try {
         await requerirUsuario();
         const insumos = await prisma.insumo.findMany({
+            where: incluirInactivos ? undefined : { estado: { not: false } },
             // Le decimos a Prisma que además de traer el insumo, nos traiga los datos de su proveedor
             include: {
                 proveedor: true
@@ -33,6 +36,24 @@ export async function obtenerInsumos() {
     }
 }
 
+async function asegurarProveedorActivo(id_proveedor: number): Promise<void> {
+    const proveedor = await prisma.proveedor.findUnique({ where: { id_proveedor }, select: { estado: true } });
+    if (!proveedor || proveedor.estado === false) {
+        throw new Error("El proveedor seleccionado no existe o está dado de baja");
+    }
+}
+
+async function nombreDeInsumoYaExiste(nombre: string, idExcluir?: number) {
+    const existente = await prisma.insumo.findFirst({
+        where: {
+            nombre: { equals: nombre, mode: "insensitive" },
+            ...(idExcluir ? { id_insumo: { not: idExcluir } } : {}),
+        },
+        select: { id_insumo: true },
+    });
+    return !!existente;
+}
+
 // 2. CREAR
 export async function crearInsumo(datos: {
     nombre: string;
@@ -42,20 +63,25 @@ export async function crearInsumo(datos: {
     stock_minimo: number;
     precio_costo: number;
     precio_venta: number;
-    estado?: boolean; // <-- 1. AGREGAMOS ESTO ACÁ
 }) {
     try {
         await requerirUsuario();
+        const nombre = datos.nombre.trim();
+        if (await nombreDeInsumoYaExiste(nombre)) {
+            return { success: false, error: "Ya existe un insumo con ese nombre" };
+        }
+        if (datos.id_proveedor) {
+            await asegurarProveedorActivo(datos.id_proveedor);
+        }
         const nuevoInsumo = await prisma.insumo.create({
             data: {
-                nombre: datos.nombre,
+                nombre,
                 descripcion: datos.descripcion,
                 id_proveedor: datos.id_proveedor,
                 stock_actual: Number(datos.stock_actual),
                 stock_minimo: Number(datos.stock_minimo),
                 precio_costo: Number(datos.precio_costo),
                 precio_venta: Number(datos.precio_venta),
-                estado: datos.estado, // <-- 2. Y LO AGREGAMOS ACÁ PARA QUE SE GUARDE EN LA BD
             },
         });
 
@@ -72,7 +98,7 @@ export async function crearInsumo(datos: {
         };
     } catch (error) {
         console.error("Error al crear insumo:", error);
-        return { success: false, error: "No se pudo crear el insumo" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo crear el insumo" };
     }
 }
 
@@ -87,24 +113,38 @@ export async function actualizarInsumo(
         stock_minimo: number;
         precio_costo: number;
         precio_venta: number;
-        estado?: boolean;
     }
 ) {
     try {
         await requerirUsuario();
+
+        const nombre = datos.nombre.trim();
+        if (await nombreDeInsumoYaExiste(nombre, id)) {
+            return { success: false, error: "Ya existe un insumo con ese nombre" };
+        }
+
+        if (datos.id_proveedor) {
+            const actual = await prisma.insumo.findUnique({ where: { id_insumo: id }, select: { id_proveedor: true } });
+            // Si el proveedor no cambia (sigue siendo el que ya tenia, aunque
+            // se haya dado de baja despues), no se revalida: guardar el
+            // insumo sin tocar el proveedor no debe perder ese dato.
+            if (datos.id_proveedor !== actual?.id_proveedor) {
+                await asegurarProveedorActivo(datos.id_proveedor);
+            }
+        }
+
         const insumoActualizado = await prisma.insumo.update({
             where: {
                 id_insumo: id,
             },
             data: {
-                nombre: datos.nombre,
+                nombre,
                 descripcion: datos.descripcion,
                 id_proveedor: datos.id_proveedor,
                 stock_actual: Number(datos.stock_actual),
                 stock_minimo: Number(datos.stock_minimo),
                 precio_costo: Number(datos.precio_costo),
                 precio_venta: Number(datos.precio_venta),
-                estado: datos.estado,
             },
         });
 
@@ -121,24 +161,79 @@ export async function actualizarInsumo(
         };
     } catch (error) {
         console.error("Error al actualizar insumo:", error);
-        return { success: false, error: "No se pudo actualizar el insumo" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el insumo" };
     }
 }
 
-// 4. ELIMINAR (DAR DE BAJA)
-export async function eliminarInsumo(id: number) {
+// Pantallas que arman un selector de insumos y no deben seguir ofreciendo uno
+// que se acaba de dar de baja (o dejar de ofrecer uno recien reactivado).
+function revalidarListadosDeInsumos() {
+    revalidatePath("/insumos");
+    revalidatePath("/ordenes");
+    revalidatePath("/compras");
+    revalidatePath("/servicios");
+    revalidatePath("/facturacion");
+}
+
+/**
+ * Baja logica (estado = false), nunca un delete. Se rechaza si el insumo
+ * esta en la receta (servicio_insumo) de algun servicio activo: si ese
+ * servicio se agrega a una orden, precarga un insumo que ya no deberia
+ * poder usarse. Un servicio inactivo no bloquea (su receta ya no se usa).
+ */
+export async function darDeBajaInsumo(id_insumo: number) {
     try {
         await requerirUsuario();
-        // Podrías en lugar de borrarlo, cambiarle el estado a inactivo si quisieras
-        await prisma.insumo.delete({
-            where: {
-                id_insumo: id,
-            },
+
+        await prisma.$transaction(async (tx) => {
+            const insumo = await tx.insumo.findUnique({ where: { id_insumo } });
+            if (!insumo) {
+                throw new Error("El insumo no existe");
+            }
+            if (insumo.estado === false) {
+                throw new Error("El insumo ya está dado de baja");
+            }
+
+            const recetas = await tx.servicio_insumo.findMany({
+                where: { id_insumo, servicio: { estado: { not: false } } },
+                select: { servicio: { select: { nombre: true } } },
+                orderBy: { id_servicio: "asc" },
+            });
+
+            if (recetas.length > 0) {
+                const nombres = [...new Set(recetas.map((r) => r.servicio.nombre))];
+                throw new Error(
+                    `No se puede dar de baja "${insumo.nombre}": está en la receta de ${formatearListaConLimite(nombres)}.`
+                );
+            }
+
+            await tx.insumo.update({ where: { id_insumo }, data: { estado: false } });
         });
-        revalidatePath("/insumos");
+
+        revalidarListadosDeInsumos();
         return { success: true };
     } catch (error) {
-        console.error("Error al eliminar insumo:", error);
-        return { success: false, error: "No se pudo eliminar el insumo" };
+        console.error("Error al dar de baja insumo:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo dar de baja el insumo" };
+    }
+}
+
+export async function reactivarInsumo(id_insumo: number) {
+    try {
+        await requerirUsuario();
+        const insumo = await prisma.insumo.findUnique({ where: { id_insumo } });
+        if (!insumo) {
+            return { success: false, error: "El insumo no existe" };
+        }
+        if (insumo.estado !== false) {
+            return { success: false, error: "El insumo ya está activo" };
+        }
+
+        await prisma.insumo.update({ where: { id_insumo }, data: { estado: true } });
+        revalidarListadosDeInsumos();
+        return { success: true };
+    } catch (error) {
+        console.error("Error al reactivar insumo:", error);
+        return { success: false, error: "No se pudo reactivar el insumo" };
     }
 }

@@ -1,9 +1,9 @@
 import { obtenerServicios } from "@/actions/servicios";
 import ModalServicio from "@/components/ModalServicio";
-import BotonEliminarServicio from "@/components/BotonEliminarServicio";
+import BotonBajaServicio from "@/components/BotonBajaServicio";
 
 export default async function ServiciosPage() {
-    const servicios = await obtenerServicios();
+    const servicios = await obtenerServicios({ incluirInactivos: true });
 
     return (
         <div>
@@ -80,9 +80,10 @@ export default async function ServiciosPage() {
                                                     </button>
                                                 }
                                             />
-                                            <BotonEliminarServicio
+                                            <BotonBajaServicio
                                                 idServicio={srv.id_servicio}
                                                 nombreServicio={srv.nombre}
+                                                estadoActual={srv.estado ?? true}
                                             />
                                         </div>
                                     </td>

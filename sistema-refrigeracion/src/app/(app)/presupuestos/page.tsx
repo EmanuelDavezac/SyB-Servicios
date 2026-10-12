@@ -12,8 +12,9 @@ export default async function PresupuestosPage({
     const fechaInicio = typeof params.fechaInicio === "string" ? params.fechaInicio : undefined;
     const fechaFin = typeof params.fechaFin === "string" ? params.fechaFin : undefined;
     const estado = typeof params.estado === "string" ? params.estado : undefined;
+    const cliente = typeof params.cliente === "string" ? params.cliente : undefined;
 
-    const presupuestos = await obtenerPresupuestos({ estado, fechaInicio, fechaFin });
+    const presupuestos = await obtenerPresupuestos({ estado, fechaInicio, fechaFin, cliente });
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount);

@@ -115,7 +115,6 @@ export default function ModalCompra({ proveedores }: Props) {
             stock_minimo: 0,
             precio_costo: parseFloat(nuevoInsumo.precio_costo) || 0,
             precio_venta: parseFloat(nuevoInsumo.precio_venta) || 0,
-            estado: true
         });
         setCargandoInsumo(false);
 

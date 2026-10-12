@@ -1,6 +1,7 @@
 import { describe, it, test, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { registrarCobro, anularCobro, anularFactura, obtenerClientesConDeuda, obtenerDeudaPorCliente } from "@/actions/cobros";
+import { registrarCobro, anularCobro, anularFactura, obtenerClientesConDeuda, obtenerDeudaPorCliente, obtenerReciboCompleto } from "@/actions/cobros";
+import { formatearMediosDePago } from "@/lib/cobros";
 import { crearFactura } from "@/actions/facturacion";
 import { crearCliente, crearInsumo, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
 
@@ -386,5 +387,117 @@ describe("obtenerClientesConDeuda y obtenerDeudaPorCliente", () => {
     const idxAlto = clientesConDeuda.findIndex((c: { id_cliente: number }) => c.id_cliente === clienteAlto.id_cliente);
     const idxBajo = clientesConDeuda.findIndex((c: { id_cliente: number }) => c.id_cliente === clienteBajo.id_cliente);
     expect(idxAlto).toBeLessThan(idxBajo);
+  });
+});
+
+describe("registrarCobro - multiples medios de pago", () => {
+  it("combina efectivo y transferencia en el mismo cobro", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      formasPago: [
+        { forma_pago: "Efectivo", monto: 500 },
+        { forma_pago: "Transferencia", monto: 300 },
+      ],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    const medios = await prisma.recibo_medio_pago.findMany({ where: { id_recibo: resultado.recibo.id_recibo } });
+    expect(medios).toHaveLength(2);
+    expect(medios.map((m) => m.forma_pago).sort()).toEqual(["Efectivo", "Transferencia"]);
+    expect(medios.reduce((acc, m) => acc + Number(m.monto), 0)).toBe(800);
+  });
+
+  it("rechaza si los medios de pago no suman lo imputado", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      formasPago: [{ forma_pago: "Efectivo", monto: 500 }],
+    });
+
+    expect(resultado.success).toBe(false);
+    const recibos = await prisma.recibo.count({ where: { id_cliente: cliente.id_cliente } });
+    expect(recibos).toBe(0);
+  });
+
+  it("los medios de pago tienen que sumar lo imputado MENOS las retenciones", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 1000 }],
+      retenciones: [{ tipo: "IVA", monto: 100 }],
+      formasPago: [{ forma_pago: "Efectivo", monto: 900 }],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const medios = await prisma.recibo_medio_pago.findMany({ where: { id_recibo: resultado.recibo.id_recibo } });
+    expect(medios).toHaveLength(1);
+    expect(Number(medios[0].monto)).toBe(900);
+  });
+
+  it("rechaza un medio de pago con monto 0", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      formasPago: [
+        { forma_pago: "Efectivo", monto: 800 },
+        { forma_pago: "Transferencia", monto: 0 },
+      ],
+    });
+
+    expect(resultado.success).toBe(false);
+  });
+
+  it("sin formasPago sigue funcionando (cobro informal, compatibilidad hacia atras)", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const medios = await prisma.recibo_medio_pago.findMany({ where: { id_recibo: resultado.recibo.id_recibo } });
+    expect(medios).toHaveLength(0);
+  });
+
+  it("obtenerReciboCompleto expone el desglose de medios de pago", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+
+    const creado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      formasPago: [
+        { forma_pago: "Efectivo", monto: 500 },
+        { forma_pago: "Transferencia", monto: 300 },
+      ],
+    });
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+
+    const completo = await obtenerReciboCompleto(creado.recibo.id_recibo);
+    expect(completo?.recibo_medio_pago).toHaveLength(2);
+    expect(completo?.recibo_medio_pago.map((m: { monto: number }) => m.monto).sort((a: number, b: number) => a - b)).toEqual([300, 500]);
+
+    const texto = formatearMediosDePago(completo!.recibo_medio_pago, completo!.forma_pago);
+    expect(texto).toContain("Efectivo");
+    expect(texto).toContain("Transferencia");
   });
 });

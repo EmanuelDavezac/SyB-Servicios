@@ -6,6 +6,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Next resuelve "server-only" via su export condicional "react-server"
+      // al compilar; fuera de ese build (este test runner) el paquete real
+      // tira throw incondicional. Ver tests/stubs/server-only.ts.
+      "server-only": path.resolve(__dirname, "./tests/stubs/server-only.ts"),
     },
   },
   test: {

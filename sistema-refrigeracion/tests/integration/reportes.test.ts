@@ -1,4 +1,4 @@
-import { describe, it, test, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
 import {
   obtenerReporteMensual,
@@ -122,16 +122,14 @@ describe("obtenerReporteMensual", () => {
     expect(reporte.totalFacturadoInterno).toBe(300);
   });
 
-  // Bug conocido con issue abierto: obtenerReporteMensual no resta las
-  // retenciones del ingreso. Escenario: la factura debe 100000, el cliente
-  // paga 90000 en efectivo y retiene 10000 (se lo queda el fisco, no entra a
-  // caja). La imputacion que salda la factura es 100000 (90000 + 10000 de
-  // retencion), asi que recibo.monto_total tambien queda en 100000 (cobros.ts
-  // no distingue el origen del monto imputado). El reporte usa monto_total
-  // como ingreso de caja del mes sin restar las retenciones asociadas al
-  // recibo, entonces informa 100000 en vez de los 90000 que realmente
-  // entraron.
-  test.fails("el ingreso del mes descuenta las retenciones del recibo", async () => {
+  // Escenario: la factura debe 100000, el cliente paga 90000 en efectivo y
+  // retiene 10000 (se lo queda el fisco, no entra a caja). La imputacion que
+  // salda la factura es 100000 (90000 + 10000 de retencion), asi que
+  // recibo.monto_total tambien queda en 100000 (cobros.ts no distingue el
+  // origen del monto imputado). obtenerReporteMensual resta las retenciones
+  // del recibo antes de sumarlas como ingreso de caja, asi que informa los
+  // 90000 que realmente entraron, no el monto_total bruto.
+  it("el ingreso del mes descuenta las retenciones del recibo", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
     const factura = await crearFacturaEmitida({ id_orden: orden.id_orden, monto_total: 100000, saldo_pendiente: 100000 });
@@ -279,8 +277,11 @@ describe("obtenerDatosDashboard", () => {
 });
 
 describe("obtenerReporteServicios", () => {
-  it("documenta que filtra por fecha_creacion de la orden, no por fecha de emision del comprobante", async () => {
+  it("filtra por fecha de emision del comprobante, no por fecha_creacion de la orden", async () => {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
+    // fecha_creacion queda en 2020, pero la factura se emite hoy (crearFactura
+    // usa fechaActualArgentina()): el reporte de 2020 no debe traerla, el del
+    // mes de emision si.
     await prisma.orden_trabajo.update({
       where: { id_orden: orden.id_orden },
       data: { fecha_creacion: new Date(2020, 0, 15) },
@@ -292,28 +293,10 @@ describe("obtenerReporteServicios", () => {
       fiscal: true,
     });
 
-    const reporteDeLaOrden = await obtenerReporteServicios(1, 2020);
-    const ids = reporteDeLaOrden.map((o: { id_orden: number }) => o.id_orden);
-    expect(ids).toContain(orden.id_orden);
-  });
-
-  // Bug conocido con issue abierto: obtenerReporteServicios filtra por
-  // fecha_creacion de la orden en vez de por fecha de emision del comprobante.
-  test.fails("deberia filtrar por la fecha de emision del comprobante", async () => {
-    const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    await prisma.orden_trabajo.update({
-      where: { id_orden: orden.id_orden },
-      data: { fecha_creacion: new Date(2020, 0, 15) },
-    });
-    await crearFactura({
-      id_orden: orden.id_orden,
-      num_factura: "F-1",
-      tipo: "Factura",
-      fiscal: true,
-    });
+    const reporteDe2020 = await obtenerReporteServicios(1, 2020);
+    expect(reporteDe2020.map((o: { id_orden: number }) => o.id_orden)).not.toContain(orden.id_orden);
 
     const reporteDelMesDeEmision = await obtenerReporteServicios(MES, ANIO);
-    const ids = reporteDelMesDeEmision.map((o: { id_orden: number }) => o.id_orden);
-    expect(ids).toContain(orden.id_orden);
+    expect(reporteDelMesDeEmision.map((o: { id_orden: number }) => o.id_orden)).toContain(orden.id_orden);
   });
 });

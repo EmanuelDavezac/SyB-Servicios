@@ -12,6 +12,8 @@ interface ModalConfirmacionProps {
     onCancelar: () => void;
     /** Muestra un spinner en el botón de confirmar mientras se procesa */
     procesando?: boolean;
+    /** Si la action devuelve un error, se muestra acá y el modal queda abierto (no se usa alert()) */
+    error?: string | null;
 }
 
 export default function ModalConfirmacion({
@@ -22,6 +24,7 @@ export default function ModalConfirmacion({
     onConfirmar,
     onCancelar,
     procesando = false,
+    error = null,
 }: ModalConfirmacionProps) {
     const [mounted, setMounted] = useState(false);
 
@@ -56,6 +59,11 @@ export default function ModalConfirmacion({
 
                     <h3 className="text-lg font-bold text-gray-800 mb-2">{titulo}</h3>
                     <p className="text-sm text-gray-500 leading-relaxed">{mensaje}</p>
+                    {error && (
+                        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3 leading-relaxed">
+                            {error}
+                        </p>
+                    )}
                 </div>
 
                 {/* ── Botones ── */}

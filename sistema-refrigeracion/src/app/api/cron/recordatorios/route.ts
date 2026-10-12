@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { enviarRecordatoriosPendientes } from "@/actions/notificaciones";
+import { procesarRecordatorios } from "@/lib/recordatorios";
 
 export async function GET(request: NextRequest) {
     const secretEsperado = process.env.CRON_SECRET;
@@ -16,10 +16,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const resultado3D = await enviarRecordatoriosPendientes(3);
-    const resultado0D = await enviarRecordatoriosPendientes(0);
+    // Sin requerirUsuario: el cron no tiene cookie de sesion. procesarRecordatorios
+    // (src/lib/recordatorios.ts) no la exige; la unica autorizacion de esta ruta
+    // es el CRON_SECRET validado arriba.
+    const resultado3D = await procesarRecordatorios(3);
+    const resultado0D = await procesarRecordatorios(0);
     return NextResponse.json({
         resultado3D,
-        resultado0D
+        resultado0D,
     });
 }

@@ -37,6 +37,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [errores, setErrores] = useState<{ nombre?: string }>({});
 
     const [nombre, setNombre] = useState(servicioInicial?.nombre ?? "");
     const [descripcion, setDescripcion] = useState(servicioInicial?.descripcion ?? "");
@@ -66,6 +67,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
         } else {
             setReceta([]);
         }
+        setErrores({});
         obtenerInsumos().then((data) => setInsumosDisponibles(data as InsumoCatalogo[]));
         setAbierto(true);
     }
@@ -94,6 +96,7 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
 
     async function handleGuardar() {
         if (!nombre.trim() || !precio) return;
+        setErrores({});
         setCargando(true);
 
         const datos = {
@@ -108,7 +111,11 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
 
         if (!resultado.success) {
             setCargando(false);
-            alert(modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio.");
+            if (resultado.error?.toLowerCase().includes("nombre")) {
+                setErrores({ nombre: resultado.error });
+            } else {
+                alert(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el servicio."));
+            }
             return;
         }
 
@@ -169,10 +176,14 @@ export default function ModalServicio({ servicioInicial, trigger }: Props) {
                                 <input
                                     type="text"
                                     value={nombre}
-                                    onChange={(e) => setNombre(e.target.value)}
+                                    onChange={(e) => {
+                                        setNombre(e.target.value);
+                                        setErrores((prev) => ({ ...prev, nombre: undefined }));
+                                    }}
                                     placeholder="Ej: Carga de gas R410A"
-                                    className={inputCls}
+                                    className={`${inputCls} ${errores.nombre ? "border-red-400 ring-1 ring-red-400" : ""}`}
                                 />
+                                {errores.nombre && <p className="text-red-500 text-xs mt-1">{errores.nombre}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Descripción</label>

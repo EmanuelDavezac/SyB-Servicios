@@ -618,6 +618,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         precio: number;
         alicuota: number;
         pendiente: boolean;
+        id_insumo: number;
         item: DetalleInsumo | InsumoPendiente;
     }[] = [
         ...insumosGuardados.map((d) => ({
@@ -627,6 +628,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             precio: parseFloat(String(d.precio_aplicado)),
             alicuota: parseFloat(String(d.alicuota_iva)),
             pendiente: false,
+            id_insumo: d.id_insumo,
             item: d,
         })),
         ...insumosPendientes.map((p) => ({
@@ -636,9 +638,17 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             precio: p.precio_aplicado,
             alicuota: p.alicuota_iva,
             pendiente: true,
+            id_insumo: p.id_insumo,
             item: p,
         })),
     ];
+
+    // Aviso (no bloqueante, en la orden el stock todavia no se descuenta) si
+    // la cantidad cargada supera el stock actual del insumo.
+    function stockDisponibleDe(id_insumo: number): number | null {
+        const insumo = catalogoInsumos.find((i) => i.id_insumo === id_insumo);
+        return insumo ? Number(insumo.stock_actual ?? 0) : null;
+    }
 
     const tabCls = (active: boolean) =>
         `px-4 py-1.5 rounded-full transition text-xs font-bold ${
@@ -944,24 +954,32 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                             <p className="text-xs text-gray-400 italic mb-2">Sin insumos registrados.</p>
                         ) : (
                             <div className="space-y-1 mb-3">
-                                {insumosDisplay.map(({ key, nombre, cantidad, precio, alicuota, pendiente, item }) => (
+                                {insumosDisplay.map(({ key, nombre, cantidad, precio, alicuota, pendiente, id_insumo, item }) => {
+                                    const stockDisponible = stockDisponibleDe(id_insumo);
+                                    const superaStock = stockDisponible !== null && cantidad > stockDisponible;
+                                    return (
                                     <div
                                         key={key}
                                         className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
                                             pendiente ? "bg-amber-50 border border-amber-200" : "bg-orange-50"
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
                                             {pendiente && (
-                                                <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                                                <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
                                                     pendiente
                                                 </span>
                                             )}
-                                            <span className={`font-medium ${pendiente ? "text-amber-900" : "text-orange-900"}`}>
+                                            <span className={`font-medium truncate ${pendiente ? "text-amber-900" : "text-orange-900"}`}>
                                                 {nombre}
                                             </span>
+                                            {superaStock && (
+                                                <span className="text-[9px] font-bold uppercase text-red-600 bg-red-100 px-1.5 py-0.5 rounded shrink-0" title="En la orden el stock no se descuenta; se descuenta al facturar">
+                                                    Stock disponible: {stockDisponible}
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="flex items-center gap-3 text-gray-600 text-xs">
+                                        <div className="flex items-center gap-3 text-gray-600 text-xs shrink-0">
                                             <span>x{cantidad}</span>
                                             <span className="font-bold text-gray-800">{fmtMoney(precio * cantidad)}</span>
                                             <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400">
@@ -978,7 +996,8 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 

@@ -154,7 +154,7 @@ export default async function FacturacionPage({
     return (
         <div className="p-8 pb-20 font-sans max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">Facturación</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Comprobantes</h1>
                 <div className="flex gap-3">
                     <ModalCobro clientes={clientesConDeuda} />
                     <ModalFactura ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />

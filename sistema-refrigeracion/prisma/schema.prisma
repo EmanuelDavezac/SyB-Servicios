@@ -228,18 +228,35 @@ model servicio_insumo {
 }
 
 model recibo {
-  id_recibo       Int               @id @default(autoincrement())
-  id_cliente      Int
-  fecha_pago      DateTime          @default(dbgenerated("CURRENT_DATE")) @db.Date
-  monto_total     Decimal           @db.Decimal(10, 2)
-  forma_pago      String?           @db.VarChar(50)
-  observacion     String?
-  pagos_parciales pagos_parciales[]
-  cliente         cliente           @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
-  retencion       retencion[]
+  id_recibo         Int                 @id @default(autoincrement())
+  id_cliente        Int
+  fecha_pago        DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
+  monto_total       Decimal             @db.Decimal(10, 2)
+  // Deprecado: un recibo nuevo puede combinar varios medios de pago
+  // (recibo_medio_pago) con su propio monto cada uno. Se deja la columna sin
+  // escribir mas para no perder el dato de recibos viejos (pre-migracion),
+  // que solo tienen esto y no filas en recibo_medio_pago.
+  forma_pago        String?             @db.VarChar(50)
+  observacion       String?
+  pagos_parciales   pagos_parciales[]
+  cliente           cliente             @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
+  retencion         retencion[]
+  recibo_medio_pago recibo_medio_pago[]
 
   @@index([fecha_pago], map: "idx_recibo_fecha_pago")
   @@index([id_cliente], map: "idx_recibo_id_cliente")
+}
+
+// Desglose de un cobro en varios medios de pago (ej. $500 efectivo + $300
+// transferencia): una fila por medio usado en el recibo.
+model recibo_medio_pago {
+  id_medio_pago Int     @id @default(autoincrement())
+  id_recibo     Int
+  forma_pago    String  @db.VarChar(50)
+  monto         Decimal @db.Decimal(10, 2)
+  recibo        recibo  @relation(fields: [id_recibo], references: [id_recibo], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([id_recibo], map: "idx_recibo_medio_pago_id_recibo")
 }
 
 model retencion {

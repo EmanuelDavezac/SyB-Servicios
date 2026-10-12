@@ -14,7 +14,7 @@ const LINKS = [
   { href: "/servicios", icon: "fa-wrench", label: "Servicios" },
   { href: "/ordenes", icon: "fa-clipboard-list", label: "Órdenes" },
   { href: "/presupuestos", icon: "fa-file-signature", label: "Presupuestos" },
-  { href: "/facturacion", icon: "fa-file-invoice-dollar", label: "Facturación" },
+  { href: "/facturacion", icon: "fa-file-invoice-dollar", label: "Comprobantes" },
   { href: "/informes-tecnicos", icon: "fa-file-lines", label: "Informe Técnico" },
   { href: "/cobros", icon: "fa-hand-holding-dollar", label: "Cobros" },
   { href: "/reportes", icon: "fa-chart-pie", label: "Reportes" },

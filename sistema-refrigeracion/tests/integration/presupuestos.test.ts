@@ -6,7 +6,10 @@ import {
   cambiarEstadoPresupuesto,
   eliminarPresupuesto,
   obtenerPresupuestos,
+  buscarDestinatarios,
+  crearOrdenDesdePresupuesto,
 } from "@/actions/presupuestos";
+import { crearCliente } from "./factories";
 
 function datosBase(overrides: Partial<Parameters<typeof crearPresupuesto>[0]> = {}) {
   return {
@@ -156,5 +159,149 @@ describe("obtenerPresupuestos", () => {
 
     expect(vencido).toBeDefined();
     expect(vigente).toBeDefined();
+  });
+
+  it("filtra por cliente/destinatario (CU19)", async () => {
+    await crearPresupuesto(datosBase({ destinatario: { nombre: "Juan Perez" } }));
+    await crearPresupuesto(datosBase({ destinatario: { nombre: "Maria Gomez" } }));
+
+    const filtrados = await obtenerPresupuestos({ cliente: "perez" });
+
+    expect(filtrados).toHaveLength(1);
+    expect(filtrados[0].destinatario_nombre).toBe("Juan Perez");
+  });
+});
+
+describe("buscarDestinatarios (CU45)", () => {
+  it("sugiere clientes activos", async () => {
+    const cliente = await crearCliente({ nombre: "Roberto", apellido: "Diaz" });
+
+    const sugerencias = await buscarDestinatarios("Diaz");
+
+    expect(sugerencias).toHaveLength(1);
+    expect(sugerencias[0].id_cliente).toBe(cliente.id_cliente);
+    expect(sugerencias[0].nombre).toBe("Roberto Diaz");
+  });
+
+  it("tambien sugiere destinatarios de presupuestos anteriores sin cliente vinculado", async () => {
+    await crearPresupuesto(datosBase({ destinatario: { nombre: "Carlos Ocasional", localidad: "Rosario" } }));
+
+    const sugerencias = await buscarDestinatarios("Ocasional");
+
+    expect(sugerencias).toHaveLength(1);
+    expect(sugerencias[0].id_cliente).toBeNull();
+    expect(sugerencias[0].nombre).toBe("Carlos Ocasional");
+    expect(sugerencias[0].localidad).toBe("Rosario");
+  });
+
+  it("no repite un destinatario que ya aparece como cliente cargado", async () => {
+    const cliente = await crearCliente({ nombre: "Laura", apellido: "Martinez" });
+    await crearPresupuesto(
+      datosBase({ destinatario: { id_cliente: cliente.id_cliente, nombre: "Laura Martinez" } })
+    );
+    // Presupuesto viejo del mismo nombre pero sin cliente vinculado (antes de cargarla).
+    await crearPresupuesto(datosBase({ destinatario: { nombre: "Laura Martinez" } }));
+
+    const sugerencias = await buscarDestinatarios("Martinez");
+
+    expect(sugerencias).toHaveLength(1);
+    expect(sugerencias[0].id_cliente).toBe(cliente.id_cliente);
+  });
+
+  it("menos de 2 caracteres no busca nada", async () => {
+    const sugerencias = await buscarDestinatarios("a");
+    expect(sugerencias).toEqual([]);
+  });
+});
+
+describe("crearOrdenDesdePresupuesto (CU47)", () => {
+  it("genera la orden con las lineas del presupuesto y guarda el vinculo", async () => {
+    const cliente = await crearCliente();
+    const creado = await crearPresupuesto(
+      datosBase({
+        destinatario: { id_cliente: cliente.id_cliente, nombre: `${cliente.nombre} ${cliente.apellido}` },
+        lineas: [{ cantidad: 2, descripcion: "Carga de gas", precio_unitario: 500 }],
+      })
+    );
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+    await cambiarEstadoPresupuesto(creado.presupuesto.id_presupuesto, "ACEPTADO");
+
+    const resultado = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.orden.id_cliente).toBe(cliente.id_cliente);
+    expect(resultado.orden.estado_trabajo).toBe("Pendiente");
+
+    const lineas = await prisma.detalle_orden_servicio.findMany({ where: { id_orden: resultado.orden.id_orden } });
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0].cantidad).toBe(2);
+    expect(Number(lineas[0].precio_acordado)).toBe(500);
+    expect(lineas[0].descripcion_libre).toBe("Carga de gas");
+
+    const presupuestoFinal = await prisma.presupuesto.findUnique({ where: { id_presupuesto: creado.presupuesto.id_presupuesto } });
+    expect(presupuestoFinal?.id_orden).toBe(resultado.orden.id_orden);
+  });
+
+  it("una cantidad fraccionaria se pasa como 1 linea por el importe total, sin perder plata", async () => {
+    const cliente = await crearCliente();
+    const creado = await crearPresupuesto(
+      datosBase({
+        destinatario: { id_cliente: cliente.id_cliente, nombre: "x" },
+        lineas: [{ cantidad: 2.5, descripcion: "Cano de cobre", precio_unitario: 100 }],
+      })
+    );
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+    await cambiarEstadoPresupuesto(creado.presupuesto.id_presupuesto, "ACEPTADO");
+
+    const resultado = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const lineas = await prisma.detalle_orden_servicio.findMany({ where: { id_orden: resultado.orden.id_orden } });
+    expect(lineas[0].cantidad).toBe(1);
+    expect(Number(lineas[0].precio_acordado)).toBe(250);
+  });
+
+  it("rechaza si el presupuesto no esta ACEPTADO", async () => {
+    const cliente = await crearCliente();
+    const creado = await crearPresupuesto(
+      datosBase({ destinatario: { id_cliente: cliente.id_cliente, nombre: "x" } })
+    );
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+
+    const resultado = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+    expect(resultado.success).toBe(false);
+  });
+
+  it("rechaza si no tiene cliente vinculado", async () => {
+    const creado = await crearPresupuesto(datosBase({ destinatario: { nombre: "Sin cliente" } }));
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+    await cambiarEstadoPresupuesto(creado.presupuesto.id_presupuesto, "ACEPTADO");
+
+    const resultado = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+    expect(resultado.success).toBe(false);
+    expect(resultado.error).toContain("cliente vinculado");
+  });
+
+  it("no se puede generar dos veces la misma orden", async () => {
+    const cliente = await crearCliente();
+    const creado = await crearPresupuesto(
+      datosBase({ destinatario: { id_cliente: cliente.id_cliente, nombre: "x" } })
+    );
+    expect(creado.success).toBe(true);
+    if (!creado.success) return;
+    await cambiarEstadoPresupuesto(creado.presupuesto.id_presupuesto, "ACEPTADO");
+
+    const primera = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+    expect(primera.success).toBe(true);
+
+    const segunda = await crearOrdenDesdePresupuesto(creado.presupuesto.id_presupuesto);
+    expect(segunda.success).toBe(false);
+    expect(segunda.error).toContain("Ya se generó una orden");
   });
 });

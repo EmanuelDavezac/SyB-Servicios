@@ -2,6 +2,7 @@ import { obtenerClientesConDeuda, obtenerCobros } from "@/actions/cobros";
 import ModalCobro from "@/components/ModalCobro";
 import BotonAnularCobro from "@/components/BotonAnularCobro";
 import BotonImprimirRecibo from "@/components/BotonImprimirRecibo";
+import { formatearMediosDePago } from "@/lib/cobros";
 
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount);
@@ -86,6 +87,7 @@ export default async function CobrosPage() {
                     ) : (
                         cobros.map((r: any) => {
                             const facturasImputadas = r.pagos_parciales.map((p: any) => p.factura?.num_factura || `#${p.id_factura}`).join(", ");
+                            const medioPago = formatearMediosDePago(r.recibo_medio_pago || [], r.forma_pago);
                             return (
                                 <div key={r.id_recibo} className="border-b hover:bg-gray-50 text-sm">
                                     {/* Tarjeta móvil */}
@@ -96,7 +98,7 @@ export default async function CobrosPage() {
                                         </div>
                                         <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
                                             <span>{formatDate(r.fecha_pago)}</span>
-                                            <span>{r.forma_pago || "-"}</span>
+                                            <span>{medioPago}</span>
                                         </div>
                                         {facturasImputadas && (
                                             <div className="text-gray-500 text-xs mt-1">{facturasImputadas}</div>
@@ -111,7 +113,7 @@ export default async function CobrosPage() {
                                     <div className="hidden md:grid grid-cols-6 items-center p-4">
                                         <div className="text-gray-900">{formatDate(r.fecha_pago)}</div>
                                         <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
-                                        <div className="text-gray-600">{r.forma_pago || "-"}</div>
+                                        <div className="text-gray-600">{medioPago}</div>
                                         <div className="text-gray-600 text-xs">{facturasImputadas}</div>
                                         <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
                                         <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">

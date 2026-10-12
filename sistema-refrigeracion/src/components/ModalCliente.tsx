@@ -98,8 +98,12 @@ export default function ModalCliente({ cliente }: Props) {
 
         if (res.success) {
             setIsOpen(false);
+        } else if (res.error?.toLowerCase().includes("cuit")) {
+            setErrores((prev) => ({ ...prev, cuit: res.error }));
+        } else if (res.error?.toLowerCase().includes("email")) {
+            setErrores((prev) => ({ ...prev, email: res.error }));
         } else {
-            setError("Hubo un error al intentar guardar el cliente.");
+            setError(res.error || "Hubo un error al intentar guardar el cliente.");
         }
     }
 
@@ -168,8 +172,9 @@ export default function ModalCliente({ cliente }: Props) {
                                             setErrores((prev) => ({ ...prev, cuit: undefined }));
                                         }}
                                         placeholder="Ej: 20-12345678-9"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.cuit ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
+                                    {errores.cuit && <p className="text-red-500 text-xs mt-1">{errores.cuit}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>

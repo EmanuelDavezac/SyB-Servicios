@@ -21,12 +21,14 @@ type Proveedor = {
     id_proveedor: number;
     razon_social: string;
     nombre_proveedor: string | null;
+    estado?: boolean | null;
 };
 
 export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insumoAEditar?: Insumo; proveedores?: Proveedor[] }) {
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const esEdicion = !!insumoAEditar;
 
@@ -34,6 +36,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        setError(null);
         setLoading(true);
 
         const formData = new FormData(e.currentTarget);
@@ -46,20 +49,17 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
         const proveedorValue = formData.get("id_proveedor");
         const id_proveedor = proveedorValue ? Number(proveedorValue) : undefined;
 
-        const estadoValue = formData.get("estado");
-        const estado = estadoValue === "true";
-
         const precio_costo = Number(formData.get("precio_costo")) || 0;
         const precio_venta = Number(formData.get("precio_venta")) || 0;
 
         let res;
         if (esEdicion && insumoAEditar) {
             res = await actualizarInsumo(insumoAEditar.id_insumo, {
-                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta, estado
+                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta
             });
         } else {
             res = await crearInsumo({
-                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta, estado
+                nombre, descripcion, id_proveedor, stock_actual, stock_minimo, precio_costo, precio_venta
             });
         }
 
@@ -67,7 +67,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
         if (res.success) {
             setIsOpen(false);
         } else {
-            alert("Hubo un error al intentar guardar el insumo.");
+            setError(res.error || "Hubo un error al intentar guardar el insumo.");
         }
     }
 
@@ -100,6 +100,12 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                 {/* Formulario */}
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
                     <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+                                {error}
+                            </div>
+                        )}
 
                         {/* ── Identificación ── */}
                         <section>
@@ -140,6 +146,7 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                                             {proveedores.map((prov) => (
                                                 <option key={prov.id_proveedor} value={prov.id_proveedor}>
                                                     {prov.razon_social || prov.nombre_proveedor}
+                                                    {prov.estado === false ? " (inactivo)" : ""}
                                                 </option>
                                             ))}
                                         </select>
@@ -221,18 +228,9 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
                     </div>
 
 
-                    {/* NUEVO: SELECTOR DE ESTADO */}
-                    <div className="pb-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Estado del Insumo</label>
-                        <select
-                            name="estado"
-                            defaultValue={insumoAEditar?.estado !== false ? "true" : "false"}
-                            className="w-full border border-gray-300 p-2 rounded focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none bg-white"
-                        >
-                            <option value="true">Activo (Visible)</option>
-                            <option value="false">Inactivo (Oculto/Dado de baja)</option>
-                        </select>
-                    </div>
+                    {/* El alta/baja del insumo se maneja con el botón "Dar de baja" /
+                        "Reactivar" de la tabla (darDeBajaInsumo/reactivarInsumo, con sus
+                        validaciones), no desde este formulario. */}
                     {/* Footer */}
                     <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 md:rounded-b-2xl shrink-0">
                         <button
@@ -265,11 +263,11 @@ export default function ModalInsumo({ insumoAEditar, proveedores = [] }: { insum
     return (
         <>
             {esEdicion ? (
-                <button onClick={() => setIsOpen(true)} className="text-blue-600 hover:text-blue-800 font-bold px-2 py-1" title="Editar">
+                <button onClick={() => { setError(null); setIsOpen(true); }} className="text-blue-600 hover:text-blue-800 font-bold px-2 py-1" title="Editar">
                     <i className="fas fa-edit"></i>
                 </button>
             ) : (
-                <button onClick={() => setIsOpen(true)} className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">
+                <button onClick={() => { setError(null); setIsOpen(true); }} className="bg-sky-600 text-white px-4 py-2 rounded shadow hover:bg-sky-700 transition">
                     + Nuevo Insumo
                 </button>
             )}

@@ -1,6 +1,6 @@
 import { obtenerClientes } from "@/actions/clientes";
 import ModalCliente from "@/components/ModalCliente";
-import BotonEliminarCliente from "@/components/BotonEliminarCliente";
+import BotonBajaCliente from "@/components/BotonBajaCliente";
 import FiltrosClientes from "@/components/FiltrosClientes";
 
 export default async function ClientesPage({
@@ -75,9 +75,10 @@ export default async function ClientesPage({
                                     <td className="p-4 text-center">
                                         <div className="flex justify-center items-center gap-2">
                                             <ModalCliente cliente={cliente} />
-                                            <BotonEliminarCliente
+                                            <BotonBajaCliente
                                                 idCliente={cliente.id_cliente}
                                                 nombreCliente={`${cliente.nombre} ${cliente.apellido}`}
+                                                estadoActual={cliente.estado ?? true}
                                             />
                                         </div>
                                     </td>

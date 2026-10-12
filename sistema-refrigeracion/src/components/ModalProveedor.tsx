@@ -24,7 +24,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [errores, setErrores] = useState<{ email?: string }>({});
+    const [errores, setErrores] = useState<{ cuit?: string; email?: string }>({});
 
     const [razonSocial, setRazonSocial] = useState(proveedorInicial?.razon_social ?? "");
     const [nombreProveedor, setNombreProveedor] = useState(proveedorInicial?.nombre_proveedor ?? "");
@@ -74,8 +74,12 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                 setRazonSocial(""); setNombreProveedor(""); setCuit(""); setTelefono(""); setEmail("");
             }
             setAbierto(false);
+        } else if (resultado.error?.toLowerCase().includes("cuit")) {
+            setErrores({ cuit: resultado.error });
+        } else if (resultado.error?.toLowerCase().includes("email")) {
+            setErrores({ email: resultado.error });
         } else {
-            alert(modoEdicion ? "Error al guardar los cambios." : "Error al crear el proveedor.");
+            alert(resultado.error || (modoEdicion ? "Error al guardar los cambios." : "Error al crear el proveedor."));
         }
     }
 
@@ -148,10 +152,14 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                                 <input
                                     type="text"
                                     value={cuit}
-                                    onChange={(e) => setCuit(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                    onChange={(e) => {
+                                        setCuit(e.target.value.replace(/\D/g, '').slice(0, 11));
+                                        setErrores((prev) => ({ ...prev, cuit: undefined }));
+                                    }}
                                     placeholder="Ej: 30123456789"
-                                    className={inputCls}
+                                    className={`${inputCls} ${errores.cuit ? "border-red-400 ring-1 ring-red-400" : ""}`}
                                 />
+                                {errores.cuit && <p className="text-red-500 text-xs mt-1">{errores.cuit}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Teléfono (solo números)</label>

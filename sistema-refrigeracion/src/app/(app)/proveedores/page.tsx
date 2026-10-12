@@ -1,5 +1,6 @@
 import { obtenerProveedores } from "@/actions/proveedores";
 import ModalProveedor from "@/components/ModalProveedor";
+import BotonBajaProveedor from "@/components/BotonBajaProveedor";
 
 export default async function ProveedoresPage() {
     const proveedores = await obtenerProveedores({ incluirInactivos: true });
@@ -77,24 +78,31 @@ export default async function ProveedoresPage() {
 
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
-                                        <ModalProveedor
-                                            proveedorInicial={{
-                                                id_proveedor: prov.id_proveedor,
-                                                razon_social: prov.razon_social,
-                                                nombre_proveedor: prov.nombre_proveedor ?? null,
-                                                cuit: prov.cuit ?? null,
-                                                telefono: prov.telefono ?? null,
-                                                email: prov.email ?? null,
-                                            }}
-                                            trigger={
-                                                <button
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Editar proveedor"
-                                                >
-                                                    <i className="fas fa-edit" />
-                                                </button>
-                                            }
-                                        />
+                                        <div className="flex items-center justify-center gap-3">
+                                            <ModalProveedor
+                                                proveedorInicial={{
+                                                    id_proveedor: prov.id_proveedor,
+                                                    razon_social: prov.razon_social,
+                                                    nombre_proveedor: prov.nombre_proveedor ?? null,
+                                                    cuit: prov.cuit ?? null,
+                                                    telefono: prov.telefono ?? null,
+                                                    email: prov.email ?? null,
+                                                }}
+                                                trigger={
+                                                    <button
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                        title="Editar proveedor"
+                                                    >
+                                                        <i className="fas fa-edit" />
+                                                    </button>
+                                                }
+                                            />
+                                            <BotonBajaProveedor
+                                                idProveedor={prov.id_proveedor}
+                                                nombreProveedor={prov.razon_social}
+                                                estadoActual={prov.estado ?? true}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))

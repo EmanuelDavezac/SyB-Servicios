@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { cambiarEstadoPresupuesto, eliminarPresupuesto } from "@/actions/presupuestos";
+import Link from "next/link";
+import { cambiarEstadoPresupuesto, eliminarPresupuesto, crearOrdenDesdePresupuesto } from "@/actions/presupuestos";
 import ModalPresupuesto from "@/components/ModalPresupuesto";
 import BotonImprimirPresupuesto from "@/components/BotonImprimirPresupuesto";
 import ModalClienteDesdePresupuesto from "@/components/ModalClienteDesdePresupuesto";
@@ -9,6 +10,7 @@ import ModalClienteDesdePresupuesto from "@/components/ModalClienteDesdePresupue
 interface PresupuestoParaEditar {
     id_presupuesto: number;
     id_cliente: number | null;
+    id_orden: number | null;
     destinatario_nombre: string;
     destinatario_cuit: string | null;
     destinatario_domicilio: string | null;
@@ -33,6 +35,18 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
     const [ofreciendoAltaCliente, setOfreciendoAltaCliente] = useState(false);
 
     const esPendiente = presupuesto.estado === "PENDIENTE";
+    const esAceptado = presupuesto.estado === "ACEPTADO";
+    const puedeGenerarOrden = esAceptado && !!presupuesto.id_cliente && !presupuesto.id_orden;
+
+    async function handleGenerarOrden() {
+        if (!confirm("¿Generar una orden de trabajo a partir de este presupuesto?")) return;
+        setProcesando(true);
+        const resultado = await crearOrdenDesdePresupuesto(presupuesto.id_presupuesto);
+        setProcesando(false);
+        if (!resultado.success) {
+            alert(resultado.error || "No se pudo generar la orden de trabajo.");
+        }
+    }
 
     async function handleCambiarEstado(estado: "ACEPTADO" | "RECHAZADO") {
         const verbo = estado === "ACEPTADO" ? "aceptar" : "rechazar";
@@ -101,6 +115,27 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
                         <i className="fas fa-trash"></i>
                     </button>
                 </>
+            )}
+
+            {puedeGenerarOrden && (
+                <button
+                    title="Generar orden de trabajo a partir de este presupuesto"
+                    onClick={handleGenerarOrden}
+                    className="hover:text-blue-600"
+                    disabled={procesando}
+                >
+                    <i className="fas fa-clipboard-list"></i>
+                </button>
+            )}
+
+            {esAceptado && presupuesto.id_orden && (
+                <Link
+                    href="/ordenes"
+                    title={`Orden de trabajo #${presupuesto.id_orden} generada`}
+                    className="text-green-600 hover:text-green-800"
+                >
+                    <i className="fas fa-circle-check"></i>
+                </Link>
             )}
 
             {editando && (

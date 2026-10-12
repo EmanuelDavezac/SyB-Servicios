@@ -1,11 +1,38 @@
 "use server";
 
+import { Prisma, type insumo as InsumoModel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, esTipoFacturable } from "@/lib/estadoFactura";
 import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
+
+// Mitad de la unidad mas chica que admite stock_actual/cantidad_usada
+// (Decimal(10,3)): evita falsos positivos de "falta stock" por ruido de
+// redondeo al sumar varias lineas, sin esconder un faltante real.
+const TOLERANCIA_STOCK = 0.0005;
+
+export interface StockInsuficienteItem {
+  id_insumo: number;
+  nombre: string;
+  /** insumo.descripcion: unidad de medida en texto libre (ej. "kg", "m") */
+  unidad: string | null;
+  disponible: number;
+  requerido: number;
+  faltante: number;
+}
+
+// Se tira dentro de la transaccion para abortarla (nada queda escrito) y se
+// atrapa en el catch de crearFactura para devolver la lista estructurada en
+// vez de un string: ModalFactura necesita los numeros para armar la tabla de
+// confirmacion, no solo un mensaje.
+class StockInsuficienteParaFacturar extends Error {
+  constructor(public readonly detalle: StockInsuficienteItem[]) {
+    super(`Stock insuficiente para ${detalle.length} insumo(s)`);
+    this.name = "StockInsuficienteParaFacturar";
+  }
+}
 
 export async function getFacturas() {
   try {
@@ -82,6 +109,8 @@ export async function crearFactura(data: {
   descuento_porcentaje?: number | null;
   descuento_monto_equipo?: number | null;
   equipo_descripcion?: string | null;
+  /** true: seguir facturando aunque algun insumo quede con stock negativo */
+  confirmarStockInsuficiente?: boolean;
 }) {
   try {
     await requerirUsuario();
@@ -133,14 +162,71 @@ export async function crearFactura(data: {
         fechaVencimiento.setUTCDate(fechaVencimiento.getUTCDate() + dias);
       }
 
-      // 2. Descontar stock de los insumos ya registrados en la ORDEN
-      //    (agregados desde ModalOrden durante el trabajo). El stock se mueve
-      //    solo con la Factura: un Remito no descuenta.
+      // 2. Insumos ya registrados en la ORDEN (agregados desde ModalOrden
+      //    durante el trabajo) + insumos adicionales que llegan de ModalFactura.
+      //    El stock se mueve solo con la Factura: un Remito no descuenta.
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
         include: { insumo: true },
       });
 
+      // Se valida que cada insumo adicional exista (y se trae junto con su
+      // precio_venta para la linea nueva) antes de escribir nada.
+      const insumosAdicionales: { item: NonNullable<typeof data.insumos>[number]; insumo: InsumoModel }[] = [];
+      for (const item of data.insumos ?? []) {
+        const insumo = await tx.insumo.findUnique({ where: { id_insumo: item.id_insumo } });
+        if (!insumo) {
+          throw new Error(`Insumo con ID ${item.id_insumo} no encontrado`);
+        }
+        insumosAdicionales.push({ item, insumo });
+      }
+
+      // 2.1 Calcular cuanto se va a descontar de cada insumo (sumando todas
+      //     las lineas que lo usan, de la orden y adicionales) y compararlo
+      //     contra el stock disponible. Es el mismo numero que se descuenta
+      //     mas abajo: no se duplica el calculo.
+      if (facturable) {
+        const requeridoPorInsumo = new Map<number, { insumo: InsumoModel; requerido: Prisma.Decimal }>();
+        const acumular = (id_insumo: number | null, cantidad: Prisma.Decimal.Value, insumo: InsumoModel | null) => {
+          if (id_insumo === null || !insumo) return;
+          const existente = requeridoPorInsumo.get(id_insumo);
+          if (existente) {
+            existente.requerido = existente.requerido.plus(cantidad);
+          } else {
+            requeridoPorInsumo.set(id_insumo, { insumo, requerido: new Prisma.Decimal(cantidad) });
+          }
+        };
+
+        for (const detalle of insumosDeOrden) {
+          acumular(detalle.id_insumo, detalle.cantidad_usada, detalle.insumo);
+        }
+        for (const { item, insumo } of insumosAdicionales) {
+          acumular(item.id_insumo, item.cantidad, insumo);
+        }
+
+        const stockInsuficiente: StockInsuficienteItem[] = [];
+        for (const { insumo, requerido } of requeridoPorInsumo.values()) {
+          const disponible = new Prisma.Decimal(insumo.stock_actual ?? 0);
+          const faltante = requerido.minus(disponible);
+          if (faltante.greaterThan(TOLERANCIA_STOCK)) {
+            stockInsuficiente.push({
+              id_insumo: insumo.id_insumo,
+              nombre: insumo.nombre,
+              unidad: insumo.descripcion,
+              disponible: disponible.toNumber(),
+              requerido: requerido.toNumber(),
+              faltante: faltante.toNumber(),
+            });
+          }
+        }
+
+        if (stockInsuficiente.length > 0 && !data.confirmarStockInsuficiente) {
+          stockInsuficiente.sort((a, b) => a.id_insumo - b.id_insumo);
+          throw new StockInsuficienteParaFacturar(stockInsuficiente);
+        }
+      }
+
+      // 3. Descontar stock de los insumos ya registrados en la orden
       for (const detalle of facturable ? insumosDeOrden : []) {
         if (detalle.id_insumo === null) continue; // id_insumo is nullable in schema; skip if missing
         await tx.insumo.update({
@@ -153,40 +239,31 @@ export async function crearFactura(data: {
         });
       }
 
-      // 3. Procesar insumos adicionales pasados manualmente (compatibilidad con ModalFactura)
-      if (data.insumos && data.insumos.length > 0) {
-        for (const item of data.insumos) {
-          const insumo = await tx.insumo.findUnique({
+      // 3.1 Descontar stock de los adicionales y registrarlos en el detalle
+      //     de la orden (compatibilidad con ModalFactura). Se registran
+      //     siempre, facturable o no; lo que depende del tipo es si mueven
+      //     stock.
+      for (const { item, insumo } of insumosAdicionales) {
+        if (facturable) {
+          await tx.insumo.update({
             where: { id_insumo: item.id_insumo },
-          });
-
-          if (!insumo) {
-            throw new Error(`Insumo con ID ${item.id_insumo} no encontrado`);
-          }
-
-          // Descontar stock (solo Factura)
-          if (facturable) {
-            await tx.insumo.update({
-              where: { id_insumo: item.id_insumo },
-              data: {
-                stock_actual: {
-                  decrement: item.cantidad,
-                },
-              },
-            });
-          }
-
-          // Registrar en el detalle de la orden
-          await tx.detalle_orden_insumo.create({
             data: {
-              id_orden: data.id_orden,
-              id_insumo: item.id_insumo,
-              cantidad_usada: item.cantidad,
-              precio_aplicado: insumo.precio_venta,
-              alicuota_iva: item.alicuota_iva ?? ALICUOTA_IVA_DEFAULT,
+              stock_actual: {
+                decrement: item.cantidad,
+              },
             },
           });
         }
+
+        await tx.detalle_orden_insumo.create({
+          data: {
+            id_orden: data.id_orden,
+            id_insumo: item.id_insumo,
+            cantidad_usada: item.cantidad,
+            precio_aplicado: insumo.precio_venta,
+            alicuota_iva: item.alicuota_iva ?? ALICUOTA_IVA_DEFAULT,
+          },
+        });
       }
 
       // 4. Calcular importes a partir de las lineas guardadas en la orden
@@ -263,6 +340,9 @@ export async function crearFactura(data: {
     revalidatePath("/ordenes");
     return { success: true, factura: JSON.parse(JSON.stringify(nuevaFactura)) };
   } catch (error) {
+    if (error instanceof StockInsuficienteParaFacturar) {
+      return { success: false, stockInsuficiente: error.detalle, error: error.message };
+    }
     console.error("Error creating factura:", error);
     return { success: false, error: error instanceof Error ? error.message : "Error al crear la factura" };
   }

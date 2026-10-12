@@ -11,7 +11,7 @@ const ESTILOS_ESTADO: Record<string, string> = {
     "Finalizado": "bg-green-100 text-green-800 border border-green-200",
 };
 
-export default async function OrdenesPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string }> }) {
+export default async function OrdenesPage({ searchParams }: { searchParams: Promise<{ busqueda?: string; estado?: string; fechaInicio?: string; fechaFin?: string }> }) {
     const params = await searchParams;
 
     // Traemos las órdenes y los clientes activos en paralelo
@@ -36,6 +36,16 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
     // Filtro por estado
     if (params.estado) {
         ordenes = ordenes.filter((orden) => (orden.estado_trabajo || "Pendiente") === params.estado);
+    }
+
+    // Filtro por fecha de creación de la orden
+    if (params.fechaInicio) {
+        const inicio = new Date(`${params.fechaInicio}T00:00:00`);
+        ordenes = ordenes.filter((orden) => new Date(orden.fecha_creacion) >= inicio);
+    }
+    if (params.fechaFin) {
+        const fin = new Date(`${params.fechaFin}T23:59:59.999`);
+        ordenes = ordenes.filter((orden) => new Date(orden.fecha_creacion) <= fin);
     }
 
     return (

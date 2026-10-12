@@ -129,6 +129,7 @@ export async function obtenerPresupuestos(filtros?: {
     estado?: string;
     fechaInicio?: string;
     fechaFin?: string;
+    cliente?: string;
 }) {
     try {
         await requerirUsuario();
@@ -142,6 +143,9 @@ export async function obtenerPresupuestos(filtros?: {
                 ...(filtros.fechaInicio ? { gte: new Date(`${filtros.fechaInicio}T00:00:00`) } : {}),
                 ...(filtros.fechaFin ? { lte: new Date(`${filtros.fechaFin}T23:59:59.999`) } : {}),
             };
+        }
+        if (filtros?.cliente?.trim()) {
+            where.destinatario_nombre = { contains: filtros.cliente.trim(), mode: "insensitive" };
         }
 
         const presupuestos = await prisma.presupuesto.findMany({
@@ -234,6 +238,86 @@ export async function vincularClienteAPresupuesto(id_presupuesto: number, id_cli
     }
 }
 
+/**
+ * Genera la orden de trabajo a partir de un presupuesto ACEPTADO: una linea
+ * de detalle_orden_servicio por cada linea del presupuesto, y guarda el
+ * vinculo en presupuesto.id_orden (no se puede generar dos veces). Requiere
+ * que el presupuesto ya tenga un cliente vinculado (id_cliente), porque
+ * orden_trabajo necesita uno; si no lo tiene, primero hay que agregarlo a la
+ * base de clientes (ModalClienteDesdePresupuesto).
+ */
+export async function crearOrdenDesdePresupuesto(id_presupuesto: number) {
+    try {
+        await requerirUsuario();
+
+        const nuevaOrden = await prisma.$transaction(async (tx) => {
+            const presupuesto = await tx.presupuesto.findUnique({
+                where: { id_presupuesto },
+                include: { detalle_presupuesto: { orderBy: { orden_linea: "asc" } } },
+            });
+            if (!presupuesto) {
+                throw new Error("El presupuesto no existe");
+            }
+            if (presupuesto.estado !== "ACEPTADO") {
+                throw new Error("Solo se puede generar la orden de un presupuesto ACEPTADO");
+            }
+            if (presupuesto.id_orden) {
+                throw new Error(`Ya se generó una orden de trabajo para este presupuesto (orden #${presupuesto.id_orden})`);
+            }
+            if (!presupuesto.id_cliente) {
+                throw new Error("El presupuesto no tiene un cliente vinculado. Agregalo a la base de clientes antes de generar la orden.");
+            }
+            if (presupuesto.detalle_presupuesto.length === 0) {
+                throw new Error("El presupuesto no tiene líneas para pasar a la orden.");
+            }
+
+            const cliente = await tx.cliente.findUnique({
+                where: { id_cliente: presupuesto.id_cliente },
+                select: { estado: true },
+            });
+            if (!cliente || cliente.estado === false) {
+                throw new Error("El cliente vinculado no existe o está dado de baja.");
+            }
+
+            const orden = await tx.orden_trabajo.create({
+                data: {
+                    id_cliente: presupuesto.id_cliente,
+                    estado_trabajo: "Pendiente",
+                    notas_internas: `Generada desde el presupuesto N° ${presupuesto.numero}.`,
+                    detalle_orden_servicio: {
+                        create: presupuesto.detalle_presupuesto.map((linea) => {
+                            const cantidad = Number(linea.cantidad);
+                            // detalle_orden_servicio.cantidad es Int; una linea con
+                            // cantidad fraccionaria (ej. 2.5) se pasa como 1 x el
+                            // importe total de la linea, para no perder plata
+                            // redondeando la cantidad.
+                            const esEntera = Number.isInteger(cantidad);
+                            return {
+                                id_servicio: linea.id_servicio,
+                                descripcion_libre: linea.id_servicio ? null : linea.descripcion,
+                                cantidad: esEntera ? cantidad : 1,
+                                precio_acordado: esEntera ? linea.precio_unitario : cantidad * Number(linea.precio_unitario),
+                                alicuota_iva: presupuesto.alicuota_iva,
+                            };
+                        }),
+                    },
+                },
+            });
+
+            await tx.presupuesto.update({ where: { id_presupuesto }, data: { id_orden: orden.id_orden } });
+
+            return orden;
+        });
+
+        revalidatePath("/presupuestos");
+        revalidatePath("/ordenes");
+        return { success: true, orden: JSON.parse(JSON.stringify(nuevaOrden)) };
+    } catch (error) {
+        console.error("Error creating orden desde presupuesto:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo generar la orden de trabajo" };
+    }
+}
+
 export async function eliminarPresupuesto(id_presupuesto: number) {
     try {
         await requerirUsuario();
@@ -258,18 +342,34 @@ export async function buscarDestinatarios(query: string) {
         if (!query || query.trim().length < 2) return [];
         const texto = query.trim();
 
-        const clientes = await prisma.cliente.findMany({
-            where: {
-                OR: [
-                    { nombre: { contains: texto, mode: "insensitive" } },
-                    { apellido: { contains: texto, mode: "insensitive" } },
-                ],
-            },
-            take: 5,
-        });
+        const [clientes, presupuestosPrevios] = await Promise.all([
+            prisma.cliente.findMany({
+                where: {
+                    estado: true,
+                    OR: [
+                        { nombre: { contains: texto, mode: "insensitive" } },
+                        { apellido: { contains: texto, mode: "insensitive" } },
+                    ],
+                },
+                take: 5,
+            }),
+            // Destinatarios de presupuestos anteriores sin cliente vinculado
+            // (alguien le pidió un presupuesto y nunca se cargó como cliente):
+            // si ya tiene id_cliente, el destinatario sale de la lista de
+            // arriba con los datos actuales del cliente, no hace falta repetirlo.
+            prisma.presupuesto.findMany({
+                where: {
+                    id_cliente: null,
+                    destinatario_nombre: { contains: texto, mode: "insensitive" },
+                },
+                distinct: ["destinatario_nombre"],
+                orderBy: { fecha_emision: "desc" },
+                take: 5,
+            }),
+        ]);
 
         const sugerenciasClientes = clientes.map((c) => ({
-            id_cliente: c.id_cliente,
+            id_cliente: c.id_cliente as number | null,
             nombre: `${c.nombre} ${c.apellido}`.trim(),
             cuit: c.cuit || "",
             domicilio: c.calle ? `${c.calle} ${c.num_calle ?? ""}`.trim() : "",
@@ -277,7 +377,23 @@ export async function buscarDestinatarios(query: string) {
             condicion_iva: "",
         }));
 
-        return JSON.parse(JSON.stringify(sugerenciasClientes));
+        const sugerenciasPresupuestos = presupuestosPrevios.map((p) => ({
+            id_cliente: null as number | null,
+            nombre: p.destinatario_nombre,
+            cuit: p.destinatario_cuit || "",
+            domicilio: p.destinatario_domicilio || "",
+            localidad: p.destinatario_localidad || "",
+            condicion_iva: p.destinatario_condicion_iva || "",
+        }));
+
+        // No repetir un destinatario que ya salió como cliente cargado.
+        const nombresDeClientes = new Set(sugerenciasClientes.map((s) => s.nombre.toLowerCase()));
+        const combinadas = [
+            ...sugerenciasClientes,
+            ...sugerenciasPresupuestos.filter((s) => !nombresDeClientes.has(s.nombre.toLowerCase())),
+        ].slice(0, 8);
+
+        return JSON.parse(JSON.stringify(combinadas));
     } catch (error) {
         console.error("Error searching destinatarios:", error);
         return [];
