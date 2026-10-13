@@ -86,9 +86,9 @@ export default async function InsumosPage({ searchParams }: { searchParams: Prom
                                 // Lógica matemática para la barra de stock
                                 const stockActual = insumo.stock_actual || 0;
                                 const stockMinimo = insumo.stock_minimo || 0;
-                                // Stock negativo: se facturó más de lo que había (confirmado a
-                                // propósito al emitir la factura). Hay que cargar una compra o
-                                // ajustar el stock.
+                                // Stock negativo: la facturación ya no lo permite, pero pueden
+                                // quedar insumos facturados así antes del bloqueo. Hay que cargar
+                                // una compra o ajustar el stock.
                                 const isNegative = stockActual < 0;
                                 const isCritical = stockActual === 0;
                                 const isLow = stockActual > 0 && stockActual <= stockMinimo;

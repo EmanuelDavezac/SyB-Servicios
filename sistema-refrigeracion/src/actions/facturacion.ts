@@ -110,8 +110,6 @@ export async function crearFactura(data: {
   descuento_porcentaje?: number | null;
   descuento_monto_equipo?: number | null;
   equipo_descripcion?: string | null;
-  /** true: seguir facturando aunque algun insumo quede con stock negativo */
-  confirmarStockInsuficiente?: boolean;
 }) {
   try {
     await requerirUsuario();
@@ -185,9 +183,10 @@ export async function crearFactura(data: {
       // 2.1 Calcular cuanto se va a descontar de cada insumo (sumando todas
       //     las lineas que lo usan, de la orden y adicionales) y compararlo
       //     contra el stock disponible. Es el mismo numero que se descuenta
-      //     mas abajo: no se duplica el calculo.
+      //     mas abajo: no se duplica el calculo. Si no alcanza, no se factura:
+      //     el stock nunca queda en negativo.
+      const requeridoPorInsumo = new Map<number, { insumo: InsumoModel; requerido: Prisma.Decimal }>();
       if (facturable) {
-        const requeridoPorInsumo = new Map<number, { insumo: InsumoModel; requerido: Prisma.Decimal }>();
         const acumular = (id_insumo: number | null, cantidad: Prisma.Decimal.Value, insumo: InsumoModel | null) => {
           if (id_insumo === null || !insumo) return;
           const existente = requeridoPorInsumo.get(id_insumo);
@@ -221,7 +220,7 @@ export async function crearFactura(data: {
           }
         }
 
-        if (stockInsuficiente.length > 0 && !data.confirmarStockInsuficiente) {
+        if (stockInsuficiente.length > 0) {
           stockInsuficiente.sort((a, b) => a.id_insumo - b.id_insumo);
           throw new StockInsuficienteParaFacturar(stockInsuficiente);
         }
@@ -265,6 +264,34 @@ export async function crearFactura(data: {
             alicuota_iva: item.alicuota_iva ?? ALICUOTA_IVA_DEFAULT,
           },
         });
+      }
+
+      // 3.2 Re-chequeo despues de descontar: si otra factura simultanea
+      //     consumio el mismo insumo entre la lectura de 2.1 y el update, el
+      //     stock real puede haber quedado negativo. Se aborta la transaccion.
+      if (facturable && requeridoPorInsumo.size > 0) {
+        const trasDescontar = await tx.insumo.findMany({
+          where: { id_insumo: { in: [...requeridoPorInsumo.keys()] } },
+        });
+        const stockInsuficiente: StockInsuficienteItem[] = [];
+        for (const insumo of trasDescontar) {
+          const stockFinal = new Prisma.Decimal(insumo.stock_actual ?? 0);
+          if (stockFinal.lessThan(-TOLERANCIA_STOCK)) {
+            const requerido = requeridoPorInsumo.get(insumo.id_insumo)!.requerido;
+            stockInsuficiente.push({
+              id_insumo: insumo.id_insumo,
+              nombre: insumo.nombre,
+              unidad: insumo.descripcion,
+              disponible: stockFinal.plus(requerido).toNumber(),
+              requerido: requerido.toNumber(),
+              faltante: stockFinal.negated().toNumber(),
+            });
+          }
+        }
+        if (stockInsuficiente.length > 0) {
+          stockInsuficiente.sort((a, b) => a.id_insumo - b.id_insumo);
+          throw new StockInsuficienteParaFacturar(stockInsuficiente);
+        }
       }
 
       // 4. Calcular importes a partir de las lineas guardadas en la orden

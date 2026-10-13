@@ -149,6 +149,12 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         const equipoDesc: string = factura.equipo_descripcion || "";
         const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
+        // El remito se imprime por triplicado, cada copia en su propia hoja
+        const esRemito = factura.tipo === "Remito";
+        const copias = esRemito
+            ? ["ORIGINAL", "DUPLICADO", "TRIPLICADO"]
+            : ["ORIGINAL"];
+
         const html = `
 <!DOCTYPE html>
 <html lang="es">
@@ -348,6 +354,9 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
             font-size: 10.5px;
         }
         .firma-section p { margin: 1px 0; }
+        .firmas-dobles { display: flex; justify-content: space-around; gap: 20px; padding-top: 50px; }
+        .firma-col { text-align: center; width: 45%; }
+        .firma-linea { border-top: 1px solid #000; margin-bottom: 6px; }
 
         /* ===== FOOTER ===== */
         .footer-section {
@@ -357,17 +366,23 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
             text-align: center;
         }
 
+        .hoja + .hoja { margin-top: 20px; }
+
         @media print {
             @page { margin: 0; }
-            body { padding: 10mm; }
+            body { padding: 0; }
+            .hoja { padding: 10mm; }
+            .hoja + .hoja { margin-top: 0; break-before: page; page-break-before: always; }
             .factura-container { border-width: 1.2px; max-width: 100%; }
         }
     </style>
 </head>
 <body>
+${copias.map((copia) => `
+    <div class="hoja">
     <div class="factura-container">
 
-        <div class="original-tag">ORIGINAL</div>
+        <div class="original-tag">${copia}</div>
 
         <!-- HEADER ROW -->
         <div class="header-row">
@@ -481,12 +496,29 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         </div>
         `}
 
+        ${esRemito ? `
+        <!-- FIRMAS REMITO -->
+        <div class="firma-section firmas-dobles">
+            <div class="firma-col">
+                <div class="firma-linea"></div>
+                <p>FIRMA Y ACLARACION DEL CLIENTE</p>
+                <p>DNI:</p>
+            </div>
+            <div class="firma-col">
+                <div class="firma-linea"></div>
+                <p>HERNAN BRUNAS</p>
+                <p>TEC. EN REFRIGERACION</p>
+                <p>S&amp;B SERVICIOS SRL</p>
+            </div>
+        </div>
+        ` : `
         <!-- FIRMA TECNICO -->
         <div class="firma-section">
             <p>HERNAN BRUNAS</p>
             <p>TEC. EN REFRIGERACION</p>
             <p>S&amp;B SERVICIOS SRL</p>
         </div>
+        `}
 
         <!-- FOOTER -->
         <div class="footer-section">
@@ -494,6 +526,8 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         </div>
 
     </div>
+    </div>
+`).join("")}
 </body>
 </html>`;
 
