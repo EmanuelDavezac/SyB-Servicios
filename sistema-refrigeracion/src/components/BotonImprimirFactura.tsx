@@ -21,6 +21,9 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         }
 
         const esInformeTecnico = factura.tipo === "Informe Tecnico";
+        const esRemito = factura.tipo === "Remito";
+        // Informe tecnico y remito no muestran precios, IVA ni totales
+        const sinPrecios = esInformeTecnico || esRemito;
         const esFactura = factura.tipo === "Factura";
         // Factura interna: no se carga en ARCA, pero se cobra y lleva IVA igual
         const esInterna = esFactura && factura.fiscal === false;
@@ -82,7 +85,7 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
             ? [{ alicuota: alicuotaUnica, neto: netoGravado, iva: netoGravado * alicuotaUnica / 100 }]
             : [];
         const noDiscriminarIva = esInterna; // Internas no discriminan el IVA por pedido
-        const mostrarIva = !esInformeTecnico && !noDiscriminarIva && factura.neto !== null && factura.neto !== undefined;
+        const mostrarIva = !sinPrecios && !noDiscriminarIva && factura.neto !== null && factura.neto !== undefined;
 
         // Alícuota a mostrar en cada línea: la de la línea, salvo en facturas
         // anteriores, donde la línea quedó con el default y manda la de la factura.
@@ -91,7 +94,7 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
                 ? alicuotaUnica
                 : parseFloat(String(valorLinea ?? 0));
 
-        const celdaIva = (alicuota: number) => (esInformeTecnico || noDiscriminarIva)
+        const celdaIva = (alicuota: number) => (sinPrecios || noDiscriminarIva)
             ? ""
             : `<td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${fmtAlicuota(alicuota)}%</td>`;
 
@@ -111,7 +114,7 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     ${celdaIva(alicuota)}
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
+                    ${esRemito ? "" : `<td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>`}
                 </tr>`;
         }
 
@@ -131,10 +134,10 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
                     <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${cant}</td>
                     <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${nombre}</td>
                     ${celdaIva(alicuota)}
-                    <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>
+                    ${esRemito ? "" : `<td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${formatMoney(subtotal)}</td>`}
                 </tr>`;
         }
-        const columnas = esInformeTecnico ? 2 : (noDiscriminarIva ? 3 : 4);
+        const columnas = sinPrecios ? 2 : (noDiscriminarIva ? 3 : 4);
 
         const montoTotal = parseFloat(factura.monto_total);
 
@@ -150,7 +153,6 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
         // El remito se imprime por triplicado, cada copia en su propia hoja
-        const esRemito = factura.tipo === "Remito";
         const copias = esRemito
             ? ["ORIGINAL", "DUPLICADO", "TRIPLICADO"]
             : ["ORIGINAL"];
@@ -444,7 +446,7 @@ ${copias.map((copia) => `
                 <tr>
                     <th class="center" style="width: 70px;">CANT.</th>
                     <th>DESCRIPCION</th>
-                    ${esInformeTecnico ? '' : (noDiscriminarIva ? '<th class="right" style="width: 120px;">PRECIO FINAL</th>' : '<th class="center" style="width: 60px;">IVA %</th><th class="right" style="width: 120px;">PRECIO</th>')}
+                    ${sinPrecios ? '' : (noDiscriminarIva ? '<th class="right" style="width: 120px;">PRECIO FINAL</th>' : '<th class="center" style="width: 60px;">IVA %</th><th class="right" style="width: 120px;">PRECIO</th>')}
                 </tr>
             </thead>
             <tbody>
@@ -456,7 +458,7 @@ ${copias.map((copia) => `
                     <tr>
                         <td style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
                         <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura.descripcion}</td>
-                        ${esInformeTecnico ? '' : '<td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td><td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>'}
+                        ${sinPrecios ? '' : '<td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td><td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>'}
                     </tr>
                 ` : ''}
                 ${insumos.length > 0 ? `
@@ -468,7 +470,7 @@ ${copias.map((copia) => `
             </tbody>
         </table>
 
-        ${esInformeTecnico ? '' : `
+        ${sinPrecios ? '' : `
         <!-- TOTALES -->
         <div class="totals-row">
             <div class="totals-box">
