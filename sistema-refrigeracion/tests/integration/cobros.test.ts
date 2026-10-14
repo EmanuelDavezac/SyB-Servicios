@@ -221,11 +221,9 @@ describe("registrarCobro", () => {
     expect(Number(f1Final?.saldo_pendiente)).toBe(1000);
   });
 
-  // Bug conocido con issue abierto: no deduplica facturas repetidas dentro de
-  // las imputaciones, asi que dos lineas sobre la misma factura pueden
-  // superar juntas su saldo pendiente (cada una se valida contra el saldo
-  // original, no contra el acumulado ya imputado en el mismo cobro).
-  test.fails("dos lineas de imputacion sobre la misma factura no deberian superar su saldo", async () => {
+  // Las imputaciones a una misma factura se suman antes de validar contra su
+  // saldo, no se valida cada linea contra el saldo original por separado.
+  test("dos lineas de imputacion sobre la misma factura no deberian superar su saldo", async () => {
     const cliente = await crearCliente();
     const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
@@ -291,6 +289,48 @@ describe("anularCobro", () => {
   it("recibo inexistente devuelve error sin romper nada", async () => {
     const resultado = await anularCobro(999999);
     expect(resultado.success).toBe(false);
+  });
+
+  it("el recibo anulado se conserva con sus imputaciones y no se puede anular dos veces", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const cobro = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 400 }],
+    });
+    if (!cobro.success) throw new Error(cobro.error);
+
+    expect((await anularCobro(cobro.recibo.id_recibo)).success).toBe(true);
+
+    const recibo = await prisma.recibo.findUnique({
+      where: { id_recibo: cobro.recibo.id_recibo },
+      include: { pagos_parciales: true },
+    });
+    expect(recibo?.fecha_anulacion).not.toBeNull();
+    expect(recibo?.pagos_parciales).toHaveLength(1);
+
+    expect((await anularCobro(cobro.recibo.id_recibo)).success).toBe(false);
+  });
+
+  it("anulado el cobro, la factura se puede anular y un cobro nuevo ve el saldo completo", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const cobro = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 400 }],
+    });
+    if (!cobro.success) throw new Error(cobro.error);
+    await anularCobro(cobro.recibo.id_recibo);
+
+    const nuevoCobro = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_factura: factura.id_factura, monto: 1000 }],
+    });
+    expect(nuevoCobro.success).toBe(true);
+    if (!nuevoCobro.success) return;
+    await anularCobro(nuevoCobro.recibo.id_recibo);
+
+    expect((await anularFactura(factura.id_factura)).success).toBe(true);
   });
 });
 
@@ -499,5 +539,20 @@ describe("registrarCobro - multiples medios de pago", () => {
     const texto = formatearMediosDePago(completo!.recibo_medio_pago, completo!.forma_pago);
     expect(texto).toContain("Efectivo");
     expect(texto).toContain("Transferencia");
+  });
+});
+
+describe("registrarCobro - cobros simultaneos", () => {
+  it("dos cobros simultaneos por el saldo total: solo uno se registra", async () => {
+    const cliente = await crearCliente();
+    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const datos = { id_cliente: cliente.id_cliente, imputaciones: [{ id_factura: factura.id_factura, monto: 1000 }] };
+
+    const resultados = await Promise.all([registrarCobro(datos), registrarCobro(datos)]);
+
+    const pagado = await prisma.pagos_parciales.aggregate({ where: { id_factura: factura.id_factura }, _sum: { monto_pagado: true } });
+    expect(resultados.filter((r) => r.success).length).toBe(1);
+    expect(Number(pagado._sum.monto_pagado)).toBe(1000);
+    expect(await prisma.recibo.count()).toBe(1);
   });
 });

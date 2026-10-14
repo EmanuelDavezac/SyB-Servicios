@@ -54,6 +54,23 @@ async function nombreDeInsumoYaExiste(nombre: string, idExcluir?: number) {
     return !!existente;
 }
 
+// Stock y precios por unidad de medida: admiten fracciones pero nunca
+// negativos (la facturacion tampoco deja el stock por debajo de 0).
+function validarNumerosInsumo(datos: { stock_actual: number; stock_minimo: number; precio_costo: number; precio_venta: number }): void {
+    const campos: [string, number][] = [
+        ["stock actual", datos.stock_actual],
+        ["stock mínimo", datos.stock_minimo],
+        ["precio de costo", datos.precio_costo],
+        ["precio de venta", datos.precio_venta],
+    ];
+    for (const [nombre, valor] of campos) {
+        const numero = Number(valor);
+        if (!Number.isFinite(numero) || numero < 0) {
+            throw new Error(`El ${nombre} no puede ser negativo.`);
+        }
+    }
+}
+
 // 2. CREAR
 export async function crearInsumo(datos: {
     nombre: string;
@@ -66,6 +83,7 @@ export async function crearInsumo(datos: {
 }) {
     try {
         await requerirUsuario();
+        validarNumerosInsumo(datos);
         const nombre = datos.nombre.trim();
         if (await nombreDeInsumoYaExiste(nombre)) {
             return { success: false, error: "Ya existe un insumo con ese nombre" };
@@ -117,6 +135,7 @@ export async function actualizarInsumo(
 ) {
     try {
         await requerirUsuario();
+        validarNumerosInsumo(datos);
 
         const nombre = datos.nombre.trim();
         if (await nombreDeInsumoYaExiste(nombre, id)) {

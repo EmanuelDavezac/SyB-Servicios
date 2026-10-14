@@ -128,9 +128,54 @@ export async function crearFactura(data: {
       }
     }
 
+    const numFactura = data.num_factura.trim();
+    if (!numFactura) {
+      throw new Error("Completá el número del comprobante.");
+    }
+
     const nuevaFactura = await prisma.$transaction(async (tx) => {
-      // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
-      //    setea el id directo desde la URL, sin validar si ya está facturada).
+      // Serializa la emision de comprobantes: con READ COMMITTED, dos
+      // crearFactura simultaneas (dos usuarios o dos pestañas) pasaban las dos
+      // los chequeos de "ya facturada" y "numero repetido" antes de que
+      // cualquiera commiteara, y se emitian dos facturas descontando stock dos
+      // veces. El lock se libera solo al terminar la transaccion; las
+      // siguientes leen lo que commiteo la anterior.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('emision_comprobante'))`;
+
+      const orden = await tx.orden_trabajo.findUnique({
+        where: { id_orden: data.id_orden },
+        include: { cliente: true },
+      });
+      if (!orden) {
+        throw new Error(`La orden #${data.id_orden} no existe.`);
+      }
+      // Mismo criterio que crearOrden: no se emiten comprobantes nuevos a un
+      // cliente dado de baja (hay que reactivarlo primero).
+      if (orden.cliente && orden.cliente.estado === false) {
+        throw new Error("El cliente de la orden está dado de baja: reactivalo para poder facturar.");
+      }
+      // /facturacion?orden=X abre el modal con cualquier id de la URL: el
+      // estado se valida aca y no solo en el listado de ordenes del modal.
+      if (facturable && orden.estado_trabajo !== "Finalizado") {
+        throw new Error(`La orden #${data.id_orden} no está Finalizado: solo se facturan órdenes terminadas.`);
+      }
+
+      // Un numero anulado sigue consumido (no se reusa). Facturas fiscales de
+      // distinto punto de venta pueden compartir numero.
+      const numeroRepetido = await tx.factura.findFirst({
+        where: {
+          tipo: data.tipo,
+          fiscal,
+          punto_venta: puntoVenta,
+          num_factura: { equals: numFactura, mode: "insensitive" },
+        },
+        select: { id_factura: true },
+      });
+      if (numeroRepetido) {
+        throw new Error(`Ya existe un comprobante con el número "${numFactura}".`);
+      }
+
+      // 0. Evitar doble facturación de la misma orden.
       //    Solo una Factura vigente por orden; los Remitos no tienen limite.
       if (facturable) {
         const facturaExistente = await tx.factura.findFirst({
@@ -151,11 +196,7 @@ export async function crearFactura(data: {
       const fechaEmision = fechaActualArgentina();
       let fechaVencimiento = facturable ? data.fecha_vencimiento : null;
       if (facturable && !fechaVencimiento) {
-        const orden = await tx.orden_trabajo.findUnique({
-          where: { id_orden: data.id_orden },
-          include: { cliente: true },
-        });
-        const dias = orden?.cliente?.condicion_pago_dias ?? 30;
+        const dias = orden.cliente?.condicion_pago_dias ?? 30;
         fechaVencimiento = new Date(fechaEmision);
         // Usamos setUTCDate para evitar corrimientos si el server está en UTC y fechaEmision en 00:00Z
         fechaVencimiento.setUTCDate(fechaVencimiento.getUTCDate() + dias);
@@ -331,7 +372,7 @@ export async function crearFactura(data: {
       const factura = await tx.factura.create({
         data: {
           id_orden: data.id_orden,
-          num_factura: data.num_factura,
+          num_factura: numFactura,
           tipo: data.tipo,
           fiscal,
           punto_venta: puntoVenta,

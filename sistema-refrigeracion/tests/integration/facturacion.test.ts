@@ -608,3 +608,83 @@ describe("getOrdenesPendientesFacturacion", () => {
     expect(pendientes.length).toBe(1);
   });
 });
+
+describe("crearFactura - validaciones de orden y numero", () => {
+  it("rechaza facturar una orden que no esta Finalizado y no toca el stock", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ estado_trabajo: "En proceso", insumos: [{ id_insumo: insumo.id_insumo }] });
+
+    const res = await crearFactura({ id_orden: orden.id_orden, num_factura: "Factura A-0001", tipo: "Factura", fiscal: true });
+
+    expect(res.success).toBe(false);
+    expect(await prisma.factura.count()).toBe(0);
+    expect(Number((await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } }))!.stock_actual)).toBe(10);
+  });
+
+  it("un Remito sobre una orden no finalizada se sigue permitiendo", async () => {
+    const orden = await crearOrdenFinalizada({ estado_trabajo: "En proceso", insumos: [] });
+    const res = await crearFactura({ id_orden: orden.id_orden, num_factura: "Remito R-0001", tipo: "Remito", fiscal: true });
+    expect(res.success).toBe(true);
+  });
+
+  it("orden inexistente: error legible", async () => {
+    const res = await crearFactura({ id_orden: 99999, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("no existe");
+  });
+
+  it("rechaza un numero ya usado (aunque difiera en mayusculas o espacios)", async () => {
+    const o1 = await crearOrdenFinalizada({ insumos: [] });
+    const o2 = await crearOrdenFinalizada({ insumos: [] });
+    expect((await crearFactura({ id_orden: o1.id_orden, num_factura: "Factura A-0001", tipo: "Factura", fiscal: true, punto_venta: 1 })).success).toBe(true);
+
+    const res = await crearFactura({ id_orden: o2.id_orden, num_factura: " factura a-0001 ", tipo: "Factura", fiscal: true, punto_venta: 1 });
+
+    expect(res.success).toBe(false);
+    expect(await prisma.factura.count()).toBe(1);
+  });
+
+  it("un numero de una factura anulada no se reusa", async () => {
+    const o1 = await crearOrdenFinalizada({ insumos: [] });
+    const o2 = await crearOrdenFinalizada({ insumos: [] });
+    const f1 = await crearFactura({ id_orden: o1.id_orden, num_factura: "Factura X-0001", tipo: "Factura", fiscal: false });
+    expect((await anularFactura(f1.factura.id_factura)).success).toBe(true);
+
+    const res = await crearFactura({ id_orden: o2.id_orden, num_factura: "Factura X-0001", tipo: "Factura", fiscal: false });
+    expect(res.success).toBe(false);
+  });
+
+  it("el mismo numero en otro punto de venta, o en una factura interna, se permite", async () => {
+    const [o1, o2, o3] = [await crearOrdenFinalizada({ insumos: [] }), await crearOrdenFinalizada({ insumos: [] }), await crearOrdenFinalizada({ insumos: [] })];
+    expect((await crearFactura({ id_orden: o1.id_orden, num_factura: "0001", tipo: "Factura", fiscal: true, punto_venta: 1 })).success).toBe(true);
+    expect((await crearFactura({ id_orden: o2.id_orden, num_factura: "0001", tipo: "Factura", fiscal: true, punto_venta: 2 })).success).toBe(true);
+    expect((await crearFactura({ id_orden: o3.id_orden, num_factura: "0001", tipo: "Factura", fiscal: false })).success).toBe(true);
+  });
+
+  it("numero vacio se rechaza", async () => {
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+    expect((await crearFactura({ id_orden: orden.id_orden, num_factura: "   ", tipo: "Factura", fiscal: true })).success).toBe(false);
+  });
+
+  it("dos facturas simultaneas de la misma orden: solo una se emite y el stock baja una vez", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 1 }] });
+    const datos = { id_orden: orden.id_orden, tipo: "Factura", fiscal: true };
+
+    const r = await Promise.all([crearFactura({ ...datos, num_factura: "F-1" }), crearFactura({ ...datos, num_factura: "F-2" })]);
+
+    expect(r.filter((x) => x.success).length).toBe(1);
+    expect(await prisma.factura.count()).toBe(1);
+    expect(Number((await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } }))!.stock_actual)).toBe(9);
+  });
+
+  it("dos facturas simultaneas de ordenes distintas con el mismo numero: solo una se emite", async () => {
+    const o1 = await crearOrdenFinalizada({ insumos: [] });
+    const o2 = await crearOrdenFinalizada({ insumos: [] });
+    const r = await Promise.all([
+      crearFactura({ id_orden: o1.id_orden, num_factura: "F-9", tipo: "Factura", fiscal: true }),
+      crearFactura({ id_orden: o2.id_orden, num_factura: "F-9", tipo: "Factura", fiscal: true }),
+    ]);
+    expect(r.filter((x) => x.success).length).toBe(1);
+  });
+});

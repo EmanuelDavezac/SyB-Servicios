@@ -34,12 +34,24 @@ interface DatosPresupuesto {
     lineas: LineaPresupuesto[];
 }
 
+function validarLineas(lineas: LineaPresupuesto[] | undefined): void {
+    if (!lineas || lineas.length === 0) {
+        throw new Error("El presupuesto debe tener al menos una línea.");
+    }
+    for (const l of lineas) {
+        if (!Number.isFinite(Number(l.cantidad)) || Number(l.cantidad) <= 0) {
+            throw new Error("La cantidad de cada línea debe ser mayor a 0.");
+        }
+        if (!Number.isFinite(Number(l.precio_unitario)) || Number(l.precio_unitario) < 0) {
+            throw new Error("El precio unitario no puede ser negativo.");
+        }
+    }
+}
+
 export async function crearPresupuesto(data: DatosPresupuesto) {
     try {
         await requerirUsuario();
-        if (!data.lineas || data.lineas.length === 0) {
-            throw new Error("El presupuesto debe tener al menos una línea.");
-        }
+        validarLineas(data.lineas);
 
         const nuevoPresupuesto = await prisma.$transaction(async (tx) => {
             return tx.presupuesto.create({
@@ -85,9 +97,7 @@ export async function actualizarPresupuesto(id_presupuesto: number, data: DatosP
             if (actual.estado !== "PENDIENTE") {
                 throw new Error("Solo se pueden editar presupuestos con estado PENDIENTE");
             }
-            if (!data.lineas || data.lineas.length === 0) {
-                throw new Error("El presupuesto debe tener al menos una línea.");
-            }
+            validarLineas(data.lineas);
 
             await tx.detalle_presupuesto.deleteMany({ where: { id_presupuesto } });
 
@@ -227,6 +237,10 @@ export async function cambiarEstadoPresupuesto(id_presupuesto: number, estado: "
 export async function vincularClienteAPresupuesto(id_presupuesto: number, id_cliente: number) {
     try {
         await requerirUsuario();
+        const cliente = await prisma.cliente.findUnique({ where: { id_cliente }, select: { estado: true } });
+        if (!cliente || cliente.estado === false) {
+            throw new Error("El cliente seleccionado no existe o está dado de baja");
+        }
         const actualizado = await prisma.presupuesto.update({
             where: { id_presupuesto },
             data: { id_cliente },

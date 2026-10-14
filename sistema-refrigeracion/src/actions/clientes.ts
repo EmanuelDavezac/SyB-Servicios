@@ -70,6 +70,19 @@ async function emailYaExiste(email: string, idExcluir?: number) {
     return !!existente;
 }
 
+// Mismas reglas que el formulario de ModalCliente, repetidas en el servidor
+// porque la action se puede invocar sin pasar por el modal.
+function validarDatosCliente(datos: { nombre: string; apellido: string; email?: string }): string | null {
+    if (!datos.nombre?.trim() || !datos.apellido?.trim()) {
+        return "El nombre y el apellido son obligatorios";
+    }
+    const email = datos.email?.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return "El email no tiene un formato válido";
+    }
+    return null;
+}
+
 export async function crearCliente(datos: {
     nombre: string;
     apellido: string;
@@ -84,6 +97,10 @@ export async function crearCliente(datos: {
 
     try {
         await requerirUsuario();
+        const errorValidacion = validarDatosCliente(datos);
+        if (errorValidacion) {
+            return { success: false, error: errorValidacion };
+        }
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit))) {
             return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };
@@ -130,6 +147,10 @@ export async function actualizarCliente(id_cliente: number, datos: {
 }) {
     try {
         await requerirUsuario();
+        const errorValidacion = validarDatosCliente(datos);
+        if (errorValidacion) {
+            return { success: false, error: errorValidacion };
+        }
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit, id_cliente))) {
             return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };

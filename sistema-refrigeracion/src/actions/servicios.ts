@@ -81,6 +81,9 @@ export async function crearServicio(datos: {
 }) {
     try {
         await requerirUsuario();
+        if (!Number.isFinite(Number(datos.precio)) || Number(datos.precio) < 0) {
+            return { success: false, error: "El precio no puede ser negativo" };
+        }
         const nombre = datos.nombre.trim();
         if (await nombreDeServicioYaExiste(nombre)) {
             return { success: false, error: "Ya existe un servicio con ese nombre" };
@@ -164,6 +167,9 @@ export async function editarServicio(
 ) {
     try {
         await requerirUsuario();
+        if (!Number.isFinite(Number(datos.precio)) || Number(datos.precio) < 0) {
+            return { success: false, error: "El precio no puede ser negativo" };
+        }
         const nombre = datos.nombre.trim();
         if (await nombreDeServicioYaExiste(nombre, id_servicio)) {
             return { success: false, error: "Ya existe un servicio con ese nombre" };

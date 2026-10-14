@@ -63,7 +63,7 @@ export async function imprimirRecibo(idRecibo: number): Promise<boolean> {
     const cuerpoRecibo = (copia: string) => `
     <div class="factura-container">
 
-        <div class="original-tag">${copia}</div>
+        <div class="original-tag">${copia}${recibo.fecha_anulacion ? " – ANULADO" : ""}</div>
 
         <!-- HEADER ROW -->
         <div class="header-row">

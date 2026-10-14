@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoFactura";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
-import { fechaActualArgentina } from "@/lib/fechas";
+import { diasHastaFecha, fechaActualArgentina } from "@/lib/fechas";
 import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 
 type Tx = Prisma.TransactionClient;
@@ -15,8 +15,10 @@ async function recalcularFactura(tx: Tx, id_factura: number) {
   const factura = await tx.factura.findUnique({ where: { id_factura } });
   if (!factura || factura.estado_pago === ESTADOS_FACTURA.ANULADA || factura.estado_pago === ESTADOS_FACTURA.NO_APLICA) return;
 
+  // Las imputaciones de un recibo anulado se conservan como registro pero
+  // no cuentan como pagado.
   const agregado = await tx.pagos_parciales.aggregate({
-    where: { id_factura },
+    where: { id_factura, recibo: { fecha_anulacion: null } },
     _sum: { monto_pagado: true },
   });
   const pagado = Number(agregado._sum.monto_pagado ?? 0);
@@ -52,6 +54,9 @@ export async function registrarCobro(data: {
     if (!data.imputaciones || data.imputaciones.length === 0) {
       return { success: false, error: "Agregá al menos una imputación a una factura." };
     }
+    if (data.fecha_pago && diasHastaFecha(data.fecha_pago) > 0) {
+      return { success: false, error: "La fecha de pago no puede ser posterior a hoy." };
+    }
     if (data.imputaciones.some((i) => i.monto <= 0)) {
       return { success: false, error: "Los montos imputados deben ser mayores a cero." };
     }
@@ -74,14 +79,30 @@ export async function registrarCobro(data: {
       }
     }
 
+    // La misma factura repetida en varias imputaciones se valida contra su
+    // saldo por el total, no linea por linea (700 + 700 sobre un saldo de
+    // 1000 pasaba cada chequeo por separado).
+    const imputadoPorFactura = new Map<number, number>();
+    for (const imp of data.imputaciones) {
+      imputadoPorFactura.set(imp.id_factura, (imputadoPorFactura.get(imp.id_factura) ?? 0) + imp.monto);
+    }
+    const idsFactura = [...imputadoPorFactura.keys()].sort((a, b) => a - b);
+
     const nuevoRecibo = await prisma.$transaction(async (tx) => {
-      const idsFactura = data.imputaciones.map((i) => i.id_factura);
+      // Bloquea las facturas imputadas hasta el commit: dos cobros
+      // simultaneos sobre el mismo saldo leian los dos el saldo viejo y se
+      // cobraba dos veces. El segundo ahora espera y lee el saldo ya
+      // actualizado. Orden por id para que dos cobros con varias facturas
+      // en comun no se bloqueen mutuamente.
+      await tx.$queryRaw`SELECT id_factura FROM factura WHERE id_factura IN (${Prisma.join(idsFactura)}) ORDER BY id_factura FOR UPDATE`;
+
       const facturas = await tx.factura.findMany({
         where: { id_factura: { in: idsFactura } },
         include: { orden_trabajo: true },
       });
 
-      for (const imp of data.imputaciones) {
+      for (const [id_factura, monto] of imputadoPorFactura) {
+        const imp = { id_factura, monto };
         const factura = facturas.find((f) => f.id_factura === imp.id_factura);
         if (!factura) {
           throw new Error(`Factura #${imp.id_factura} no encontrada`);
@@ -157,12 +178,18 @@ export async function anularCobro(id_recibo: number) {
   try {
     await requerirUsuario();
     await prisma.$transaction(async (tx) => {
-      const pagos = await tx.pagos_parciales.findMany({ where: { id_recibo } });
-      if (pagos.length === 0) {
-        throw new Error("El recibo no existe o no tiene imputaciones");
+      const recibo = await tx.recibo.findUnique({ where: { id_recibo }, include: { pagos_parciales: true } });
+      if (!recibo) {
+        throw new Error("El recibo no existe");
       }
+      if (recibo.fecha_anulacion) {
+        throw new Error("El recibo ya está anulado");
+      }
+      const pagos = recibo.pagos_parciales;
 
-      await tx.recibo.delete({ where: { id_recibo } });
+      // El recibo y sus imputaciones quedan como registro; recalcularFactura
+      // ya no suma las imputaciones de un recibo anulado.
+      await tx.recibo.update({ where: { id_recibo }, data: { fecha_anulacion: new Date() } });
 
       const idsFactura = [...new Set(pagos.map((p) => p.id_factura))];
       for (const id_factura of idsFactura) {
@@ -192,7 +219,7 @@ export async function anularFactura(id_factura: number) {
         throw new Error("La factura ya está anulada");
       }
 
-      const tienePagos = await tx.pagos_parciales.count({ where: { id_factura } });
+      const tienePagos = await tx.pagos_parciales.count({ where: { id_factura, recibo: { fecha_anulacion: null } } });
       if (tienePagos > 0) {
         throw new Error("No se puede anular una factura que ya tiene cobros registrados");
       }
@@ -364,6 +391,7 @@ export async function obtenerRetencionesDelMes(mes: number, anio: number) {
         direccion: "SUFRIDA",
         recibo: {
           fecha_pago: { gte: fechaInicio, lte: fechaFin },
+          fecha_anulacion: null,
         },
       },
     });

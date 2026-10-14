@@ -84,7 +84,7 @@ export default async function FacturacionPage({
             tipo: null,
             fecha: r.fecha_pago,
             fecha_vencimiento: null,
-            comprobante: `Recibo #${r.id_recibo}`,
+            comprobante: r.fecha_anulacion ? `Recibo #${r.id_recibo} (anulado)` : `Recibo #${r.id_recibo}`,
             nombreCliente,
             textoBusqueda: `${nombreCliente} ${r.observacion || ""}`.toLowerCase(),
             total: Number(r.monto_total),
