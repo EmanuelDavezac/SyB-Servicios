@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { crearProveedor, editarProveedor } from "@/actions/proveedores";
+import { limpiarCuit, limpiarTelefono, validarCuit, validarTelefono } from "@/lib/validaciones-cliente";
 
 interface ProveedorInicial {
     id_proveedor: number;
@@ -24,7 +25,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [errores, setErrores] = useState<{ cuit?: string; email?: string }>({});
+    const [errores, setErrores] = useState<{ cuit?: string; telefono?: string; email?: string }>({});
     const [error, setError] = useState<string | null>(null);
 
     const [razonSocial, setRazonSocial] = useState(proveedorInicial?.razon_social ?? "");
@@ -39,7 +40,7 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
         if (modoEdicion && proveedorInicial) {
             setRazonSocial(proveedorInicial.razon_social);
             setNombreProveedor(proveedorInicial.nombre_proveedor ?? "");
-            setCuit(proveedorInicial.cuit ?? "");
+            setCuit(limpiarCuit(proveedorInicial.cuit ?? ""));
             setTelefono(proveedorInicial.telefono ?? "");
             setEmail(proveedorInicial.email ?? "");
         }
@@ -51,8 +52,16 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
     async function handleGuardar() {
         if (!razonSocial.trim()) return;
 
+        const nuevosErrores: typeof errores = {};
+        const errorCuit = validarCuit(cuit);
+        if (errorCuit) nuevosErrores.cuit = errorCuit;
+        const errorTelefono = validarTelefono(telefono);
+        if (errorTelefono) nuevosErrores.telefono = errorTelefono;
         if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            setErrores({ email: "El email no tiene un formato válido." });
+            nuevosErrores.email = "El email no tiene un formato válido.";
+        }
+        if (Object.keys(nuevosErrores).length > 0) {
+            setErrores(nuevosErrores);
             return;
         }
         setErrores({});
@@ -80,6 +89,8 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
             setAbierto(false);
         } else if (resultado.error?.toLowerCase().includes("cuit")) {
             setErrores({ cuit: resultado.error });
+        } else if (resultado.error?.toLowerCase().includes("teléfono")) {
+            setErrores({ telefono: resultado.error });
         } else if (resultado.error?.toLowerCase().includes("email")) {
             setErrores({ email: resultado.error });
         } else {
@@ -163,9 +174,10 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                                     type="text"
                                     value={cuit}
                                     onChange={(e) => {
-                                        setCuit(e.target.value.replace(/\D/g, '').slice(0, 11));
+                                        setCuit(limpiarCuit(e.target.value));
                                         setErrores((prev) => ({ ...prev, cuit: undefined }));
                                     }}
+                                    inputMode="numeric"
                                     placeholder="Ej: 30123456789"
                                     className={`${inputCls} ${errores.cuit ? "border-red-400 ring-1 ring-red-400" : ""}`}
                                 />
@@ -176,10 +188,15 @@ export default function ModalProveedor({ proveedorInicial, trigger }: Props) {
                                 <input
                                     type="text"
                                     value={telefono}
-                                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 20))}
+                                    inputMode="numeric"
+                                    onChange={(e) => {
+                                        setTelefono(limpiarTelefono(e.target.value));
+                                        setErrores((prev) => ({ ...prev, telefono: undefined }));
+                                    }}
                                     placeholder="Ej: 3511234567"
-                                    className={inputCls}
+                                    className={`${inputCls} ${errores.telefono ? "border-red-400 ring-1 ring-red-400" : ""}`}
                                 />
+                                {errores.telefono && <p className="text-red-500 text-xs mt-1">{errores.telefono}</p>}
                             </div>
                             <div className="col-span-2">
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { crearInformeTecnico } from "@/actions/informesTecnicos";
+import { limpiarCuit } from "@/lib/validaciones-cliente";
 
 interface Cliente {
     id_cliente: number;
@@ -201,7 +202,8 @@ export default function ModalInformeTecnico({ clientes }: Props) {
                                             <input
                                                 type="text"
                                                 value={cuit}
-                                                onChange={(e) => setCuit(e.target.value)}
+                                                inputMode="numeric"
+                                                onChange={(e) => setCuit(limpiarCuit(e.target.value))}
                                                 className={inputCls}
                                             />
                                         </div>

@@ -3,6 +3,18 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { crearCliente, actualizarCliente } from "@/actions/clientes";
+import {
+    MAX_CONDICION_PAGO_DIAS,
+    MAX_NUM_CALLE,
+    limpiarCuit,
+    limpiarTelefono,
+    validarCondicionPagoDias,
+    validarCuit,
+    validarNumCalle,
+    validarTelefono,
+} from "@/lib/validaciones-cliente";
+
+type CampoConError = "cuit" | "telefono" | "email" | "numCalle" | "condicionPagoDias";
 
 interface ClienteExistente {
     id_cliente: number;
@@ -27,7 +39,7 @@ export default function ModalCliente({ cliente }: Props) {
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [errores, setErrores] = useState<{ cuit?: string; telefono?: string; email?: string }>({});
+    const [errores, setErrores] = useState<Partial<Record<CampoConError, string>>>({});
 
     /* campos del formulario */
     const [nombre, setNombre] = useState("");
@@ -46,7 +58,7 @@ export default function ModalCliente({ cliente }: Props) {
         /* precargar datos del cliente si es edición, resetear si es alta */
         setNombre(cliente?.nombre ?? "");
         setApellido(cliente?.apellido ?? "");
-        setCuit(cliente?.cuit ?? "");
+        setCuit(limpiarCuit(cliente?.cuit ?? ""));
         setTelefono(cliente?.telefono ?? "");
         setEmail(cliente?.email ?? "");
         setCalle(cliente?.calle ?? "");
@@ -65,10 +77,21 @@ export default function ModalCliente({ cliente }: Props) {
             return;
         }
 
+        const numCalleValor = numCalle ? parseInt(numCalle, 10) : undefined;
+        const condicionPagoValor = condicionPagoDias ? parseInt(condicionPagoDias, 10) : 30;
+
         const nuevosErrores: typeof errores = {};
         if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
             nuevosErrores.email = "El email no tiene un formato válido.";
         }
+        const errorCuit = validarCuit(cuit);
+        if (errorCuit) nuevosErrores.cuit = errorCuit;
+        const errorTelefono = validarTelefono(telefono);
+        if (errorTelefono) nuevosErrores.telefono = errorTelefono;
+        const errorNumCalle = validarNumCalle(numCalleValor);
+        if (errorNumCalle) nuevosErrores.numCalle = errorNumCalle;
+        const errorCondicion = validarCondicionPagoDias(condicionPagoValor);
+        if (errorCondicion) nuevosErrores.condicionPagoDias = errorCondicion;
         if (Object.keys(nuevosErrores).length > 0) {
             setErrores(nuevosErrores);
             return;
@@ -85,9 +108,9 @@ export default function ModalCliente({ cliente }: Props) {
             telefono: telefono.trim() || undefined,
             email: email.trim() || undefined,
             calle: calle.trim() || undefined,
-            num_calle: numCalle ? parseInt(numCalle) : undefined,
+            num_calle: numCalleValor,
             localidad: localidad.trim() || undefined,
-            condicion_pago_dias: condicionPagoDias ? parseInt(condicionPagoDias) : 30,
+            condicion_pago_dias: condicionPagoValor,
         };
 
         const res = esEdicion
@@ -100,6 +123,8 @@ export default function ModalCliente({ cliente }: Props) {
             setIsOpen(false);
         } else if (res.error?.toLowerCase().includes("cuit")) {
             setErrores((prev) => ({ ...prev, cuit: res.error }));
+        } else if (res.error?.toLowerCase().includes("teléfono")) {
+            setErrores((prev) => ({ ...prev, telefono: res.error }));
         } else if (res.error?.toLowerCase().includes("email")) {
             setErrores((prev) => ({ ...prev, email: res.error }));
         } else {
@@ -168,10 +193,11 @@ export default function ModalCliente({ cliente }: Props) {
                                         type="text"
                                         value={cuit}
                                         onChange={(e) => {
-                                            setCuit(e.target.value.replace(/[^\d\-]/g, '').slice(0, 20));
+                                            setCuit(limpiarCuit(e.target.value));
                                             setErrores((prev) => ({ ...prev, cuit: undefined }));
                                         }}
-                                        placeholder="Ej: 20-12345678-9"
+                                        inputMode="numeric"
+                                        placeholder="Ej: 20123456786"
                                         className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.cuit ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
                                     {errores.cuit && <p className="text-red-500 text-xs mt-1">{errores.cuit}</p>}
@@ -182,12 +208,14 @@ export default function ModalCliente({ cliente }: Props) {
                                         type="text"
                                         value={telefono}
                                         onChange={(e) => {
-                                            setTelefono(e.target.value.replace(/[^\d\s\-\+\(\)]/g, '').slice(0, 20));
+                                            setTelefono(limpiarTelefono(e.target.value));
                                             setErrores((prev) => ({ ...prev, telefono: undefined }));
                                         }}
-                                        placeholder="Ej: 351 123-4567"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        inputMode="numeric"
+                                        placeholder="Ej: 3511234567"
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.telefono ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
+                                    {errores.telefono && <p className="text-red-500 text-xs mt-1">{errores.telefono}</p>}
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
@@ -223,12 +251,17 @@ export default function ModalCliente({ cliente }: Props) {
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Número</label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
                                         value={numCalle}
-                                        onChange={(e) => setNumCalle(e.target.value)}
+                                        onChange={(e) => {
+                                            setNumCalle(e.target.value.replace(/\D/g, '').slice(0, String(MAX_NUM_CALLE).length));
+                                            setErrores((prev) => ({ ...prev, numCalle: undefined }));
+                                        }}
                                         placeholder="1234"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.numCalle ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                     />
+                                    {errores.numCalle && <p className="text-red-500 text-xs mt-1">{errores.numCalle}</p>}
                                 </div>
                                 <div className="col-span-3">
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Localidad</label>
@@ -245,13 +278,19 @@ export default function ModalCliente({ cliente }: Props) {
                                     <div className="w-1/2">
                                         <label className="block text-sm font-bold text-gray-700 mb-1">Condición de Pago (Días)</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={condicionPagoDias}
-                                            onChange={(e) => setCondicionPagoDias(e.target.value)}
+                                            onChange={(e) => {
+                                                setCondicionPagoDias(e.target.value.replace(/\D/g, '').slice(0, String(MAX_CONDICION_PAGO_DIAS).length));
+                                                setErrores((prev) => ({ ...prev, condicionPagoDias: undefined }));
+                                            }}
                                             placeholder="30"
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 bg-white ${errores.condicionPagoDias ? "border-red-400 focus:ring-red-400" : "border-gray-300 focus:ring-blue-500"}`}
                                         />
-                                        <p className="text-xs text-gray-500 mt-1">Días para el vencimiento de facturas.</p>
+                                        {errores.condicionPagoDias
+                                            ? <p className="text-red-500 text-xs mt-1">{errores.condicionPagoDias}</p>
+                                            : <p className="text-xs text-gray-500 mt-1">Días para el vencimiento de facturas (0 a {MAX_CONDICION_PAGO_DIAS}).</p>}
                                     </div>
                                 </div>
                             </div>

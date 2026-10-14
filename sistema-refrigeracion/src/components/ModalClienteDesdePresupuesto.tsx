@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { crearCliente } from "@/actions/clientes";
 import { vincularClienteAPresupuesto } from "@/actions/presupuestos";
+import { limpiarCuit, limpiarTelefono } from "@/lib/validaciones-cliente";
 
 interface Props {
     idPresupuesto: number;
@@ -61,7 +62,7 @@ export default function ModalClienteDesdePresupuesto({
 
         if (!resCliente.success || !resCliente.cliente) {
             setLoading(false);
-            setError("No se pudo crear el cliente.");
+            setError(resCliente.error || "No se pudo crear el cliente.");
             return;
         }
 
@@ -127,7 +128,8 @@ export default function ModalClienteDesdePresupuesto({
                                     <input
                                         type="text"
                                         value={cuit}
-                                        onChange={(e) => setCuit(e.target.value.replace(/[^\d\-]/g, '').slice(0, 20))}
+                                        inputMode="numeric"
+                                        onChange={(e) => setCuit(limpiarCuit(e.target.value))}
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
                                 </div>
@@ -136,7 +138,8 @@ export default function ModalClienteDesdePresupuesto({
                                     <input
                                         type="text"
                                         value={telefono}
-                                        onChange={(e) => setTelefono(e.target.value.replace(/[^\d\s\-\+\(\)]/g, '').slice(0, 20))}
+                                        inputMode="numeric"
+                                        onChange={(e) => setTelefono(limpiarTelefono(e.target.value))}
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                     />
                                 </div>
@@ -178,9 +181,10 @@ export default function ModalClienteDesdePresupuesto({
                                     <div className="w-1/2">
                                         <label className="block text-sm font-bold text-gray-700 mb-1">Condición de Pago (Días)</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={condicionPagoDias}
-                                            onChange={(e) => setCondicionPagoDias(e.target.value)}
+                                            onChange={(e) => setCondicionPagoDias(e.target.value.replace(/\D/g, '').slice(0, 3))}
                                             placeholder="30"
                                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                         />

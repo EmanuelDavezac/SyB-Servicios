@@ -47,6 +47,7 @@ import { requerirUsuario } from "@/lib/sesion";
 import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, TOLERANCIA_MONTO } from "@/lib/estadoFactura";
 import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
+import { validarDatosNumericosCliente } from "@/lib/validaciones-cliente";
 
 async function cuitYaExiste(cuit: string, idExcluir?: number) {
     const existente = await prisma.cliente.findFirst({
@@ -84,6 +85,8 @@ export async function crearCliente(datos: {
 
     try {
         await requerirUsuario();
+        const errorValidacion = validarDatosNumericosCliente(datos);
+        if (errorValidacion) return { success: false, error: errorValidacion };
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit))) {
             return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };
@@ -130,6 +133,8 @@ export async function actualizarCliente(id_cliente: number, datos: {
 }) {
     try {
         await requerirUsuario();
+        const errorValidacion = validarDatosNumericosCliente(datos);
+        if (errorValidacion) return { success: false, error: errorValidacion };
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit, id_cliente))) {
             return { success: false, error: "Ya existe un cliente con ese DNI/CUIT" };

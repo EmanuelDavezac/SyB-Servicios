@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { formatearListaConLimite } from "@/lib/formato";
+import { validarCuit, validarTelefono } from "@/lib/validaciones-cliente";
 
 // Mensaje de "ya existe" cuando el chequeo previo no alcanzo a frenarlo (dos
 // altas en simultaneo) y lo termina frenando la constraint unique de la
@@ -91,6 +92,8 @@ export async function crearProveedor(datos: {
 }) {
     try {
         await requerirUsuario();
+        const errorValidacion = validarCuit(datos.cuit ?? "") ?? validarTelefono(datos.telefono ?? "");
+        if (errorValidacion) return { success: false, error: errorValidacion };
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit))) {
             return { success: false, error: "Ya existe un proveedor con ese CUIT" };
@@ -120,6 +123,8 @@ export async function editarProveedor(
 ) {
     try {
         await requerirUsuario();
+        const errorValidacion = validarCuit(datos.cuit ?? "") ?? validarTelefono(datos.telefono ?? "");
+        if (errorValidacion) return { success: false, error: errorValidacion };
         const cuit = datos.cuit?.trim();
         if (cuit && (await cuitYaExiste(cuit, id_proveedor))) {
             return { success: false, error: "Ya existe un proveedor con ese CUIT" };
