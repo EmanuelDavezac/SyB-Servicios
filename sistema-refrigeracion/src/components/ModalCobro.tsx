@@ -294,26 +294,6 @@ export default function ModalCobro({ clientes }: Props) {
                                         <p className="text-sm text-gray-500">Este cliente no tiene facturas pendientes.</p>
                                     ) : (
                                         <>
-                                            <div className="flex gap-2 mb-3">
-                                                <div className="relative flex-1">
-                                                    <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
-                                                    <input
-                                                        type="number"
-                                                        value={montoEntregado}
-                                                        onChange={(e) => setMontoEntregado(e.target.value)}
-                                                        placeholder="Monto entregado"
-                                                        className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                                                    />
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={distribuirMontoEntregado}
-                                                    className="bg-green-50 text-green-700 hover:bg-green-100 font-semibold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
-                                                >
-                                                    Repartir
-                                                </button>
-                                            </div>
-
                                             <div className="space-y-2">
                                                 {facturasPendientes.map((f) => (
                                                     <div
@@ -403,6 +383,35 @@ export default function ModalCobro({ clientes }: Props) {
                                             (se puede combinar, ej. una parte en efectivo y otra por transferencia)
                                         </span>
                                     </h4>
+
+                                    {facturasPendientes.length > 0 && (
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                Monto entregado (se reparte de la factura más vieja a la más nueva)
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={montoEntregado}
+                                                        onChange={(e) => setMontoEntregado(e.target.value)}
+                                                        placeholder="Monto entregado"
+                                                        min="0"
+                                                        step="0.01"
+                                                        className="w-full border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={distribuirMontoEntregado}
+                                                    className="bg-green-50 text-green-700 hover:bg-green-100 font-semibold px-4 py-2 rounded-lg text-sm transition whitespace-nowrap"
+                                                >
+                                                    Repartir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {medios.length > 0 && (
                                         <div className="space-y-1 mb-3">
