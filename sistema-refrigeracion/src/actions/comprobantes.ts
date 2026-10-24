@@ -4,7 +4,7 @@ import { Prisma, type insumo as InsumoModel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
-import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE, esTipoFacturable } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE, esTipoFacturable } from "@/lib/estadoComprobante";
 import { calcularImportes, alicuotaValida, ALICUOTA_IVA_DEFAULT, type ImportesComprobante } from "@/lib/comprobantes";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
@@ -25,8 +25,8 @@ export interface StockInsuficienteItem {
 }
 
 // Se tira dentro de la transaccion para abortarla (nada queda escrito) y se
-// atrapa en el catch de crearFactura para devolver la lista estructurada en
-// vez de un string: ModalFactura necesita los numeros para armar la tabla de
+// atrapa en el catch de crearComprobante para devolver la lista estructurada en
+// vez de un string: ModalComprobante necesita los numeros para armar la tabla de
 // confirmacion, no solo un mensaje.
 class StockInsuficienteParaFacturar extends Error {
   constructor(public readonly detalle: StockInsuficienteItem[]) {
@@ -35,10 +35,10 @@ class StockInsuficienteParaFacturar extends Error {
   }
 }
 
-export async function getFacturas() {
+export async function getComprobantes() {
   try {
         await requerirUsuario();
-    const facturas = await prisma.factura.findMany({
+    const comprobantes = await prisma.comprobante.findMany({
       include: {
         orden_trabajo: {
           include: {
@@ -48,14 +48,14 @@ export async function getFacturas() {
       },
       orderBy: [
         { fecha_emision: "desc" },
-        { id_factura: "desc" }
+        { id_comprobante: "desc" }
       ],
     });
 
     // JSON stringify/parse convierte los Decimal para poder pasarlos a Client Components
-    return serializar(facturas);
+    return serializar(comprobantes);
   } catch (error) {
-    console.error("Error fetching facturas:", error);
+    console.error("Error fetching comprobantes:", error);
     return [];
   }
 }
@@ -63,21 +63,21 @@ export async function getFacturas() {
 export async function getOrdenesPendientesFacturacion() {
   try {
         await requerirUsuario();
-    // Órdenes Finalizado que todavía no tienen una Factura vigente
+    // Órdenes Finalizado que todavía no tienen una Comprobante vigente
     const ordenes = await prisma.orden_trabajo.findMany({
       where: {
         estado_trabajo: "Finalizado",
-        // excluye órdenes con una Factura vigente; una anulada o un Remito no cuentan
-        factura: {
+        // excluye órdenes con una Comprobante vigente; una anulada o un Remito no cuentan
+        comprobante: {
           none: {
             tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
-            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+            estado_pago: { not: ESTADOS_COMPROBANTE.ANULADA },
           },
         },
       },
       include: {
         cliente: true,
-        factura: true,
+        comprobante: true,
       },
       orderBy: {
         fecha_creacion: "desc",
@@ -92,13 +92,13 @@ export async function getOrdenesPendientesFacturacion() {
   }
 }
 
-// Solo las facturas eligen si se cargan en ARCA o son internas; el resto de
+// Solo los comprobantes eligen si se cargan en ARCA o son internas; el resto de
 // los comprobantes (ej. Remito) queda siempre con fiscal = true.
 const TIPO_CON_OPCION_FISCAL = "Factura";
 
-export async function crearFactura(data: {
+export async function crearComprobante(data: {
   id_orden: number;
-  num_factura: string;
+  num_comprobante: string;
   tipo: string;
   /** true = se carga en ARCA; false = comprobante interno (se cobra igual, lleva IVA igual) */
   fiscal: boolean;
@@ -128,26 +128,26 @@ export async function crearFactura(data: {
       }
     }
 
-    const nuevaFactura = await prisma.$transaction(async (tx) => {
-      // 0. Evitar doble facturación de la misma orden (bug: /facturacion?orden=X
+    const nuevaComprobante = await prisma.$transaction(async (tx) => {
+      // 0. Evitar doble facturación de la misma orden (bug: /comprobantes?orden=X
       //    setea el id directo desde la URL, sin validar si ya está facturada).
-      //    Solo una Factura vigente por orden; los Remitos no tienen limite.
+      //    Solo una Comprobante vigente por orden; los Remitos no tienen limite.
       if (facturable) {
-        const facturaExistente = await tx.factura.findFirst({
+        const comprobanteExistente = await tx.comprobante.findFirst({
           where: {
             id_orden: data.id_orden,
             tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
-            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+            estado_pago: { not: ESTADOS_COMPROBANTE.ANULADA },
           },
         });
-        if (facturaExistente) {
-          throw new Error(`La orden #${data.id_orden} ya tiene una factura registrada (#${facturaExistente.id_factura})`);
+        if (comprobanteExistente) {
+          throw new Error(`La orden #${data.id_orden} ya tiene un comprobante registrada (#${comprobanteExistente.id_comprobante})`);
         }
       }
 
       // 1. Calcular vencimiento por default si no se cargo a mano
       //    (fecha_emision + condicion_pago_dias del cliente). El campo manual
-      //    manda si vino cargado: esto no se recalcula sobre facturas existentes.
+      //    manda si vino cargado: esto no se recalcula sobre comprobantes existentes.
       const fechaEmision = fechaActualArgentina();
       let fechaVencimiento = facturable ? data.fecha_vencimiento : null;
       if (facturable && !fechaVencimiento) {
@@ -162,8 +162,8 @@ export async function crearFactura(data: {
       }
 
       // 2. Insumos ya registrados en la ORDEN (agregados desde ModalOrden
-      //    durante el trabajo) + insumos adicionales que llegan de ModalFactura.
-      //    El stock se mueve solo con la Factura: un Remito no descuenta.
+      //    durante el trabajo) + insumos adicionales que llegan de ModalComprobante.
+      //    El stock se mueve solo con la Comprobante: un Remito no descuenta.
       const insumosDeOrden = await tx.detalle_orden_insumo.findMany({
         where: { id_orden: data.id_orden },
         include: { insumo: true },
@@ -183,7 +183,7 @@ export async function crearFactura(data: {
       // 2.1 Calcular cuanto se va a descontar de cada insumo (sumando todas
       //     las lineas que lo usan, de la orden y adicionales) y compararlo
       //     contra el stock disponible. Es el mismo numero que se descuenta
-      //     mas abajo: no se duplica el calculo. Si no alcanza, no se factura:
+      //     mas abajo: no se duplica el calculo. Si no alcanza, no se comprobante:
       //     el stock nunca queda en negativo.
       const requeridoPorInsumo = new Map<number, { insumo: InsumoModel; requerido: Prisma.Decimal }>();
       if (facturable) {
@@ -240,7 +240,7 @@ export async function crearFactura(data: {
       }
 
       // 3.1 Descontar stock de los adicionales y registrarlos en el detalle
-      //     de la orden (compatibilidad con ModalFactura). Se registran
+      //     de la orden (compatibilidad con ModalComprobante). Se registran
       //     siempre, facturable o no; lo que depende del tipo es si mueven
       //     stock.
       for (const { item, insumo } of insumosAdicionales) {
@@ -266,7 +266,7 @@ export async function crearFactura(data: {
         });
       }
 
-      // 3.2 Re-chequeo despues de descontar: si otra factura simultanea
+      // 3.2 Re-chequeo despues de descontar: si otro comprobante simultanea
       //     consumio el mismo insumo entre la lectura de 2.1 y el update, el
       //     stock real puede haber quedado negativo. Se aborta la transaccion.
       if (facturable && requeridoPorInsumo.size > 0) {
@@ -326,12 +326,12 @@ export async function crearFactura(data: {
         }
       }
 
-      // 5. Crear la factura y su IVA discriminado por alicuota
+      // 5. Crear el comprobante y su IVA discriminado por alicuota
       const alicuotaUnica = importes && importes.desglose.length === 1 ? importes.desglose[0].alicuota : null;
-      const factura = await tx.factura.create({
+      const comprobante = await tx.comprobante.create({
         data: {
           id_orden: data.id_orden,
-          num_factura: data.num_factura,
+          num_comprobante: data.num_comprobante,
           tipo: data.tipo,
           fiscal,
           punto_venta: puntoVenta,
@@ -345,9 +345,9 @@ export async function crearFactura(data: {
           equipo_descripcion: facturable && data.tipo_descuento === "EQUIPO" ? (data.equipo_descripcion?.trim() ?? null) : null,
           monto_total: importes ? importes.montoTotal : 0,
           saldo_pendiente: importes ? importes.montoTotal : 0,
-          estado_pago: facturable ? ESTADOS_FACTURA.IMPAGA : ESTADOS_FACTURA.NO_APLICA,
+          estado_pago: facturable ? ESTADOS_COMPROBANTE.IMPAGA : ESTADOS_COMPROBANTE.NO_APLICA,
           descripcion: data.descripcion,
-          factura_iva: importes
+          comprobante_iva: importes
             ? {
                 create: importes.desglose.map((d) => ({
                   alicuota: d.alicuota,
@@ -357,32 +357,32 @@ export async function crearFactura(data: {
               }
             : undefined,
         },
-        include: { factura_iva: true },
+        include: { comprobante_iva: true },
       });
 
-      return factura;
+      return comprobante;
     });
 
-    revalidatePath("/facturacion");
+    revalidatePath("/comprobantes");
     revalidatePath("/insumos");
     revalidatePath("/ordenes");
-    return { success: true, factura: JSON.parse(JSON.stringify(nuevaFactura)) };
+    return { success: true, comprobante: JSON.parse(JSON.stringify(nuevaComprobante)) };
   } catch (error) {
     if (error instanceof StockInsuficienteParaFacturar) {
       return { success: false, stockInsuficiente: error.detalle, error: error.message };
     }
-    console.error("Error creating factura:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Error al crear la factura" };
+    console.error("Error creating comprobante:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Error al crear el comprobante" };
   }
 }
 
-export async function getFacturaCompleta(id_factura: number) {
+export async function getComprobanteCompleto(id_comprobante: number) {
   try {
         await requerirUsuario();
-    const factura = await prisma.factura.findUnique({
-      where: { id_factura },
+    const comprobante = await prisma.comprobante.findUnique({
+      where: { id_comprobante },
       include: {
-        factura_iva: { orderBy: { alicuota: "desc" } },
+        comprobante_iva: { orderBy: { alicuota: "desc" } },
         orden_trabajo: {
           include: {
             cliente: true,
@@ -397,33 +397,33 @@ export async function getFacturaCompleta(id_factura: number) {
       },
     });
 
-    if (!factura) return null;
-    return JSON.parse(JSON.stringify(factura));
+    if (!comprobante) return null;
+    return JSON.parse(JSON.stringify(comprobante));
   } catch (error) {
-    console.error("Error fetching factura completa:", error);
+    console.error("Error fetching comprobante completa:", error);
     return null;
   }
 }
 
-export async function getSiguienteNumeroFactura(tipo: string, fiscal: boolean) {
+export async function getSiguienteNumeroComprobante(tipo: string, fiscal: boolean) {
   try {
     await requerirUsuario();
     const prefix = tipo === "Factura" ? (fiscal ? "A-" : "X-") : "R-";
     
-    // Solo buscamos facturas del mismo tipo general (Factura vs Remito) y subtipo (fiscal vs interna)
-    const facturas = await prisma.factura.findMany({
+    // Solo buscamos comprobantes del mismo tipo general (Comprobante vs Remito) y subtipo (fiscal vs interna)
+    const comprobantes = await prisma.comprobante.findMany({
       where: {
         tipo,
         fiscal: tipo === "Factura" ? fiscal : true,
       },
-      select: { num_factura: true },
+      select: { num_comprobante: true },
     });
 
     let maxNum = 0;
-    for (const f of facturas) {
-      if (f.num_factura) {
-        // Extraemos los ultimos digitos, pej de "Factura A-0005" o "X-0012"
-        const match = f.num_factura.match(/\d+$/);
+    for (const f of comprobantes) {
+      if (f.num_comprobante) {
+        // Extraemos los ultimos digitos, pej de "Comprobante A-0005" o "X-0012"
+        const match = f.num_comprobante.match(/\d+$/);
         if (match) {
           const n = parseInt(match[0], 10);
           if (n > maxNum) maxNum = n;

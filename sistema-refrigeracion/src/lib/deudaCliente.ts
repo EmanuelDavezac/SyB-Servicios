@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE } from "@/lib/estadoComprobante";
 
 // Acepta tanto el cliente de Prisma normal como un TransactionClient: quien
 // llama a darDeBajaCliente (clientes.ts) necesita calcular esto dentro de la
@@ -10,7 +10,7 @@ type ClientePrisma = Prisma.TransactionClient;
 
 export interface DeudaCliente {
     saldo: number;
-    cantidadFacturas: number;
+    cantidadComprobantes: number;
 }
 
 /**
@@ -20,17 +20,17 @@ export interface DeudaCliente {
  * (clientes.ts), centralizado aca para que no se desincronicen.
  */
 export async function obtenerDeudaCliente(db: ClientePrisma, id_cliente: number): Promise<DeudaCliente> {
-    const agregado = await db.factura.aggregate({
+    const agregado = await db.comprobante.aggregate({
         where: {
-            estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
+            estado_pago: { in: [ESTADOS_COMPROBANTE.IMPAGA, ESTADOS_COMPROBANTE.PARCIAL] },
             orden_trabajo: { id_cliente },
         },
         _sum: { saldo_pendiente: true },
-        _count: { id_factura: true },
+        _count: { id_comprobante: true },
     });
 
     return {
         saldo: Number(agregado._sum.saldo_pendiente ?? 0),
-        cantidadFacturas: agregado._count.id_factura,
+        cantidadComprobantes: agregado._count.id_comprobante,
     };
 }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE } from "@/lib/estadoComprobante";
 import { fechaActualArgentina } from "@/lib/fechas";
 
 // Este modulo NO es "use server": todo lo exportado desde un archivo
@@ -15,7 +15,7 @@ const FROM = process.env.RESEND_FROM_EMAIL || "SyB Servicios <onboarding@resend.
 
 // Reintentos dentro de una misma corrida si Resend falla (error de API o
 // excepcion). Esperas cortas a proposito: la funcion del cron tiene un
-// timeout y esto corre en loop por cada factura del lote.
+// timeout y esto corre en loop por cada comprobante del lote.
 const MAX_INTENTOS = 3;
 const ESPERAS_REINTENTO_MS = [1000, 3000];
 
@@ -52,18 +52,18 @@ export function rangoVencimiento(diasAnticipacion: number, hoy: Date) {
 }
 
 /**
- * Facturas IMPAGA/PARCIAL cuyo vencimiento cae en el rango que le toca a este
+ * Comprobantes IMPAGA/PARCIAL cuyo vencimiento cae en el rango que le toca a este
  * aviso, y que todavia no tienen un recordatorio de este tipo marcado como
  * ENVIADO (en cualquier fecha: un ERROR o NO_NOTIFICABLE de un dia anterior
  * no cuenta como avisado, se vuelve a intentar).
  */
-export async function obtenerFacturasParaRecordatorio(diasAnticipacion: number, hoy: Date) {
+export async function obtenerComprobantesParaRecordatorio(diasAnticipacion: number, hoy: Date) {
     const tipo = tipoRecordatorio(diasAnticipacion);
     const { inicio, fin } = rangoVencimiento(diasAnticipacion, hoy);
 
-    return prisma.factura.findMany({
+    return prisma.comprobante.findMany({
         where: {
-            estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
+            estado_pago: { in: [ESTADOS_COMPROBANTE.IMPAGA, ESTADOS_COMPROBANTE.PARCIAL] },
             fecha_vencimiento: { gte: inicio, lte: fin },
             historial_notificaciones: {
                 none: {
@@ -145,7 +145,7 @@ async function enviarConReintentos(params: {
 }
 
 async function registrarIntento(datos: {
-    id_factura: number;
+    id_comprobante: number;
     id_cliente: number | null;
     tipo: string;
     hoy: Date;
@@ -153,20 +153,20 @@ async function registrarIntento(datos: {
     descripcion: string;
 }) {
     try {
-        // Upsert sobre el unique (id_factura, tipo_notificacion, fecha_creacion):
+        // Upsert sobre el unique (id_comprobante, tipo_notificacion, fecha_creacion):
         // una sola fila por comprobante+aviso+dia, que se va actualizando con el
         // resultado del ultimo intento (no se puede insertar una fila nueva por
         // intento, el unique de dedupe no lo permite ni hace falta migracion).
         await prisma.historial_notificaciones.upsert({
             where: {
-                id_factura_tipo_notificacion_fecha_creacion: {
-                    id_factura: datos.id_factura,
+                id_comprobante_tipo_notificacion_fecha_creacion: {
+                    id_comprobante: datos.id_comprobante,
                     tipo_notificacion: datos.tipo,
                     fecha_creacion: datos.hoy,
                 },
             },
             create: {
-                id_factura: datos.id_factura,
+                id_comprobante: datos.id_comprobante,
                 id_cliente: datos.id_cliente,
                 tipo_notificacion: datos.tipo,
                 fecha_creacion: datos.hoy,
@@ -192,9 +192,9 @@ export interface ResumenRecordatorios {
 }
 
 /**
- * Busca facturas por vencer para el aviso `diasAnticipacion` (3 o 0) y manda
+ * Busca comprobantes por vencer para el aviso `diasAnticipacion` (3 o 0) y manda
  * el recordatorio por email a cada cliente via Resend, reintentando hasta
- * MAX_INTENTOS veces por factura antes de darse por vencido en esta corrida.
+ * MAX_INTENTOS veces por comprobante antes de darse por vencido en esta corrida.
  * Deja constancia en historial_notificaciones (ENVIADO, ERROR o
  * NO_NOTIFICABLE). No depende de sesion: la llama tanto el cron (sin
  * usuario logueado) como la action manual, que valida sesion antes de
@@ -205,20 +205,20 @@ export async function procesarRecordatorios(
     hoy: Date = fechaActualArgentina()
 ): Promise<ResumenRecordatorios> {
     const tipo = tipoRecordatorio(diasAnticipacion);
-    const facturas = await obtenerFacturasParaRecordatorio(diasAnticipacion, hoy);
+    const comprobantes = await obtenerComprobantesParaRecordatorio(diasAnticipacion, hoy);
 
     let enviados = 0;
     let fallidos = 0;
     let omitidos = 0;
 
-    for (const factura of facturas) {
-        const cliente = factura.orden_trabajo?.cliente;
+    for (const comprobante of comprobantes) {
+        const cliente = comprobante.orden_trabajo?.cliente;
         const idCliente = cliente?.id_cliente ?? null;
 
         if (!cliente?.email) {
             omitidos++;
             await registrarIntento({
-                id_factura: factura.id_factura,
+                id_comprobante: comprobante.id_comprobante,
                 id_cliente: idCliente,
                 tipo,
                 hoy,
@@ -231,15 +231,15 @@ export async function procesarRecordatorios(
         // Re-chequeo anti-duplicado: si otra corrida (cron solapado) ya mando
         // este mismo aviso mientras se armaba el lote, no reenviar.
         const yaEnviado = await prisma.historial_notificaciones.findFirst({
-            where: { id_factura: factura.id_factura, tipo_notificacion: tipo, estado: "ENVIADO" },
+            where: { id_comprobante: comprobante.id_comprobante, tipo_notificacion: tipo, estado: "ENVIADO" },
             select: { id_notificacion: true },
         });
         if (yaEnviado) continue;
 
         const registroDeHoy = await prisma.historial_notificaciones.findUnique({
             where: {
-                id_factura_tipo_notificacion_fecha_creacion: {
-                    id_factura: factura.id_factura,
+                id_comprobante_tipo_notificacion_fecha_creacion: {
+                    id_comprobante: comprobante.id_comprobante,
                     tipo_notificacion: tipo,
                     fecha_creacion: hoy,
                 },
@@ -249,10 +249,10 @@ export async function procesarRecordatorios(
         const intentoInicial = extraerIntentoPrevio(registroDeHoy?.descripcion);
 
         const nombreCliente = `${cliente.nombre} ${cliente.apellido}`;
-        const numComprobante = factura.num_factura || `Factura #${factura.id_factura}`;
-        const saldo = Number(factura.saldo_pendiente);
+        const numComprobante = comprobante.num_comprobante || `Comprobante #${comprobante.id_comprobante}`;
+        const saldo = Number(comprobante.saldo_pendiente);
         const vencimientoTexto =
-            diasAnticipacion === 0 ? "hoy" : `el ${formatDate(factura.fecha_vencimiento!)}`;
+            diasAnticipacion === 0 ? "hoy" : `el ${formatDate(comprobante.fecha_vencimiento!)}`;
 
         const resultado = await enviarConReintentos({
             email: cliente.email,
@@ -270,7 +270,7 @@ export async function procesarRecordatorios(
         else fallidos++;
 
         await registrarIntento({
-            id_factura: factura.id_factura,
+            id_comprobante: comprobante.id_comprobante,
             id_cliente: idCliente,
             tipo,
             hoy,
@@ -279,5 +279,5 @@ export async function procesarRecordatorios(
         });
     }
 
-    return { total: facturas.length, enviados, fallidos, omitidos };
+    return { total: comprobantes.length, enviados, fallidos, omitidos };
 }

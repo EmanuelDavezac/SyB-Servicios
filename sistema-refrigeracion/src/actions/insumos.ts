@@ -172,7 +172,7 @@ function revalidarListadosDeInsumos() {
     revalidatePath("/ordenes");
     revalidatePath("/compras");
     revalidatePath("/servicios");
-    revalidatePath("/facturacion");
+    revalidatePath("/comprobantes");
 }
 
 /**

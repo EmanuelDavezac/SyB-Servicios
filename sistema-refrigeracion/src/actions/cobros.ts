@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
-import { ESTADOS_FACTURA, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoComprobante";
 import type { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
 import { fechaActualArgentina } from "@/lib/fechas";
@@ -11,20 +11,20 @@ import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 
 type Tx = Prisma.TransactionClient;
 
-async function recalcularFactura(tx: Tx, id_factura: number) {
-  const factura = await tx.factura.findUnique({ where: { id_factura } });
-  if (!factura || factura.estado_pago === ESTADOS_FACTURA.ANULADA || factura.estado_pago === ESTADOS_FACTURA.NO_APLICA) return;
+async function recalcularComprobante(tx: Tx, id_comprobante: number) {
+  const comprobante = await tx.comprobante.findUnique({ where: { id_comprobante } });
+  if (!comprobante || comprobante.estado_pago === ESTADOS_COMPROBANTE.ANULADA || comprobante.estado_pago === ESTADOS_COMPROBANTE.NO_APLICA) return;
 
   const agregado = await tx.pagos_parciales.aggregate({
-    where: { id_factura },
+    where: { id_comprobante },
     _sum: { monto_pagado: true },
   });
   const pagado = Number(agregado._sum.monto_pagado ?? 0);
-  const montoTotal = Number(factura.monto_total);
+  const montoTotal = Number(comprobante.monto_total);
   const saldo = Math.max(0, montoTotal - pagado);
 
-  await tx.factura.update({
-    where: { id_factura },
+  await tx.comprobante.update({
+    where: { id_comprobante },
     data: {
       saldo_pendiente: saldo,
       estado_pago: calcularEstado(saldo, montoTotal),
@@ -44,13 +44,13 @@ export async function registrarCobro(data: {
   formasPago?: { forma_pago: string; monto: number }[];
   observacion?: string;
   fecha_pago?: Date;
-  imputaciones: { id_factura: number; monto: number }[];
+  imputaciones: { id_comprobante: number; monto: number }[];
   retenciones?: { tipo: string; monto: number }[];
 }) {
   try {
     await requerirUsuario();
     if (!data.imputaciones || data.imputaciones.length === 0) {
-      return { success: false, error: "Agregá al menos una imputación a una factura." };
+      return { success: false, error: "Agregá al menos una imputación a un comprobante." };
     }
     if (data.imputaciones.some((i) => i.monto <= 0)) {
       return { success: false, error: "Los montos imputados deben ser mayores a cero." };
@@ -75,28 +75,28 @@ export async function registrarCobro(data: {
     }
 
     const nuevoRecibo = await prisma.$transaction(async (tx) => {
-      const idsFactura = data.imputaciones.map((i) => i.id_factura);
-      const facturas = await tx.factura.findMany({
-        where: { id_factura: { in: idsFactura } },
+      const idsComprobante = data.imputaciones.map((i) => i.id_comprobante);
+      const comprobantes = await tx.comprobante.findMany({
+        where: { id_comprobante: { in: idsComprobante } },
         include: { orden_trabajo: true },
       });
 
       for (const imp of data.imputaciones) {
-        const factura = facturas.find((f) => f.id_factura === imp.id_factura);
-        if (!factura) {
-          throw new Error(`Factura #${imp.id_factura} no encontrada`);
+        const comprobante = comprobantes.find((f) => f.id_comprobante === imp.id_comprobante);
+        if (!comprobante) {
+          throw new Error(`Comprobante #${imp.id_comprobante} no encontrada`);
         }
-        if (factura.orden_trabajo?.id_cliente !== data.id_cliente) {
-          throw new Error(`Factura #${imp.id_factura} no pertenece al cliente seleccionado`);
+        if (comprobante.orden_trabajo?.id_cliente !== data.id_cliente) {
+          throw new Error(`Comprobante #${imp.id_comprobante} no pertenece al cliente seleccionado`);
         }
-        if (factura.estado_pago === ESTADOS_FACTURA.ANULADA) {
-          throw new Error(`Factura #${imp.id_factura} está anulada`);
+        if (comprobante.estado_pago === ESTADOS_COMPROBANTE.ANULADA) {
+          throw new Error(`Comprobante #${imp.id_comprobante} está anulada`);
         }
-        if (factura.estado_pago === ESTADOS_FACTURA.NO_APLICA) {
-          throw new Error(`Comprobante #${imp.id_factura} no admite cobros (no genera deuda)`);
+        if (comprobante.estado_pago === ESTADOS_COMPROBANTE.NO_APLICA) {
+          throw new Error(`Comprobante #${imp.id_comprobante} no admite cobros (no genera deuda)`);
         }
-        if (imp.monto > Number(factura.saldo_pendiente) + TOLERANCIA_MONTO) {
-          throw new Error(`El monto imputado a la factura #${imp.id_factura} supera su saldo pendiente`);
+        if (imp.monto > Number(comprobante.saldo_pendiente) + TOLERANCIA_MONTO) {
+          throw new Error(`El monto imputado al comprobante #${imp.id_comprobante} supera su saldo pendiente`);
         }
       }
 
@@ -118,14 +118,14 @@ export async function registrarCobro(data: {
         await tx.pagos_parciales.create({
           data: {
             id_recibo: recibo.id_recibo,
-            id_factura: imp.id_factura,
+            id_comprobante: imp.id_comprobante,
             monto_pagado: imp.monto,
           },
         });
       }
 
-      for (const id_factura of idsFactura) {
-        await recalcularFactura(tx, id_factura);
+      for (const id_comprobante of idsComprobante) {
+        await recalcularComprobante(tx, id_comprobante);
       }
 
       if (data.retenciones && data.retenciones.length > 0) {
@@ -144,7 +144,7 @@ export async function registrarCobro(data: {
     });
 
     revalidatePath("/cobros");
-    revalidatePath("/facturacion");
+    revalidatePath("/comprobantes");
     revalidatePath("/reportes");
     return { success: true, recibo: JSON.parse(JSON.stringify(nuevoRecibo)) };
   } catch (error) {
@@ -164,14 +164,14 @@ export async function anularCobro(id_recibo: number) {
 
       await tx.recibo.delete({ where: { id_recibo } });
 
-      const idsFactura = [...new Set(pagos.map((p) => p.id_factura))];
-      for (const id_factura of idsFactura) {
-        await recalcularFactura(tx, id_factura);
+      const idsComprobante = [...new Set(pagos.map((p) => p.id_comprobante))];
+      for (const id_comprobante of idsComprobante) {
+        await recalcularComprobante(tx, id_comprobante);
       }
     });
 
     revalidatePath("/cobros");
-    revalidatePath("/facturacion");
+    revalidatePath("/comprobantes");
     revalidatePath("/reportes");
     return { success: true };
   } catch (error) {
@@ -180,30 +180,30 @@ export async function anularCobro(id_recibo: number) {
   }
 }
 
-export async function anularFactura(id_factura: number) {
+export async function anularComprobante(id_comprobante: number) {
   try {
     await requerirUsuario();
     await prisma.$transaction(async (tx) => {
-      const factura = await tx.factura.findUnique({ where: { id_factura } });
-      if (!factura) {
-        throw new Error("La factura no existe");
+      const comprobante = await tx.comprobante.findUnique({ where: { id_comprobante } });
+      if (!comprobante) {
+        throw new Error("El comprobante no existe");
       }
-      if (factura.estado_pago === ESTADOS_FACTURA.ANULADA) {
-        throw new Error("La factura ya está anulada");
+      if (comprobante.estado_pago === ESTADOS_COMPROBANTE.ANULADA) {
+        throw new Error("El comprobante ya está anulada");
       }
 
-      const tienePagos = await tx.pagos_parciales.count({ where: { id_factura } });
+      const tienePagos = await tx.pagos_parciales.count({ where: { id_comprobante } });
       if (tienePagos > 0) {
-        throw new Error("No se puede anular una factura que ya tiene cobros registrados");
+        throw new Error("No se puede anular un comprobante que ya tiene cobros registrados");
       }
 
-      // Devolver al stock los insumos que se descontaron al emitir la factura
-      // (crearFactura descuenta el stock de todo lo cargado en
+      // Devolver al stock los insumos que se descontaron al emitir el comprobante
+      // (crearComprobante descuenta el stock de todo lo cargado en
       // detalle_orden_insumo, pero solo para comprobantes facturables: un
       // Remito no movio stock y por eso tampoco lo devuelve).
-      const insumosDeOrden = esTipoFacturable(factura.tipo)
+      const insumosDeOrden = esTipoFacturable(comprobante.tipo)
         ? await tx.detalle_orden_insumo.findMany({
-            where: { id_orden: factura.id_orden },
+            where: { id_orden: comprobante.id_orden },
           })
         : [];
 
@@ -219,37 +219,37 @@ export async function anularFactura(id_factura: number) {
         });
       }
 
-      await tx.factura.update({
-        where: { id_factura },
-        data: { estado_pago: ESTADOS_FACTURA.ANULADA, saldo_pendiente: 0 },
+      await tx.comprobante.update({
+        where: { id_comprobante },
+        data: { estado_pago: ESTADOS_COMPROBANTE.ANULADA, saldo_pendiente: 0 },
       });
     });
 
-    revalidatePath("/facturacion");
+    revalidatePath("/comprobantes");
     revalidatePath("/cobros");
     revalidatePath("/reportes");
     revalidatePath("/insumos");
     return { success: true };
   } catch (error) {
-    console.error("Error anulando factura:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Error al anular la factura" };
+    console.error("Error anulando comprobante:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Error al anular el comprobante" };
   }
 }
 
-export async function obtenerFacturasPendientesCliente(id_cliente: number) {
+export async function obtenerComprobantesPendientesCliente(id_cliente: number) {
   try {
         await requerirUsuario();
-    const facturas = await prisma.factura.findMany({
+    const comprobantes = await prisma.comprobante.findMany({
       where: {
-        estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
+        estado_pago: { in: [ESTADOS_COMPROBANTE.IMPAGA, ESTADOS_COMPROBANTE.PARCIAL] },
         orden_trabajo: { id_cliente },
       },
       orderBy: { fecha_emision: "asc" },
     });
 
-    return JSON.parse(JSON.stringify(facturas));
+    return JSON.parse(JSON.stringify(comprobantes));
   } catch (error) {
-    console.error("Error obteniendo facturas pendientes del cliente:", error);
+    console.error("Error obteniendo comprobantes pendientes del cliente:", error);
     return [];
   }
 }
@@ -257,9 +257,9 @@ export async function obtenerFacturasPendientesCliente(id_cliente: number) {
 export async function obtenerClientesConDeuda() {
   try {
         await requerirUsuario();
-    const facturas = await prisma.factura.findMany({
+    const comprobantes = await prisma.comprobante.findMany({
       where: {
-        estado_pago: { in: [ESTADOS_FACTURA.IMPAGA, ESTADOS_FACTURA.PARCIAL] },
+        estado_pago: { in: [ESTADOS_COMPROBANTE.IMPAGA, ESTADOS_COMPROBANTE.PARCIAL] },
       },
       include: {
         orden_trabajo: { include: { cliente: true } },
@@ -268,24 +268,24 @@ export async function obtenerClientesConDeuda() {
 
     const porCliente = new Map<
       number,
-      { id_cliente: number; nombre: string; apellido: string; saldo: number; cantidadFacturas: number }
+      { id_cliente: number; nombre: string; apellido: string; saldo: number; cantidadComprobantes: number }
     >();
 
-    for (const f of facturas) {
+    for (const f of comprobantes) {
       const cliente = f.orden_trabajo?.cliente;
       if (!cliente) continue;
       const saldo = Number(f.saldo_pendiente);
       const actual = porCliente.get(cliente.id_cliente);
       if (actual) {
         actual.saldo += saldo;
-        actual.cantidadFacturas += 1;
+        actual.cantidadComprobantes += 1;
       } else {
         porCliente.set(cliente.id_cliente, {
           id_cliente: cliente.id_cliente,
           nombre: cliente.nombre,
           apellido: cliente.apellido,
           saldo,
-          cantidadFacturas: 1,
+          cantidadComprobantes: 1,
         });
       }
     }
@@ -315,7 +315,7 @@ export async function obtenerReciboCompleto(id_recibo: number) {
       where: { id_recibo },
       include: {
         cliente: true,
-        pagos_parciales: { include: { factura: true } },
+        pagos_parciales: { include: { comprobante: true } },
         recibo_medio_pago: true,
       },
     });
@@ -334,13 +334,13 @@ export async function obtenerReciboCompleto(id_recibo: number) {
       })),
       pagos_parciales: recibo.pagos_parciales.map((p) => ({
         id_pago: p.id_pago,
-        id_factura: p.id_factura,
+        id_comprobante: p.id_comprobante,
         monto_pagado: Number(p.monto_pagado),
-        saldo_restante: Number(p.factura.saldo_pendiente),
-        factura: {
-          ...p.factura,
-          monto_total: Number(p.factura.monto_total),
-          saldo_pendiente: Number(p.factura.saldo_pendiente),
+        saldo_restante: Number(p.comprobante.saldo_pendiente),
+        comprobante: {
+          ...p.comprobante,
+          monto_total: Number(p.comprobante.monto_total),
+          saldo_pendiente: Number(p.comprobante.saldo_pendiente),
         },
       })),
       deudaRestanteCliente,
@@ -393,7 +393,7 @@ export async function obtenerCobros() {
       include: {
         cliente: true,
         pagos_parciales: {
-          include: { factura: true },
+          include: { comprobante: true },
         },
         recibo_medio_pago: true,
       },

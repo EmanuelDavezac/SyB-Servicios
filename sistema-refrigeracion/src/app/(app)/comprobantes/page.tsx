@@ -1,17 +1,17 @@
-import { getFacturas, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
+import { getComprobantes, getOrdenesPendientesFacturacion } from "@/actions/comprobantes";
 import { obtenerClientesConDeuda, obtenerCobros } from "@/actions/cobros";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
-import FiltrosFacturacion from "@/components/FiltrosFacturacion";
-import ModalFactura from "@/components/ModalFactura";
+import { ESTADOS_COMPROBANTE } from "@/lib/estadoComprobante";
+import FiltrosComprobantes from "@/components/FiltrosComprobantes";
+import ModalComprobante from "@/components/ModalComprobante";
 import ModalCobro from "@/components/ModalCobro";
-import BotonImprimirFactura from "@/components/BotonImprimirFactura";
+import BotonImprimirComprobante from "@/components/BotonImprimirComprobante";
 import BotonImprimirRecibo from "@/components/BotonImprimirRecibo";
 import BotonAnularCobro from "@/components/BotonAnularCobro";
-import BotonAnularFactura from "@/components/BotonAnularFactura";
+import BotonAnularComprobante from "@/components/BotonAnularComprobante";
 
 type FilaComprobante = {
     key: string;
-    origen: "factura" | "recibo";
+    origen: "comprobante" | "recibo";
     id: number;
     tipo: string | null;
     fecha: string | Date;
@@ -22,11 +22,11 @@ type FilaComprobante = {
     total: number | null;
     saldo: number | null;
     estado_pago: string | null;
-    /** solo facturas: true = cargada en ARCA, false = interna; null en recibos */
+    /** solo comprobantes: true = cargada en ARCA, false = interna; null en recibos */
     fiscal: boolean | null;
 };
 
-export default async function FacturacionPage({
+export default async function ComprobantesPage({
     searchParams,
 }: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -41,8 +41,8 @@ export default async function FacturacionPage({
     const soloConSaldo = params.conSaldo === "1";
     const filtroFiscal = params.fiscal === "1" ? true : params.fiscal === "0" ? false : null;
 
-    const [facturasOriginales, ordenesPendientes, clientesConDeuda, recibosOriginales] = await Promise.all([
-        getFacturas(),
+    const [comprobantesOriginales, ordenesPendientes, clientesConDeuda, recibosOriginales] = await Promise.all([
+        getComprobantes(),
         getOrdenesPendientesFacturacion(),
         obtenerClientesConDeuda(),
         obtenerCobros(),
@@ -50,7 +50,7 @@ export default async function FacturacionPage({
 
     // Los informes técnicos son solo texto (no se cobran, no generan deuda):
     // tienen su propia sección en /informes-tecnicos y no aparecen acá.
-    const filasFactura: FilaComprobante[] = facturasOriginales
+    const filasComprobante: FilaComprobante[] = comprobantesOriginales
         .filter((f) => f.tipo !== "Informe Tecnico")
         .map((f) => {
         const cliente = f.orden_trabajo?.cliente;
@@ -58,19 +58,19 @@ export default async function FacturacionPage({
             ? `${cliente.nombre} ${cliente.apellido}`
             : (f.descripcion || "Desconocido");
         return {
-            key: `factura-${f.id_factura}`,
-            origen: "factura",
-            id: f.id_factura,
+            key: `comprobante-${f.id_comprobante}`,
+            origen: "comprobante",
+            id: f.id_comprobante,
             tipo: f.tipo,
             fecha: f.fecha_emision,
             fecha_vencimiento: f.fecha_vencimiento,
-            comprobante: f.num_factura,
+            comprobante: f.num_comprobante,
             nombreCliente,
             textoBusqueda: `${nombreCliente} ${f.descripcion || ""}`.toLowerCase(),
             total: f.monto_total !== null ? Number(f.monto_total) : null,
             saldo: f.saldo_pendiente !== null ? Number(f.saldo_pendiente) : null,
             estado_pago: f.estado_pago,
-            // ARCA / interna solo aplica a facturas (los remitos no eligen)
+            // ARCA / interna solo aplica a comprobantes (los remitos no eligen)
             fiscal: f.tipo === "Factura" ? f.fiscal : null,
         };
     });
@@ -94,10 +94,10 @@ export default async function FacturacionPage({
         };
     });
 
-    const todasLasFilas = [...filasFactura, ...filasRecibo];
+    const todasLasFilas = [...filasComprobante, ...filasRecibo];
 
     // Filtramos en memoria (o podrías pasarlo a Prisma)
-    const facturas = todasLasFilas.filter((fila) => {
+    const comprobantes = todasLasFilas.filter((fila) => {
         if (fechaInicioStr) {
             const fi = new Date(`${fechaInicioStr}T00:00:00`);
             if (new Date(fila.fecha) < fi) return false;
@@ -115,7 +115,7 @@ export default async function FacturacionPage({
         if (filtroTipo === "Recibo") {
             if (fila.origen !== "recibo") return false;
         } else if (filtroTipo) {
-            if (fila.origen !== "factura" || fila.tipo !== filtroTipo) return false;
+            if (fila.origen !== "comprobante" || fila.tipo !== filtroTipo) return false;
         }
 
         // Estado y saldo solo tienen sentido para comprobantes facturables;
@@ -129,7 +129,7 @@ export default async function FacturacionPage({
             if (!(fila.saldo !== null && fila.saldo > 0)) return false;
         }
 
-        // Fiscal/interna es un eje de las facturas: con el filtro activo los
+        // Fiscal/interna es un eje de los comprobantes: con el filtro activo los
         // recibos y remitos (fiscal = null) quedan afuera.
         if (filtroFiscal !== null) {
             if (fila.fiscal !== filtroFiscal) return false;
@@ -157,11 +157,11 @@ export default async function FacturacionPage({
                 <h1 className="text-3xl font-bold text-gray-800">Comprobantes</h1>
                 <div className="flex gap-3">
                     <ModalCobro clientes={clientesConDeuda} />
-                    <ModalFactura ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />
+                    <ModalComprobante ordenes={ordenesPendientes} openWithOrdenId={ordenIdQuery} />
                 </div>
             </div>
 
-            <FiltrosFacturacion />
+            <FiltrosComprobantes />
 
             <div className="bg-white rounded shadow text-black overflow-hidden">
                 <div className="hidden md:grid grid-cols-7 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
@@ -174,16 +174,16 @@ export default async function FacturacionPage({
                     <div className="text-right">Acciones</div>
                 </div>
 
-                {facturas.length === 0 ? (
+                {comprobantes.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
                         No se encontraron comprobantes con los filtros actuales.
                     </div>
                 ) : (
-                    facturas.map((fila) => {
+                    comprobantes.map((fila) => {
                         // Un comprobante no facturable (ej. un recibo) no tiene estado
                         // de pago ni saldo: la columna va vacía, nunca en $0,00 ni con
                         // el badge NO_APLICA.
-                        const esFacturable = fila.origen === "factura" && fila.estado_pago !== ESTADOS_FACTURA.NO_APLICA;
+                        const esFacturable = fila.origen === "comprobante" && fila.estado_pago !== ESTADOS_COMPROBANTE.NO_APLICA;
 
                         let badgeColor = "bg-gray-200 text-gray-800";
                         switch (fila.estado_pago) {
@@ -220,10 +220,10 @@ export default async function FacturacionPage({
                             </>
                         ) : (
                             <>
-                                <BotonImprimirFactura idFactura={fila.id} />
+                                <BotonImprimirComprobante idComprobante={fila.id} />
                                 <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
-                                {fila.estado_pago !== ESTADOS_FACTURA.ANULADA && (
-                                    <BotonAnularFactura idFactura={fila.id} />
+                                {fila.estado_pago !== ESTADOS_COMPROBANTE.ANULADA && (
+                                    <BotonAnularComprobante idComprobante={fila.id} />
                                 )}
                             </>
                         );

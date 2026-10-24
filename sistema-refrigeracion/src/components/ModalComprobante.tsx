@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { crearFactura, getSiguienteNumeroFactura, type StockInsuficienteItem } from "@/actions/facturacion";
+import { crearComprobante, getSiguienteNumeroComprobante, type StockInsuficienteItem } from "@/actions/comprobantes";
 import { obtenerInsumos } from "@/actions/insumos";
 import { obtenerInsumosDeOrden, obtenerServiciosDeOrden } from "@/actions/ordenes";
-import { esTipoFacturable } from "@/lib/estadoFactura";
+import { esTipoFacturable } from "@/lib/estadoComprobante";
 import {
     calcularImportes,
     formatearAlicuota,
@@ -46,7 +46,7 @@ const DATALIST_IVA_ID = "factura-alicuotas-iva";
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
-export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
+export default function ModalComprobante({ ordenes, openWithOrdenId }: Props) {
     const [abierto, setAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     const facturable = esTipoFacturable(tipo);
     const mostrarPrecios = facturable;
     const mostrarInsumosYDescuento = facturable;
-    // Solo las facturas eligen ARCA / interna; los remitos quedan siempre fiscales
+    // Solo los comprobantes eligen ARCA / interna; los remitos quedan siempre fiscales
     const esFactura = tipo === "Factura";
     const fiscalEfectivo = esFactura ? fiscal : true;
     const mostrarPuntoVenta = esFactura && fiscal;
@@ -120,7 +120,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
     // Aviso previo: mismo criterio que el servidor (suma por insumo entre las
     // lineas de la orden y las adicionales), pero con los datos que ya estan
-    // en pantalla. El bloqueo real lo hace crearFactura; esto es solo para
+    // en pantalla. El bloqueo real lo hace crearComprobante; esto es solo para
     // que no haga falta ni guardar para enterarse.
     const requeridoPorInsumo = new Map<number, number>();
     if (mostrarInsumosYDescuento) {
@@ -144,7 +144,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     // Preview en vivo: mientras el usuario está tipeando, el descuento puede
     // estar incompleto (ej. tipo "PORCENTAJE" elegido pero el % todavía vacío).
     // calcularImportes tira error en esos casos porque son inválidos para
-    // guardar la factura, pero acá solo queremos mostrar 0 de descuento.
+    // guardar el comprobante, pero acá solo queremos mostrar 0 de descuento.
     const sinDescuento = { lineas, facturable: true };
     let importes: ImportesComprobante | null = null;
     try {
@@ -177,7 +177,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
     /* Obtener numero sugerido al abrir o cambiar tipo/fiscal */
     useEffect(() => {
         if (abierto) {
-            getSiguienteNumeroFactura(tipo, fiscalEfectivo).then((num) => {
+            getSiguienteNumeroComprobante(tipo, fiscalEfectivo).then((num) => {
                 setLetraNumero(num);
             });
         }
@@ -311,12 +311,12 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
 
         const descuentoActivo = mostrarInsumosYDescuento ? tipoDescuento : "";
 
-        const resultado = await crearFactura({
+        const resultado = await crearComprobante({
             id_orden: Number(idOrden),
             tipo,
             fiscal: fiscalEfectivo,
             punto_venta: puntoVentaNum,
-            num_factura: `${tipo} ${letraNumero}`.trim(),
+            num_comprobante: `${tipo} ${letraNumero}`.trim(),
             fecha_vencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
             descripcion: descripcion || undefined,
             insumos: mostrarInsumosYDescuento
@@ -338,11 +338,11 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
             setAbierto(false);
             resetForm();
         } else if (resultado.stockInsuficiente && resultado.stockInsuficiente.length > 0) {
-            // Alerta bloqueante: no se factura con stock insuficiente. El form
+            // Alerta bloqueante: no se comprobante con stock insuficiente. El form
             // queda abierto detras para corregir la orden o los adicionales.
             setStockInsuficiente(resultado.stockInsuficiente);
         } else {
-            setError(resultado.error || "Error al crear la factura.");
+            setError(resultado.error || "Error al crear el comprobante.");
         }
     }
 
@@ -370,7 +370,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                             <div>
                                 <h3 className="text-lg font-bold tracking-wide">Nuevo Comprobante</h3>
                                 <p className="text-blue-100 text-xs mt-0.5">
-                                    Generá una factura o remito. Recibos, presupuestos e informes técnicos tienen su propio flujo.
+                                    Generá un comprobante o remito. Recibos, presupuestos e informes técnicos tienen su propio flujo.
                                 </p>
                             </div>
                             <button
@@ -805,7 +805,7 @@ export default function ModalFactura({ ordenes, openWithOrdenId }: Props) {
                         <div className="px-6 py-4 border-b bg-gradient-to-r from-red-500 to-red-600 text-white shrink-0">
                             <h3 className="text-lg font-bold tracking-wide">Stock insuficiente</h3>
                             <p className="text-red-100 text-xs mt-0.5">
-                                No se puede emitir la factura. Registrá la compra de estos insumos o corregí las cantidades de la orden.
+                                No se puede emitir el comprobante. Registrá la compra de estos insumos o corregí las cantidades de la orden.
                             </p>
                         </div>
                         <div className="px-6 py-4 overflow-y-auto flex-1 min-h-0">

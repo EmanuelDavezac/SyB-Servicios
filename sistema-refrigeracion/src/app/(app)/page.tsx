@@ -3,7 +3,7 @@ import { obtenerDatosDashboard } from "@/actions/reportes";
 import { diasHastaFecha, fechaActualArgentina } from "@/lib/fechas";
 
 export default async function DashboardPage() {
-  const { ordenesEnCurso, alertasStock, facturasPorVencer, cuentasPorCobrar } = await obtenerDatosDashboard();
+  const { ordenesEnCurso, alertasStock, comprobantesPorVencer, cuentasPorCobrar } = await obtenerDatosDashboard();
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
@@ -76,17 +76,17 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Cuadro 3: Facturas por Vencer */}
+        {/* Cuadro 3: Comprobantes por Vencer */}
         <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-500 flex flex-col h-full">
           <h3 className="text-lg font-semibold mb-4 text-red-700">
-            <i className="fas fa-clock mr-2"></i> Facturas por Vencer
+            <i className="fas fa-clock mr-2"></i> Comprobantes por Vencer
           </h3>
           <ul className="space-y-3 flex-1">
-            {facturasPorVencer.length > 0 ? (
-              facturasPorVencer.map((f) => {
+            {comprobantesPorVencer.length > 0 ? (
+              comprobantesPorVencer.map((f) => {
                 const info = getTextoVencimiento(f.fecha_vencimiento);
                 return (
-                  <li key={f.id_factura} className="flex flex-col border-b border-gray-100 pb-2">
+                  <li key={f.id_comprobante} className="flex flex-col border-b border-gray-100 pb-2">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700 truncate mr-1" title={`${f.orden_trabajo?.cliente?.nombre} ${f.orden_trabajo?.cliente?.apellido}`}>
                         {f.orden_trabajo?.cliente?.nombre} {f.orden_trabajo?.cliente?.apellido}
@@ -98,11 +98,11 @@ export default async function DashboardPage() {
                 );
               })
             ) : (
-              <p className="text-gray-400 text-sm">No hay facturas pendientes de cobro.</p>
+              <p className="text-gray-400 text-sm">No hay comprobantes pendientes de cobro.</p>
             )}
           </ul>
-          <Link href="/facturacion" className="block w-full mt-4 text-sm text-red-600 hover:text-red-800 font-semibold text-right">
-            Ver facturación &rarr;
+          <Link href="/comprobantes" className="block w-full mt-4 text-sm text-red-600 hover:text-red-800 font-semibold text-right">
+            Ver comprobantes &rarr;
           </Link>
         </div>
 

@@ -8,54 +8,54 @@ import {
 } from "@/actions/reportes";
 import { registrarCobro } from "@/actions/cobros";
 import { crearCompra } from "@/actions/compras";
-import { crearFactura } from "@/actions/facturacion";
-import { crearCliente, crearOrdenFinalizada, crearFacturaEmitida, crearInsumo, crearProveedor } from "./factories";
+import { crearComprobante } from "@/actions/comprobantes";
+import { crearCliente, crearOrdenFinalizada, crearComprobanteEmitido, crearInsumo, crearProveedor } from "./factories";
 
 const hoy = new Date();
 const MES = hoy.getMonth() + 1;
 const ANIO = hoy.getFullYear();
 
 describe("obtenerReporteMensual", () => {
-  it("los ingresos son los cobros del mes, no las facturas emitidas", async () => {
+  it("los ingresos son los cobros del mes, no los comprobantes emitidas", async () => {
     const cliente = await crearCliente();
-    const facturaSinCobrar = await crearFacturaEmitida({
+    const comprobanteSinCobrar = await crearComprobanteEmitido({
       id_orden: (await crearOrdenFinalizada({ id_cliente: cliente.id_cliente })).id_orden,
       monto_total: 1000,
       saldo_pendiente: 1000,
     });
-    const facturaCobrada = await crearFacturaEmitida({
+    const comprobanteCobrado = await crearComprobanteEmitido({
       id_orden: (await crearOrdenFinalizada({ id_cliente: cliente.id_cliente })).id_orden,
       monto_total: 500,
       saldo_pendiente: 500,
     });
     await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: facturaCobrada.id_factura, monto: 500 }],
+      imputaciones: [{ id_comprobante: comprobanteCobrado.id_comprobante, monto: 500 }],
     });
 
     const reporte = await obtenerReporteMensual(MES, ANIO);
 
     expect(reporte.totalIngresos).toBe(500);
     expect(reporte.totalFacturado).toBe(1500);
-    void facturaSinCobrar;
+    void comprobanteSinCobrar;
   });
 
-  it("una factura cobrada mitad este mes y mitad el mes siguiente genera un ingreso en cada mes", async () => {
+  it("un comprobante cobrada mitad este mes y mitad el mes siguiente genera un ingreso en cada mes", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    const factura = await crearFacturaEmitida({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
 
     const finDeMes = new Date(ANIO, MES - 1, 28, 12, 0, 0);
     const mesSiguiente = new Date(ANIO, MES, 5, 12, 0, 0);
 
     await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 400 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 400 }],
       fecha_pago: finDeMes,
     });
     await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 600 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 600 }],
       fecha_pago: mesSiguiente,
     });
 
@@ -85,9 +85,9 @@ describe("obtenerReporteMensual", () => {
     const orden2 = await crearOrdenFinalizada();
     const orden3 = await crearOrdenFinalizada();
 
-    await crearFacturaEmitida({ id_orden: orden1.id_orden, monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
-    await crearFacturaEmitida({ id_orden: orden2.id_orden, monto_total: 500, saldo_pendiente: 0, estado_pago: "ANULADA" });
-    await crearFacturaEmitida({
+    await crearComprobanteEmitido({ id_orden: orden1.id_orden, monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
+    await crearComprobanteEmitido({ id_orden: orden2.id_orden, monto_total: 500, saldo_pendiente: 0, estado_pago: "ANULADA" });
+    await crearComprobanteEmitido({
       id_orden: orden3.id_orden,
       tipo: "Informe Tecnico",
       monto_total: 0,
@@ -113,8 +113,8 @@ describe("obtenerReporteMensual", () => {
   });
 
   it("totalFacturado se separa en fiscal e interno", async () => {
-    await crearFacturaEmitida({ monto_total: 1000, saldo_pendiente: 1000, fiscal: true });
-    await crearFacturaEmitida({ monto_total: 300, saldo_pendiente: 300, fiscal: false });
+    await crearComprobanteEmitido({ monto_total: 1000, saldo_pendiente: 1000, fiscal: true });
+    await crearComprobanteEmitido({ monto_total: 300, saldo_pendiente: 300, fiscal: false });
 
     const reporte = await obtenerReporteMensual(MES, ANIO);
     expect(reporte.totalFacturado).toBe(1300);
@@ -122,9 +122,9 @@ describe("obtenerReporteMensual", () => {
     expect(reporte.totalFacturadoInterno).toBe(300);
   });
 
-  // Escenario: la factura debe 100000, el cliente paga 90000 en efectivo y
+  // Escenario: el comprobante debe 100000, el cliente paga 90000 en efectivo y
   // retiene 10000 (se lo queda el fisco, no entra a caja). La imputacion que
-  // salda la factura es 100000 (90000 + 10000 de retencion), asi que
+  // salda el comprobante es 100000 (90000 + 10000 de retencion), asi que
   // recibo.monto_total tambien queda en 100000 (cobros.ts no distingue el
   // origen del monto imputado). obtenerReporteMensual resta las retenciones
   // del recibo antes de sumarlas como ingreso de caja, asi que informa los
@@ -132,17 +132,17 @@ describe("obtenerReporteMensual", () => {
   it("el ingreso del mes descuenta las retenciones del recibo", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    const factura = await crearFacturaEmitida({ id_orden: orden.id_orden, monto_total: 100000, saldo_pendiente: 100000 });
+    const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 100000, saldo_pendiente: 100000 });
 
     const cobro = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 100000 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 100000 }],
       retenciones: [{ tipo: "IVA", monto: 10000 }],
     });
     expect(cobro.success).toBe(true);
 
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("PAGADA");
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("PAGADA");
 
     const reporte = await obtenerReporteMensual(MES, ANIO);
     expect(reporte.totalIngresos).toBe(90000);
@@ -155,9 +155,9 @@ describe("obtenerPosicionIVA", () => {
     const orden2 = await crearOrdenFinalizada();
     const orden3 = await crearOrdenFinalizada();
 
-    await crearFacturaEmitida({ id_orden: orden1.id_orden, neto: 1000, alicuota_iva: 21, monto_total: 1210, saldo_pendiente: 1210 });
-    await crearFacturaEmitida({ id_orden: orden2.id_orden, neto: 500, alicuota_iva: 21, monto_total: 0, saldo_pendiente: 0, estado_pago: "ANULADA" });
-    await crearFacturaEmitida({
+    await crearComprobanteEmitido({ id_orden: orden1.id_orden, neto: 1000, alicuota_iva: 21, monto_total: 1210, saldo_pendiente: 1210 });
+    await crearComprobanteEmitido({ id_orden: orden2.id_orden, neto: 500, alicuota_iva: 21, monto_total: 0, saldo_pendiente: 0, estado_pago: "ANULADA" });
+    await crearComprobanteEmitido({
       id_orden: orden3.id_orden,
       tipo: "Informe Tecnico",
       monto_total: 0,
@@ -170,17 +170,17 @@ describe("obtenerPosicionIVA", () => {
     expect(posicion.ventas.iva).toBe(210);
   });
 
-  it("las facturas internas no entran en la posicion de IVA", async () => {
-    await crearFacturaEmitida({ neto: 1000, alicuota_iva: 21, monto_total: 1210, saldo_pendiente: 1210, fiscal: true });
-    await crearFacturaEmitida({ neto: 500, alicuota_iva: 21, monto_total: 605, saldo_pendiente: 605, fiscal: false });
+  it("los comprobantes internas no entran en la posicion de IVA", async () => {
+    await crearComprobanteEmitido({ neto: 1000, alicuota_iva: 21, monto_total: 1210, saldo_pendiente: 1210, fiscal: true });
+    await crearComprobanteEmitido({ neto: 500, alicuota_iva: 21, monto_total: 605, saldo_pendiente: 605, fiscal: false });
 
     const posicion = await obtenerPosicionIVA(MES, ANIO);
     expect(posicion.ventas.neto).toBe(1000);
     expect(posicion.ventas.iva).toBe(210);
   });
 
-  it("el IVA de ventas se suma desde factura_iva cuando la factura lo tiene discriminado", async () => {
-    await crearFacturaEmitida({
+  it("el IVA de ventas se suma desde comprobante_iva cuando el comprobante lo tiene discriminado", async () => {
+    await crearComprobanteEmitido({
       neto: 3000,
       monto_total: 3420,
       saldo_pendiente: 3420,
@@ -195,11 +195,11 @@ describe("obtenerPosicionIVA", () => {
     expect(posicion.ventas.iva).toBe(420);
   });
 
-  it("factura interna generada por crearFactura no suma IVA, la fiscal si", async () => {
+  it("comprobante interna generada por crearComprobante no suma IVA, la fiscal si", async () => {
     const ordenFiscal = await crearOrdenFinalizada({ insumos: [] });
     const ordenInterna = await crearOrdenFinalizada({ insumos: [] });
-    await crearFactura({ id_orden: ordenFiscal.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    await crearFactura({ id_orden: ordenInterna.id_orden, num_factura: "X-1", tipo: "Factura", fiscal: false });
+    await crearComprobante({ id_orden: ordenFiscal.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    await crearComprobante({ id_orden: ordenInterna.id_orden, num_comprobante: "X-1", tipo: "Factura", fiscal: false });
 
     const posicion = await obtenerPosicionIVA(MES, ANIO);
     expect(posicion.ventas.neto).toBe(1000);
@@ -228,11 +228,11 @@ describe("obtenerPosicionIVA", () => {
   it("retenciones agrupadas por tipo", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    const factura = await crearFacturaEmitida({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
 
     await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 850 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 850 }],
       retenciones: [
         { tipo: "IVA", monto: 100 },
         { tipo: "GANANCIAS", monto: 50 },
@@ -266,10 +266,10 @@ describe("obtenerDatosDashboard", () => {
     const orden3 = await crearOrdenFinalizada();
     const orden4 = await crearOrdenFinalizada();
 
-    await crearFacturaEmitida({ id_orden: orden1.id_orden, monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
-    await crearFacturaEmitida({ id_orden: orden2.id_orden, monto_total: 500, saldo_pendiente: 200, estado_pago: "PARCIAL" });
-    await crearFacturaEmitida({ id_orden: orden3.id_orden, monto_total: 300, saldo_pendiente: 0, estado_pago: "PAGADA" });
-    await crearFacturaEmitida({ id_orden: orden4.id_orden, monto_total: 400, saldo_pendiente: 0, estado_pago: "ANULADA" });
+    await crearComprobanteEmitido({ id_orden: orden1.id_orden, monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
+    await crearComprobanteEmitido({ id_orden: orden2.id_orden, monto_total: 500, saldo_pendiente: 200, estado_pago: "PARCIAL" });
+    await crearComprobanteEmitido({ id_orden: orden3.id_orden, monto_total: 300, saldo_pendiente: 0, estado_pago: "PAGADA" });
+    await crearComprobanteEmitido({ id_orden: orden4.id_orden, monto_total: 400, saldo_pendiente: 0, estado_pago: "ANULADA" });
 
     const dashboard = await obtenerDatosDashboard();
     expect(dashboard.cuentasPorCobrar.total).toBe(1200);
@@ -279,16 +279,16 @@ describe("obtenerDatosDashboard", () => {
 describe("obtenerReporteServicios", () => {
   it("filtra por fecha de emision del comprobante, no por fecha_creacion de la orden", async () => {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    // fecha_creacion queda en 2020, pero la factura se emite hoy (crearFactura
+    // fecha_creacion queda en 2020, pero el comprobante se emite hoy (crearComprobante
     // usa fechaActualArgentina()): el reporte de 2020 no debe traerla, el del
     // mes de emision si.
     await prisma.orden_trabajo.update({
       where: { id_orden: orden.id_orden },
       data: { fecha_creacion: new Date(2020, 0, 15) },
     });
-    await crearFactura({
+    await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });

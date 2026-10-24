@@ -1,20 +1,20 @@
 const TOLERANCIA = 0.001;
 
-export interface FacturaPendienteReparto {
-    id_factura: number;
+export interface ComprobantePendienteReparto {
+    id_comprobante: number;
     saldo_pendiente: number | string;
 }
 
-export function distribuirCobro(facturasPendientes: FacturaPendienteReparto[], monto: number): Record<number, string> {
+export function distribuirCobro(comprobantesPendientes: ComprobantePendienteReparto[], monto: number): Record<number, string> {
     let restante = monto || 0;
     const nuevasImputaciones: Record<number, string> = {};
 
-    for (const factura of facturasPendientes) {
+    for (const comprobante of comprobantesPendientes) {
         if (restante <= TOLERANCIA) break;
-        const saldo = Number(factura.saldo_pendiente);
+        const saldo = Number(comprobante.saldo_pendiente);
         const aplicar = Math.min(saldo, restante);
         if (aplicar > TOLERANCIA) {
-            nuevasImputaciones[factura.id_factura] = aplicar.toFixed(2);
+            nuevasImputaciones[comprobante.id_comprobante] = aplicar.toFixed(2);
             restante -= aplicar;
         }
     }

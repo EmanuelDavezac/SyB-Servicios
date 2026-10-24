@@ -50,7 +50,7 @@ async function obtenerTablas(): Promise<string[]> {
 }
 
 // Aislamiento por truncate en vez de envolver cada test en una transaccion
-// con rollback: varias actions (crearFactura, registrarCobro, crearCompra,
+// con rollback: varias actions (crearComprobante, registrarCobro, crearCompra,
 // crearPresupuesto) abren su propio prisma.$transaction internamente sobre
 // el mismo cliente singleton. Envolver el test en una transaccion externa
 // significaria anidar esa transaccion dentro de la del test, y el pool de

@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { anularFactura } from "@/actions/cobros";
+import { anularComprobante } from "@/actions/cobros";
 import ModalConfirmacion from "@/components/ModalConfirmacion";
 
 interface Props {
-    idFactura: number;
+    idComprobante: number;
 }
 
-export default function BotonAnularFactura({ idFactura }: Props) {
+export default function BotonAnularComprobante({ idComprobante }: Props) {
     const [isPending, startTransition] = useTransition();
     const [showConfirm, setShowConfirm] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function BotonAnularFactura({ idFactura }: Props) {
 
     function handleConfirmar() {
         startTransition(async () => {
-            const resultado = await anularFactura(idFactura);
+            const resultado = await anularComprobante(idComprobante);
             if (!resultado.success) {
                 setError(resultado.error || "Error al anular el comprobante.");
                 return;

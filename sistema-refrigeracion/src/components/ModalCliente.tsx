@@ -290,7 +290,7 @@ export default function ModalCliente({ cliente }: Props) {
                                         />
                                         {errores.condicionPagoDias
                                             ? <p className="text-red-500 text-xs mt-1">{errores.condicionPagoDias}</p>
-                                            : <p className="text-xs text-gray-500 mt-1">Días para el vencimiento de facturas (0 a {MAX_CONDICION_PAGO_DIAS}).</p>}
+                                            : <p className="text-xs text-gray-500 mt-1">Días para el vencimiento de comprobantes (0 a {MAX_CONDICION_PAGO_DIAS}).</p>}
                                     </div>
                                 </div>
                             </div>

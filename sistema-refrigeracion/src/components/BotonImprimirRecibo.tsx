@@ -40,19 +40,19 @@ export async function imprimirRecibo(idRecibo: number): Promise<boolean> {
     const montoEnLetras = montoALetras(montoTotal);
     const formaPago = formatearMediosDePago(recibo.recibo_medio_pago || [], recibo.forma_pago) || "No especificada";
     const concepto = recibo.observacion
-        ? `Pago a cuenta de facturas pendientes – ${recibo.observacion}`
-        : "Pago a cuenta de facturas pendientes";
+        ? `Pago a cuenta de comprobantes pendientes – ${recibo.observacion}`
+        : "Pago a cuenta de comprobantes pendientes";
 
     let imputacionesHTML = "";
     for (const p of recibo.pagos_parciales) {
-        const factura = p.factura;
+        const comprobante = p.comprobante;
         const saldo = Number(p.saldo_restante);
         const saldoTexto = saldo <= TOLERANCIA ? "CANCELADA" : soloNumero(saldo);
         imputacionesHTML += `
             <tr>
-                <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura?.num_factura || `Factura #${p.id_factura}`}</td>
-                <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${factura ? new Date(factura.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" }) : "-"}</td>
-                <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right;">${factura ? soloNumero(Number(factura.monto_total)) : "-"}</td>
+                <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${comprobante?.num_comprobante || `Comprobante #${p.id_comprobante}`}</td>
+                <td class="center" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">${comprobante ? new Date(comprobante.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" }) : "-"}</td>
+                <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right;">${comprobante ? soloNumero(Number(comprobante.monto_total)) : "-"}</td>
                 <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${soloNumero(Number(p.monto_pagado))}</td>
                 <td class="right" style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: right; ${saldo <= TOLERANCIA ? "font-weight: 700; color: #0a7a2f;" : ""}">${saldoTexto}</td>
             </tr>`;

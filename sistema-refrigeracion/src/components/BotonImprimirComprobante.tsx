@@ -1,44 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import { getFacturaCompleta } from "@/actions/facturacion";
+import { getComprobanteCompleto } from "@/actions/comprobantes";
 import { montoALetras } from "@/lib/numeroALetras";
 
 interface Props {
-    idFactura: number;
+    idComprobante: number;
 }
 
 /** Devuelve false si no se pudieron obtener los datos (el que llama muestra el error). */
-export async function imprimirComprobante(idFactura: number): Promise<boolean> {
-        const factura = await getFacturaCompleta(idFactura);
-        if (!factura) {
+export async function imprimirComprobante(idComprobante: number): Promise<boolean> {
+        const comprobante = await getComprobanteCompleto(idComprobante);
+        if (!comprobante) {
             return false;
         }
 
-        if (factura.tipo === "Recibo") {
-            imprimirComoRecibo(factura);
+        if (comprobante.tipo === "Recibo") {
+            imprimirComoRecibo(comprobante);
             return true;
         }
 
-        const esInformeTecnico = factura.tipo === "Informe Tecnico";
-        const esRemito = factura.tipo === "Remito";
+        const esInformeTecnico = comprobante.tipo === "Informe Tecnico";
+        const esRemito = comprobante.tipo === "Remito";
         // Informe tecnico y remito no muestran precios, IVA ni totales
         const sinPrecios = esInformeTecnico || esRemito;
-        const esFactura = factura.tipo === "Factura";
-        // Factura interna: no se carga en ARCA, pero se cobra y lleva IVA igual
-        const esInterna = esFactura && factura.fiscal === false;
+        const esFactura = comprobante.tipo === "Factura";
+        // Comprobante interna: no se carga en ARCA, pero se cobra y lleva IVA igual
+        const esInterna = esFactura && comprobante.fiscal === false;
         const esFacturaFiscal = esFactura && !esInterna;
         const tituloComprobante = esInterna
             ? "COMPROBANTE INTERNO"
             : esFactura
             ? "FACTURA"
-            : factura.tipo === "Remito"
+            : comprobante.tipo === "Remito"
             ? "REMITO"
             : "INFORME TECNICO DE SERVICIO";
 
-        const cliente = factura.orden_trabajo?.cliente;
-        const servicios = factura.orden_trabajo?.detalle_orden_servicio || [];
-        const insumos = factura.orden_trabajo?.detalle_orden_insumo || [];
+        const cliente = comprobante.orden_trabajo?.cliente;
+        const servicios = comprobante.orden_trabajo?.detalle_orden_servicio || [];
+        const insumos = comprobante.orden_trabajo?.detalle_orden_insumo || [];
 
         const nombreCliente = cliente
             ? `${cliente.nombre} ${cliente.apellido}`
@@ -49,34 +49,34 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
             : "—";
         const localidadCliente = cliente?.localidad || "—";
 
-        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
+        const fechaEmision = new Date(comprobante.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
 
-        // Número: si la factura fiscal tiene punto de venta, formato ARCA
-        // PPPPP – NNNNNNNN (el número sale de los dígitos finales de num_factura)
-        const puntoVenta: number | null = esFacturaFiscal ? factura.punto_venta ?? null : null;
-        const nroDelComprobante = String(factura.num_factura ?? "").match(/(\d+)\s*$/)?.[1] ?? String(factura.id_factura);
+        // Número: si el comprobante fiscal tiene punto de venta, formato ARCA
+        // PPPPP – NNNNNNNN (el número sale de los dígitos finales de num_comprobante)
+        const puntoVenta: number | null = esFacturaFiscal ? comprobante.punto_venta ?? null : null;
+        const nroDelComprobante = String(comprobante.num_comprobante ?? "").match(/(\d+)\s*$/)?.[1] ?? String(comprobante.id_comprobante);
         const numeroInforme = puntoVenta
             ? `${String(puntoVenta).padStart(5, "0")} – ${nroDelComprobante.padStart(8, "0")}`
-            : `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
+            : `0001 – ${String(comprobante.id_comprobante).padStart(10, "0")}`;
 
-        // Letra de la factura fiscal (A/B) tomada del número cargado; A por defecto
-        const letraFactura = String(factura.num_factura ?? "").match(/\b([AB])-/)?.[1] ?? "A";
+        // Letra del comprobante fiscal (A/B) tomada del número cargado; A por defecto
+        const letraFactura = String(comprobante.num_comprobante ?? "").match(/\b([AB])-/)?.[1] ?? "A";
         const codigoLetra = letraFactura === "B" ? "COD. 06" : "COD. 01";
 
         const formatMoney = (n: number) =>
             new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
         const fmtAlicuota = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
-        // IVA discriminado: de factura_iva; las facturas anteriores al IVA por
+        // IVA discriminado: de comprobante_iva; los comprobantes anteriores al IVA por
         // línea no tienen filas ahí y usan su alícuota única.
-        const netoGravado = factura.neto ? parseFloat(factura.neto) : 0;
-        const alicuotaUnica = factura.alicuota_iva !== null && factura.alicuota_iva !== undefined
-            ? parseFloat(factura.alicuota_iva)
+        const netoGravado = comprobante.neto ? parseFloat(comprobante.neto) : 0;
+        const alicuotaUnica = comprobante.alicuota_iva !== null && comprobante.alicuota_iva !== undefined
+            ? parseFloat(comprobante.alicuota_iva)
             : null;
-        const facturaIva: { alicuota: string; neto_gravado: string; monto_iva: string }[] = factura.factura_iva ?? [];
-        const esFacturaAnterior = facturaIva.length === 0;
+        const comprobanteIva: { alicuota: string; neto_gravado: string; monto_iva: string }[] = comprobante.comprobante_iva ?? [];
+        const esFacturaAnterior = comprobanteIva.length === 0;
         const ivaPorAlicuota: { alicuota: number; neto: number; iva: number }[] = !esFacturaAnterior
-            ? facturaIva.map((fi) => ({
+            ? comprobanteIva.map((fi) => ({
                 alicuota: parseFloat(fi.alicuota),
                 neto: parseFloat(fi.neto_gravado),
                 iva: parseFloat(fi.monto_iva),
@@ -85,10 +85,10 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
             ? [{ alicuota: alicuotaUnica, neto: netoGravado, iva: netoGravado * alicuotaUnica / 100 }]
             : [];
         const noDiscriminarIva = esInterna; // Internas no discriminan el IVA por pedido
-        const mostrarIva = !sinPrecios && !noDiscriminarIva && factura.neto !== null && factura.neto !== undefined;
+        const mostrarIva = !sinPrecios && !noDiscriminarIva && comprobante.neto !== null && comprobante.neto !== undefined;
 
-        // Alícuota a mostrar en cada línea: la de la línea, salvo en facturas
-        // anteriores, donde la línea quedó con el default y manda la de la factura.
+        // Alícuota a mostrar en cada línea: la de la línea, salvo en comprobantes
+        // anteriores, donde la línea quedó con el default y manda la del comprobante.
         const alicuotaLinea = (valorLinea: string | number | null | undefined) =>
             esFacturaAnterior && alicuotaUnica !== null
                 ? alicuotaUnica
@@ -139,17 +139,17 @@ export async function imprimirComprobante(idFactura: number): Promise<boolean> {
         }
         const columnas = sinPrecios ? 2 : (noDiscriminarIva ? 3 : 4);
 
-        const montoTotal = parseFloat(factura.monto_total);
+        const montoTotal = parseFloat(comprobante.monto_total);
 
-        const tipoDescuento: string | null = factura.tipo_descuento || null;
-        let descuentoMonto = factura.descuento_monto ? parseFloat(factura.descuento_monto) : 0;
+        const tipoDescuento: string | null = comprobante.tipo_descuento || null;
+        let descuentoMonto = comprobante.descuento_monto ? parseFloat(comprobante.descuento_monto) : 0;
         if (noDiscriminarIva && descuentoMonto > 0) {
             // Si el comprobante es de consumidor final, el descuento mostrado incluye su IVA proporcional para cuadrar
             descuentoMonto = (totalServicios + totalInsumos) - montoTotal;
             if (descuentoMonto < 0) descuentoMonto = 0; // Evita -0 por float quirks
         }
-        const descuentoPct = factura.descuento_porcentaje ? parseFloat(factura.descuento_porcentaje) : 0;
-        const equipoDesc: string = factura.equipo_descripcion || "";
+        const descuentoPct = comprobante.descuento_porcentaje ? parseFloat(comprobante.descuento_porcentaje) : 0;
+        const equipoDesc: string = comprobante.equipo_descripcion || "";
         const fmtAmt = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
         // El remito se imprime por triplicado, cada copia en su propia hoja
@@ -453,11 +453,11 @@ ${copias.map((copia) => `
                 ${servicios.length > 0 ? `
                     <tr class="section-separator"><td colspan="${columnas}">— Servicios Prestados —</td></tr>
                     ${serviciosHTML}
-                ` : factura.descripcion ? `
+                ` : comprobante.descripcion ? `
                     <tr class="section-separator"><td colspan="${columnas}">— Trabajo Realizado —</td></tr>
                     <tr>
                         <td style="padding: 5px 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
-                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${factura.descripcion}</td>
+                        <td style="padding: 5px 10px; border-bottom: 1px solid #ddd;">${comprobante.descripcion}</td>
                         ${sinPrecios ? '' : '<td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td><td style="padding: 5px 10px; border-bottom: 1px solid #ddd;"></td>'}
                     </tr>
                 ` : ''}
@@ -465,7 +465,7 @@ ${copias.map((copia) => `
                     <tr class="section-separator"><td colspan="${columnas}">— Insumos Utilizados —</td></tr>
                     ${insumosHTML}
                 ` : ''}
-                ${servicios.length === 0 && !factura.descripcion && insumos.length === 0 ? `<tr><td colspan="${columnas}" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>` : ''}
+                ${servicios.length === 0 && !comprobante.descripcion && insumos.length === 0 ? `<tr><td colspan="${columnas}" style="padding:20px; text-align:center; color:#999;">Sin detalle de items</td></tr>` : ''}
                 <tr><td colspan="${columnas}" class="items-body-spacer"></td></tr>
             </tbody>
         </table>
@@ -564,8 +564,8 @@ function imprimirHTML(html: string) {
         }
 }
 
-function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFacturaCompleta>>>) {
-        const cliente = factura.orden_trabajo?.cliente;
+function imprimirComoRecibo(comprobante: NonNullable<Awaited<ReturnType<typeof getComprobanteCompleto>>>) {
+        const cliente = comprobante.orden_trabajo?.cliente;
 
         const nombreCliente = cliente
             ? `${cliente.nombre} ${cliente.apellido}`
@@ -576,17 +576,17 @@ function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFa
             : "—";
         const localidadCliente = cliente?.localidad || "—";
 
-        const fechaEmision = new Date(factura.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
-        const numeroRecibo = `0001 – ${String(factura.id_factura).padStart(10, "0")}`;
+        const fechaEmision = new Date(comprobante.fecha_emision).toLocaleDateString("es-AR", { timeZone: "UTC" });
+        const numeroRecibo = `0001 – ${String(comprobante.id_comprobante).padStart(10, "0")}`;
 
         const formatMoney = (n: number) =>
             new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
         const soloNumero = (n: number) => formatMoney(n).replace("$", "").replace("ARS", "").trim();
 
-        const montoTotal = parseFloat(factura.monto_total);
+        const montoTotal = parseFloat(comprobante.monto_total);
         const montoEnLetras = montoALetras(montoTotal);
-        const concepto = factura.descripcion
-            ? `Pago de S&B Servicios – ${factura.descripcion}`
+        const concepto = comprobante.descripcion
+            ? `Pago de S&B Servicios – ${comprobante.descripcion}`
             : "Pago de S&B Servicios";
 
         const html = `
@@ -770,13 +770,13 @@ function imprimirComoRecibo(factura: NonNullable<Awaited<ReturnType<typeof getFa
         imprimirHTML(html);
 }
 
-export default function BotonImprimirFactura({ idFactura }: Props) {
+export default function BotonImprimirComprobante({ idComprobante }: Props) {
     const [error, setError] = useState<string | null>(null);
 
     async function handleImprimir() {
         setError(null);
-        const ok = await imprimirComprobante(idFactura);
-        if (!ok) setError("No se pudo obtener los datos de la factura.");
+        const ok = await imprimirComprobante(idComprobante);
+        if (!ok) setError("No se pudo obtener los datos del comprobante.");
     }
 
     return (

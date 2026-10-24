@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -92,10 +91,10 @@ model detalle_orden_servicio {
   servicio          servicio?      @relation(fields: [id_servicio], references: [id_servicio], onDelete: Restrict, onUpdate: NoAction)
 }
 
-model factura {
-  id_factura               Int                        @id @default(autoincrement())
+model comprobante {
+  id_comprobante           Int                        @id @default(autoincrement())
   id_orden                 Int?
-  num_factura              String?                    @db.VarChar(50)
+  num_comprobante          String?                    @db.VarChar(50)
   tipo                     String?                    @db.VarChar(20)
   fecha_emision            DateTime                   @db.Date
   fecha_vencimiento        DateTime?                  @db.Date
@@ -114,7 +113,7 @@ model factura {
   orden_trabajo            orden_trabajo?             @relation(fields: [id_orden], references: [id_orden], onDelete: Restrict, onUpdate: NoAction)
   historial_notificaciones historial_notificaciones[]
   pagos_parciales          pagos_parciales[]
-  factura_iva              factura_iva[]
+  comprobante_iva          comprobante_iva[]
 
   @@index([fecha_emision])
   @@index([estado_pago])
@@ -122,32 +121,32 @@ model factura {
   @@index([fiscal])
 }
 
-// IVA discriminado por alicuota de cada factura, calculado al emitirla a
-// partir de las lineas de la orden. Las facturas anteriores a esta tabla no
-// tienen filas aca: se leen con factura.neto * factura.alicuota_iva.
-model factura_iva {
-  id_factura_iva Int     @id @default(autoincrement())
-  id_factura     Int
-  alicuota       Decimal @db.Decimal(5, 2)
-  neto_gravado   Decimal @db.Decimal(10, 2)
-  monto_iva      Decimal @db.Decimal(10, 2)
-  factura        factura @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+// IVA discriminado por alicuota de cada comprobante, calculado al emitirlo a
+// partir de las lineas de la orden. Los comprobantes anteriores a esta tabla no
+// tienen filas aca: se leen con comprobante.neto * comprobante.alicuota_iva.
+model comprobante_iva {
+  id_comprobante_iva Int         @id @default(autoincrement())
+  id_comprobante     Int
+  alicuota           Decimal     @db.Decimal(5, 2)
+  neto_gravado       Decimal     @db.Decimal(10, 2)
+  monto_iva          Decimal     @db.Decimal(10, 2)
+  comprobante        comprobante @relation(fields: [id_comprobante], references: [id_comprobante], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([id_factura])
+  @@index([id_comprobante])
 }
 
 model historial_notificaciones {
-  id_notificacion   Int      @id @default(autoincrement())
-  id_factura        Int?
+  id_notificacion   Int          @id @default(autoincrement())
+  id_comprobante    Int?
   id_cliente        Int?
-  tipo_notificacion String?  @db.VarChar(50)
-  fecha_creacion    DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
-  estado            String?  @db.VarChar(20)
+  tipo_notificacion String?      @db.VarChar(50)
+  fecha_creacion    DateTime     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  estado            String?      @db.VarChar(20)
   descripcion       String?
-  cliente           cliente? @relation(fields: [id_cliente], references: [id_cliente], onDelete: Cascade, onUpdate: NoAction)
-  factura           factura? @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+  cliente           cliente?     @relation(fields: [id_cliente], references: [id_cliente], onDelete: Cascade, onUpdate: NoAction)
+  comprobante       comprobante? @relation(fields: [id_comprobante], references: [id_comprobante], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([id_factura, tipo_notificacion, fecha_creacion], map: "historial_notificaciones_dedupe_unique")
+  @@unique([id_comprobante, tipo_notificacion, fecha_creacion], map: "historial_notificaciones_dedupe_unique")
 }
 
 model insumo {
@@ -174,7 +173,7 @@ model orden_trabajo {
   notas_internas         String?
   detalle_orden_insumo   detalle_orden_insumo[]
   detalle_orden_servicio detalle_orden_servicio[]
-  factura                factura[]
+  comprobante            comprobante[]
   cliente                cliente?                 @relation(fields: [id_cliente], references: [id_cliente], onDelete: Restrict, onUpdate: NoAction)
   presupuesto            presupuesto[]
 
@@ -184,14 +183,14 @@ model orden_trabajo {
 }
 
 model pagos_parciales {
-  id_pago      Int     @id @default(autoincrement())
-  id_factura   Int
-  monto_pagado Decimal @db.Decimal(10, 2)
-  id_recibo    Int
-  recibo       recibo  @relation(fields: [id_recibo], references: [id_recibo], onDelete: Cascade, onUpdate: NoAction, map: "fk_pagos_parciales_recibo")
-  factura      factura @relation(fields: [id_factura], references: [id_factura], onDelete: Cascade, onUpdate: NoAction)
+  id_pago        Int         @id @default(autoincrement())
+  id_comprobante Int
+  monto_pagado   Decimal     @db.Decimal(10, 2)
+  id_recibo      Int
+  recibo         recibo      @relation(fields: [id_recibo], references: [id_recibo], onDelete: Cascade, onUpdate: NoAction, map: "fk_pagos_parciales_recibo")
+  comprobante    comprobante @relation(fields: [id_comprobante], references: [id_comprobante], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([id_factura], map: "idx_pagos_parciales_id_factura")
+  @@index([id_comprobante], map: "idx_pagos_parciales_id_comprobante")
   @@index([id_recibo], map: "idx_pagos_parciales_id_recibo")
 }
 

@@ -1,50 +1,50 @@
 import { describe, it, test, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { crearFactura, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
-import { anularFactura } from "@/actions/cobros";
+import { crearComprobante, getOrdenesPendientesFacturacion } from "@/actions/comprobantes";
+import { anularComprobante } from "@/actions/cobros";
 import { crearCliente, crearInsumo, crearOrdenFinalizada } from "./factories";
 
-describe("crearFactura", () => {
-  it("factura sobre orden finalizada: IMPAGA, saldo igual al total, neto y alicuota guardados", async () => {
+describe("crearComprobante", () => {
+  it("comprobante sobre orden finalizada: IMPAGA, saldo igual al total, neto y alicuota guardados", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.estado_pago).toBe("IMPAGA");
-    expect(resultado.factura.saldo_pendiente).toBe(resultado.factura.monto_total);
-    expect(Number(resultado.factura.neto)).toBe(1000);
-    expect(Number(resultado.factura.alicuota_iva)).toBe(21);
-    expect(Number(resultado.factura.monto_total)).toBe(1210);
+    expect(resultado.comprobante.estado_pago).toBe("IMPAGA");
+    expect(resultado.comprobante.saldo_pendiente).toBe(resultado.comprobante.monto_total);
+    expect(Number(resultado.comprobante.neto)).toBe(1000);
+    expect(Number(resultado.comprobante.alicuota_iva)).toBe(21);
+    expect(Number(resultado.comprobante.monto_total)).toBe(1210);
   });
 
   it("la misma orden dos veces: la segunda falla y no descuenta stock de nuevo", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 1 }] });
 
-    const primera = await crearFactura({
+    const primera = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
     expect(primera.success).toBe(true);
 
-    const segunda = await crearFactura({
+    const segunda = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-2",
+      num_comprobante: "F-2",
       tipo: "Factura",
       fiscal: true,
     });
     expect(segunda.success).toBe(false);
     if (segunda.success) return;
-    expect(segunda.error).toContain("ya tiene una factura registrada");
+    expect(segunda.error).toContain("ya tiene un comprobante registrada");
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(insumoFinal?.stock_actual)).toBe(9);
@@ -54,9 +54,9 @@ describe("crearFactura", () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       insumos: [{ id_insumo: 999999, cantidad: 1 }],
@@ -67,17 +67,17 @@ describe("crearFactura", () => {
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(insumoFinal?.stock_actual)).toBe(10);
 
-    const facturaCreada = await prisma.factura.findFirst({ where: { id_orden: orden.id_orden } });
-    expect(facturaCreada).toBeNull();
+    const comprobanteCreada = await prisma.comprobante.findFirst({ where: { id_orden: orden.id_orden } });
+    expect(comprobanteCreada).toBeNull();
   });
 
   it("descuenta el stock de los insumos de detalle_orden_insumo", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
 
-    await crearFactura({
+    await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -90,9 +90,9 @@ describe("crearFactura", () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       insumos: [{ id_insumo: insumo.id_insumo, cantidad: 5 }],
@@ -100,44 +100,44 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
-    // 10 inicial - 2 de la orden = 8. Luego - 5 adicionales en factura = 3
+    // 10 inicial - 2 de la orden = 8. Luego - 5 adicionales en comprobante = 3
     expect(Number(insumoFinal?.stock_actual)).toBe(3);
   });
 
   it("comprobante no facturable: monto 0, saldo 0, estado NO_APLICA", async () => {
     const orden = await crearOrdenFinalizada();
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "IT-1",
+      num_comprobante: "IT-1",
       tipo: "Informe Tecnico",
       fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(Number(resultado.factura.monto_total)).toBe(0);
-    expect(Number(resultado.factura.saldo_pendiente)).toBe(0);
-    expect(resultado.factura.estado_pago).toBe("NO_APLICA");
+    expect(Number(resultado.comprobante.monto_total)).toBe(0);
+    expect(Number(resultado.comprobante.saldo_pendiente)).toBe(0);
+    expect(resultado.comprobante.estado_pago).toBe("NO_APLICA");
   });
 
   it("sin vencimiento explicito lo calcula como emision mas condicion_pago_dias", async () => {
     const cliente = await crearCliente({ condicion_pago_dias: 15 });
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    const emision = new Date(resultado.factura.fecha_emision);
+    const emision = new Date(resultado.comprobante.fecha_emision);
     const vencimientoEsperado = new Date(emision);
     vencimientoEsperado.setDate(vencimientoEsperado.getDate() + 15);
-    const vencimiento = new Date(resultado.factura.fecha_vencimiento);
+    const vencimiento = new Date(resultado.comprobante.fecha_vencimiento);
     expect(vencimiento.toISOString().slice(0, 10)).toBe(vencimientoEsperado.toISOString().slice(0, 10));
   });
 
@@ -145,9 +145,9 @@ describe("crearFactura", () => {
     const orden = await crearOrdenFinalizada();
     const vencimiento = new Date("2027-05-20");
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       fecha_vencimiento: vencimiento,
@@ -155,15 +155,15 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(new Date(resultado.factura.fecha_vencimiento).toISOString().slice(0, 10)).toBe("2027-05-20");
+    expect(new Date(resultado.comprobante.fecha_vencimiento).toISOString().slice(0, 10)).toBe("2027-05-20");
   });
 
   it("descuento por porcentaje persistido en las columnas correctas", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       tipo_descuento: "PORCENTAJE",
@@ -172,19 +172,19 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.tipo_descuento).toBe("PORCENTAJE");
-    expect(Number(resultado.factura.descuento_porcentaje)).toBe(10);
-    expect(Number(resultado.factura.descuento_monto)).toBe(100);
-    expect(Number(resultado.factura.neto)).toBe(900);
-    expect(resultado.factura.equipo_descripcion).toBeNull();
+    expect(resultado.comprobante.tipo_descuento).toBe("PORCENTAJE");
+    expect(Number(resultado.comprobante.descuento_porcentaje)).toBe(10);
+    expect(Number(resultado.comprobante.descuento_monto)).toBe(100);
+    expect(Number(resultado.comprobante.neto)).toBe(900);
+    expect(resultado.comprobante.equipo_descripcion).toBeNull();
   });
 
   it("descuento por equipo persistido en las columnas correctas", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       tipo_descuento: "EQUIPO",
@@ -194,11 +194,11 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.tipo_descuento).toBe("EQUIPO");
-    expect(resultado.factura.descuento_porcentaje).toBeNull();
-    expect(Number(resultado.factura.descuento_monto)).toBe(300);
-    expect(Number(resultado.factura.neto)).toBe(700);
-    expect(resultado.factura.equipo_descripcion).toBe("Heladera vieja");
+    expect(resultado.comprobante.tipo_descuento).toBe("EQUIPO");
+    expect(resultado.comprobante.descuento_porcentaje).toBeNull();
+    expect(Number(resultado.comprobante.descuento_monto)).toBe(300);
+    expect(Number(resultado.comprobante.neto)).toBe(700);
+    expect(resultado.comprobante.equipo_descripcion).toBe("Heladera vieja");
   });
 
   it("calcula los importes en el servidor a partir de las lineas de la orden y discrimina el IVA", async () => {
@@ -207,22 +207,22 @@ describe("crearFactura", () => {
       insumos: [{ cantidad_usada: 0.5, precio_aplicado: 400, alicuota_iva: 10.5 }],
     });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(Number(resultado.factura.neto)).toBe(1200);
-    // varias alicuotas: no hay alicuota unica en la factura
-    expect(resultado.factura.alicuota_iva).toBeNull();
-    expect(Number(resultado.factura.monto_total)).toBe(1200 + 210 + 21);
+    expect(Number(resultado.comprobante.neto)).toBe(1200);
+    // varias alicuotas: no hay alicuota unica en el comprobante
+    expect(resultado.comprobante.alicuota_iva).toBeNull();
+    expect(Number(resultado.comprobante.monto_total)).toBe(1200 + 210 + 21);
 
-    const iva = await prisma.factura_iva.findMany({
-      where: { id_factura: resultado.factura.id_factura },
+    const iva = await prisma.comprobante_iva.findMany({
+      where: { id_comprobante: resultado.comprobante.id_comprobante },
       orderBy: { alicuota: "desc" },
     });
     expect(iva.map((i) => [Number(i.alicuota), Number(i.neto_gravado), Number(i.monto_iva)])).toEqual([
@@ -231,15 +231,15 @@ describe("crearFactura", () => {
     ]);
   });
 
-  it("el descuento se reparte entre alicuotas en factura_iva", async () => {
+  it("el descuento se reparte entre alicuotas en comprobante_iva", async () => {
     const orden = await crearOrdenFinalizada({
       servicios: [{ precio_acordado: 1000, alicuota_iva: 21 }, { precio_acordado: 1000, alicuota_iva: 10.5 }],
       insumos: [],
     });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       tipo_descuento: "PORCENTAJE",
@@ -248,17 +248,17 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(Number(resultado.factura.descuento_monto)).toBe(200);
-    expect(Number(resultado.factura.neto)).toBe(1800);
-    expect(Number(resultado.factura.monto_total)).toBe(1800 + 189 + 94.5);
+    expect(Number(resultado.comprobante.descuento_monto)).toBe(200);
+    expect(Number(resultado.comprobante.neto)).toBe(1800);
+    expect(Number(resultado.comprobante.monto_total)).toBe(1800 + 189 + 94.5);
   });
 
-  it("factura interna: se guarda con fiscal false, genera deuda y el IVA se calcula igual", async () => {
+  it("comprobante interna: se guarda con fiscal false, genera deuda y el IVA se calcula igual", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "Factura X-0001",
+      num_comprobante: "Comprobante X-0001",
       tipo: "Factura",
       fiscal: false,
       punto_venta: 3,
@@ -266,20 +266,20 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.fiscal).toBe(false);
-    expect(resultado.factura.estado_pago).toBe("IMPAGA");
-    expect(Number(resultado.factura.monto_total)).toBe(1210);
-    expect(Number(resultado.factura.saldo_pendiente)).toBe(1210);
+    expect(resultado.comprobante.fiscal).toBe(false);
+    expect(resultado.comprobante.estado_pago).toBe("IMPAGA");
+    expect(Number(resultado.comprobante.monto_total)).toBe(1210);
+    expect(Number(resultado.comprobante.saldo_pendiente)).toBe(1210);
     // una interna no guarda punto de venta
-    expect(resultado.factura.punto_venta).toBeNull();
+    expect(resultado.comprobante.punto_venta).toBeNull();
   });
 
-  it("factura fiscal guarda punto de venta", async () => {
+  it("comprobante fiscal guarda punto de venta", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "Factura A-0001",
+      num_comprobante: "Comprobante A-0001",
       tipo: "Factura",
       fiscal: true,
       punto_venta: 3,
@@ -287,16 +287,16 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.fiscal).toBe(true);
-    expect(resultado.factura.punto_venta).toBe(3);
+    expect(resultado.comprobante.fiscal).toBe(true);
+    expect(resultado.comprobante.punto_venta).toBe(3);
   });
 
-  it("punto de venta invalido rechaza la factura", async () => {
+  it("punto de venta invalido rechaza el comprobante", async () => {
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       punto_venta: 0,
@@ -310,25 +310,25 @@ describe("crearFactura", () => {
   it("un remito queda siempre fiscal aunque se mande fiscal false", async () => {
     const orden = await crearOrdenFinalizada();
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "R-1",
+      num_comprobante: "R-1",
       tipo: "Remito",
       fiscal: false,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.fiscal).toBe(true);
+    expect(resultado.comprobante.fiscal).toBe(true);
   });
 
   it("insumos adicionales se registran con su alicuota y entran en el calculo", async () => {
     const insumo = await crearInsumo({ stock_actual: 10, precio_venta: 100 });
     const orden = await crearOrdenFinalizada({ insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       insumos: [{ id_insumo: insumo.id_insumo, cantidad: 2, alicuota_iva: 10.5 }],
@@ -336,8 +336,8 @@ describe("crearFactura", () => {
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(Number(resultado.factura.neto)).toBe(1200);
-    expect(Number(resultado.factura.monto_total)).toBe(1200 + 210 + 21);
+    expect(Number(resultado.comprobante.neto)).toBe(1200);
+    expect(Number(resultado.comprobante.monto_total)).toBe(1200 + 210 + 21);
     const detalle = await prisma.detalle_orden_insumo.findFirst({ where: { id_orden: orden.id_orden } });
     expect(Number(detalle?.alicuota_iva)).toBe(10.5);
   });
@@ -345,9 +345,9 @@ describe("crearFactura", () => {
   it("orden sin lineas con precio no se puede facturar", async () => {
     const orden = await crearOrdenFinalizada({ servicios: [], insumos: [] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -359,9 +359,9 @@ describe("crearFactura", () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
-    await crearFactura({
+    await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "IT-1",
+      num_comprobante: "IT-1",
       tipo: "Informe Tecnico",
       fiscal: true,
     });
@@ -370,51 +370,51 @@ describe("crearFactura", () => {
     expect(Number(insumoFinal?.stock_actual)).toBe(10);
   });
 
-  it("remito y despues factura en la misma orden: ambos se emiten y el stock se descuenta una sola vez", async () => {
+  it("remito y despues comprobante en la misma orden: ambos se emiten y el stock se descuenta una sola vez", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
 
-    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    const remito = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "R-1", tipo: "Remito", fiscal: true });
     expect(remito.success).toBe(true);
     const trasRemito = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(trasRemito?.stock_actual)).toBe(10);
 
-    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    expect(factura.success).toBe(true);
-    const trasFactura = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
-    expect(Number(trasFactura?.stock_actual)).toBe(7);
+    const comprobante = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    expect(comprobante.success).toBe(true);
+    const trasComprobante = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(trasComprobante?.stock_actual)).toBe(7);
   });
 
-  it("remito despues de la factura se permite", async () => {
+  it("remito despues del comprobante se permite", async () => {
     const orden = await crearOrdenFinalizada();
 
-    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    expect(factura.success).toBe(true);
-    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    const comprobante = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    expect(comprobante.success).toBe(true);
+    const remito = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "R-1", tipo: "Remito", fiscal: true });
     expect(remito.success).toBe(true);
   });
 
-  it("factura anulada: la orden se puede volver a facturar", async () => {
+  it("comprobante anulada: la orden se puede volver a facturar", async () => {
     const orden = await crearOrdenFinalizada();
 
-    const primera = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
+    const primera = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
     expect(primera.success).toBe(true);
     if (!primera.success) return;
-    const anulacion = await anularFactura(primera.factura.id_factura);
+    const anulacion = await anularComprobante(primera.comprobante.id_comprobante);
     expect(anulacion.success).toBe(true);
 
-    const segunda = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-2", tipo: "Factura", fiscal: true });
+    const segunda = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-2", tipo: "Factura", fiscal: true });
     expect(segunda.success).toBe(true);
   });
 
-  // Bug conocido con issue abierto: crearFactura no pasa la orden a estado
+  // Bug conocido con issue abierto: crearComprobante no pasa la orden a estado
   // "Facturada" (queda en "Finalizado").
-  test.fails("crearFactura deberia pasar la orden a estado Facturada", async () => {
+  test.fails("crearComprobante deberia pasar la orden a estado Facturada", async () => {
     const orden = await crearOrdenFinalizada();
 
-    await crearFactura({
+    await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -426,28 +426,28 @@ describe("crearFactura", () => {
   it("el Remito no deberia generar deuda del cliente", async () => {
     const orden = await crearOrdenFinalizada();
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "R-1",
+      num_comprobante: "R-1",
       tipo: "Remito",
       fiscal: true,
     });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
-    expect(resultado.factura.estado_pago).toBe("NO_APLICA");
-    expect(Number(resultado.factura.saldo_pendiente)).toBe(0);
+    expect(resultado.comprobante.estado_pago).toBe("NO_APLICA");
+    expect(Number(resultado.comprobante.saldo_pendiente)).toBe(0);
   });
 });
 
-describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
-  it("stock suficiente: factura normal, sin aviso", async () => {
+describe("crearComprobante - control de stock insuficiente (CU01/CU16)", () => {
+  it("stock suficiente: comprobante normal, sin aviso", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -459,13 +459,13 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     expect(Number(insumoFinal?.stock_actual)).toBe(7);
   });
 
-  it("stock insuficiente sin confirmar: no crea la factura, no toca el stock, devuelve el detalle", async () => {
+  it("stock insuficiente sin confirmar: no crea el comprobante, no toca el stock, devuelve el detalle", async () => {
     const insumo = await crearInsumo({ stock_actual: 1, nombre: "Gas R410a", descripcion: "kg" });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -486,8 +486,8 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(insumoFinal?.stock_actual)).toBe(1);
-    const facturaCreada = await prisma.factura.findFirst({ where: { id_orden: orden.id_orden } });
-    expect(facturaCreada).toBeNull();
+    const comprobanteCreada = await prisma.comprobante.findFirst({ where: { id_orden: orden.id_orden } });
+    expect(comprobanteCreada).toBeNull();
   });
 
   it("el mismo insumo en dos lineas de la orden: se suman para el chequeo", async () => {
@@ -499,9 +499,9 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
       ],
     });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -516,9 +516,9 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     const insumo = await crearInsumo({ stock_actual: 4 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 2 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
       insumos: [{ id_insumo: insumo.id_insumo, cantidad: 3 }],
@@ -530,13 +530,13 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     expect(resultado.stockInsuficiente?.[0]).toMatchObject({ disponible: 4, requerido: 5, faltante: 1 });
   });
 
-  it("stock exacto: factura y deja el stock en cero", async () => {
+  it("stock exacto: comprobante y deja el stock en cero", async () => {
     const insumo = await crearInsumo({ stock_actual: 5 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -550,9 +550,9 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     const insumo = await crearInsumo({ stock_actual: 1 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "R-1",
+      num_comprobante: "R-1",
       tipo: "Remito",
       fiscal: true,
     });
@@ -562,13 +562,13 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     expect(Number(insumoFinal?.stock_actual)).toBe(1);
   });
 
-  it("anular una factura que dejo el stock en cero devuelve el stock al valor anterior", async () => {
+  it("anular un comprobante que dejo el stock en cero devuelve el stock al valor anterior", async () => {
     const insumo = await crearInsumo({ stock_actual: 5 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 5 }] });
 
-    const resultado = await crearFactura({
+    const resultado = await crearComprobante({
       id_orden: orden.id_orden,
-      num_factura: "F-1",
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -578,7 +578,7 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
     const trasFacturar = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(trasFacturar?.stock_actual)).toBe(0);
 
-    const anulacion = await anularFactura(resultado.factura.id_factura);
+    const anulacion = await anularComprobante(resultado.comprobante.id_comprobante);
     expect(anulacion.success).toBe(true);
 
     const trasAnular = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
@@ -588,13 +588,13 @@ describe("crearFactura - control de stock insuficiente (CU01/CU16)", () => {
 
 describe("getOrdenesPendientesFacturacion", () => {
   it("trae finalizadas sin comprobante, no trae pendientes ni en proceso, no trae las ya facturadas", async () => {
-    const finalizadaSinFactura = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
+    const finalizadaSinComprobante = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
     await crearOrdenFinalizada({ estado_trabajo: "Pendiente" });
     await crearOrdenFinalizada({ estado_trabajo: "En proceso" });
-    const finalizadaConFactura = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    await crearFactura({
-      id_orden: finalizadaConFactura.id_orden,
-      num_factura: "F-1",
+    const finalizadaConComprobante = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
+    await crearComprobante({
+      id_orden: finalizadaConComprobante.id_orden,
+      num_comprobante: "F-1",
       tipo: "Factura",
       fiscal: true,
     });
@@ -602,9 +602,9 @@ describe("getOrdenesPendientesFacturacion", () => {
     const pendientes = await getOrdenesPendientesFacturacion();
     const ids = pendientes.map((o: { id_orden: number }) => o.id_orden);
 
-    expect(ids).toContain(finalizadaSinFactura.id_orden);
-    expect(ids).not.toContain(finalizadaConFactura.id_orden);
-    expect(pendientes.every((o: { id_orden: number }) => o.id_orden !== finalizadaConFactura.id_orden)).toBe(true);
+    expect(ids).toContain(finalizadaSinComprobante.id_orden);
+    expect(ids).not.toContain(finalizadaConComprobante.id_orden);
+    expect(pendientes.every((o: { id_orden: number }) => o.id_orden !== finalizadaConComprobante.id_orden)).toBe(true);
     expect(pendientes.length).toBe(1);
   });
 });

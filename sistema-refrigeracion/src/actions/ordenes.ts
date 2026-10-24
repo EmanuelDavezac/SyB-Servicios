@@ -5,7 +5,7 @@ import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
-import { ESTADOS_FACTURA, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoComprobante";
 import { nombreDeServicioYaExiste } from "@/actions/servicios";
 
 function validarAlicuota(alicuota: number | undefined): number {
@@ -16,25 +16,25 @@ function validarAlicuota(alicuota: number | undefined): number {
     return valor;
 }
 
-// Una orden con una Factura vigente (no anulada) no se toca: su IVA ya quedo
-// congelado en factura_iva y no se recalculan facturas emitidas. Los
+// Una orden con una Comprobante vigente (no anulada) no se toca: su IVA ya quedo
+// congelado en comprobante_iva y no se recalculan comprobantes emitidas. Los
 // comprobantes no facturables (ej. Remito) no bloquean la orden.
 async function ordenYaFacturada(id_orden: number | null): Promise<boolean> {
     if (id_orden === null) return false;
-    const factura = await prisma.factura.findFirst({
+    const comprobante = await prisma.comprobante.findFirst({
         where: {
             id_orden,
             tipo: { in: [...TIPOS_COMPROBANTE_FACTURABLE] },
-            estado_pago: { not: ESTADOS_FACTURA.ANULADA },
+            estado_pago: { not: ESTADOS_COMPROBANTE.ANULADA },
         },
-        select: { id_factura: true },
+        select: { id_comprobante: true },
     });
-    return !!factura;
+    return !!comprobante;
 }
 
 async function asegurarOrdenEditable(id_orden: number | null): Promise<void> {
     if (await ordenYaFacturada(id_orden)) {
-        throw new Error(`La orden #${id_orden} ya está facturada: anulá la factura para poder modificarla.`);
+        throw new Error(`La orden #${id_orden} ya está facturada: anulá el comprobante para poder modificarla.`);
     }
 }
 
@@ -81,8 +81,8 @@ export async function obtenerOrdenes() {
                         apellido: true,
                     },
                 },
-                factura: {
-                    select: { id_factura: true, estado_pago: true, tipo: true },
+                comprobante: {
+                    select: { id_comprobante: true, estado_pago: true, tipo: true },
                 },
             },
         });
@@ -180,12 +180,12 @@ export async function editarOrden(id_orden: number, datos: {
 
 /**
  * Borra una orden (por ejemplo, una cargada por error). Se rechaza si tiene
- * cualquier comprobante en la tabla factura (Factura, Remito, Informe
+ * cualquier comprobante en la tabla comprobante (Comprobante, Remito, Informe
  * Tecnico, incluso anulados): la FK es onDelete: Restrict y esos comprobantes
  * conservan su historial. Los presupuestos que la generaron se desvinculan
  * (id_orden = null) para poder volver a generarla desde el presupuesto. Las
  * lineas de detalle se borran en cascada y no se toca stock: las ordenes no
- * lo mueven, solo la factura.
+ * lo mueven, solo el comprobante.
  */
 export async function eliminarOrden(id_orden: number) {
     try {
@@ -194,12 +194,12 @@ export async function eliminarOrden(id_orden: number) {
         await prisma.$transaction(async (tx) => {
             const orden = await tx.orden_trabajo.findUnique({
                 where: { id_orden },
-                select: { id_orden: true, _count: { select: { factura: true } } },
+                select: { id_orden: true, _count: { select: { comprobante: true } } },
             });
             if (!orden) {
                 throw new Error("La orden no existe.");
             }
-            if (orden._count.factura > 0) {
+            if (orden._count.comprobante > 0) {
                 throw new Error(`La orden #${id_orden} tiene comprobantes asociados y no se puede eliminar.`);
             }
 
@@ -384,7 +384,7 @@ export async function obtenerServiciosDeOrden(id_orden: number) {
 }
 
 // ─── Insumos en la orden ──────────────────────────────────────────────────────
-// El stock NO se descuenta aquí; se descuenta al generar la factura (crearFactura).
+// El stock NO se descuenta aquí; se descuenta al generar el comprobante (crearComprobante).
 
 /** Agrega un insumo a la orden (solo registra cantidad usada, sin mover stock) */
 export async function agregarInsumoAOrden(datos: {

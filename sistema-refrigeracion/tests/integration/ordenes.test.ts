@@ -10,10 +10,10 @@ import {
   quitarInsumoDeOrden,
   eliminarOrden,
 } from "@/actions/ordenes";
-import { crearFactura, getOrdenesPendientesFacturacion } from "@/actions/facturacion";
-import { anularFactura } from "@/actions/cobros";
+import { crearComprobante, getOrdenesPendientesFacturacion } from "@/actions/comprobantes";
+import { anularComprobante } from "@/actions/cobros";
 import { crearPresupuesto, cambiarEstadoPresupuesto, crearOrdenDesdePresupuesto } from "@/actions/presupuestos";
-import { crearCliente, crearInsumo, crearServicio, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
+import { crearCliente, crearInsumo, crearServicio, crearOrdenFinalizada, crearComprobanteEmitido } from "./factories";
 
 const MENSAJE_FACTURADA = "ya está facturada";
 
@@ -25,7 +25,7 @@ async function contarLineas(id_orden: number) {
   return { servicios, insumos };
 }
 
-describe("orden sin factura", () => {
+describe("orden sin comprobante", () => {
   it("editarOrden actualiza cliente, estado y notas", async () => {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Pendiente" });
 
@@ -67,7 +67,7 @@ describe("orden sin factura", () => {
 
   it("una orden con solo un Remito sigue siendo editable", async () => {
     const orden = await crearOrdenFinalizada();
-    await crearFacturaEmitida({ id_orden: orden.id_orden, tipo: "Remito", estado_pago: "NO_APLICA" });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, tipo: "Remito", estado_pago: "NO_APLICA" });
 
     const resultado = await editarOrden(orden.id_orden, {
       id_cliente: orden.id_cliente!,
@@ -82,10 +82,10 @@ describe("orden sin factura", () => {
   });
 });
 
-describe("orden con factura vigente", () => {
+describe("orden con comprobante vigente", () => {
   async function ordenFacturada() {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    await crearFacturaEmitida({ id_orden: orden.id_orden });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden });
     return orden;
   }
 
@@ -167,13 +167,13 @@ describe("orden con factura vigente", () => {
   });
 });
 
-describe("orden con factura anulada", () => {
+describe("orden con comprobante anulada", () => {
   it("vuelve a ser editable", async () => {
     const orden = await crearOrdenFinalizada();
-    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    expect(factura.success).toBe(true);
-    if (!factura.success) return;
-    expect((await anularFactura(factura.factura.id_factura)).success).toBe(true);
+    const comprobante = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    expect(comprobante.success).toBe(true);
+    if (!comprobante.success) return;
+    expect((await anularComprobante(comprobante.comprobante.id_comprobante)).success).toBe(true);
 
     const edicion = await editarOrden(orden.id_orden, {
       id_cliente: orden.id_cliente!,
@@ -191,13 +191,13 @@ describe("orden con factura anulada", () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
 
-    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    expect(factura.success).toBe(true);
-    if (!factura.success) return;
+    const comprobante = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    expect(comprobante.success).toBe(true);
+    if (!comprobante.success) return;
     const trasFacturar = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(trasFacturar?.stock_actual)).toBe(7);
 
-    await anularFactura(factura.factura.id_factura);
+    await anularComprobante(comprobante.comprobante.id_comprobante);
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
     expect(Number(insumoFinal?.stock_actual)).toBe(10);
@@ -205,9 +205,9 @@ describe("orden con factura anulada", () => {
 });
 
 describe("getOrdenesPendientesFacturacion", () => {
-  it("incluye una orden Finalizada cuya unica factura esta ANULADA", async () => {
+  it("incluye una orden Finalizada cuya unica comprobante esta ANULADA", async () => {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
 
     const pendientes = await getOrdenesPendientesFacturacion();
 
@@ -216,7 +216,7 @@ describe("getOrdenesPendientesFacturacion", () => {
 
   it("incluye una orden Finalizada que solo tiene un Remito", async () => {
     const orden = await crearOrdenFinalizada({ estado_trabajo: "Finalizado" });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, tipo: "Remito", estado_pago: "NO_APLICA" });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, tipo: "Remito", estado_pago: "NO_APLICA" });
 
     const pendientes = await getOrdenesPendientesFacturacion();
 
@@ -247,12 +247,12 @@ describe("eliminarOrden", () => {
   });
 
   it.each([
-    { caso: "una Factura vigente", tipo: "Factura", estado_pago: "IMPAGA" },
-    { caso: "una Factura anulada", tipo: "Factura", estado_pago: "ANULADA" },
+    { caso: "una Comprobante vigente", tipo: "Factura", estado_pago: "IMPAGA" },
+    { caso: "una Comprobante anulada", tipo: "Factura", estado_pago: "ANULADA" },
     { caso: "un Remito", tipo: "Remito", estado_pago: "NO_APLICA" },
   ])("rechaza una orden con $caso y no borra nada", async ({ tipo, estado_pago }) => {
     const orden = await crearOrdenFinalizada();
-    await crearFacturaEmitida({ id_orden: orden.id_orden, tipo, estado_pago });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, tipo, estado_pago });
 
     const resultado = await eliminarOrden(orden.id_orden);
 
@@ -262,7 +262,7 @@ describe("eliminarOrden", () => {
     });
     expect(await prisma.orden_trabajo.findUnique({ where: { id_orden: orden.id_orden } })).not.toBeNull();
     expect(await contarLineas(orden.id_orden)).toEqual({ servicios: 1, insumos: 1 });
-    expect(await prisma.factura.count({ where: { id_orden: orden.id_orden } })).toBe(1);
+    expect(await prisma.comprobante.count({ where: { id_orden: orden.id_orden } })).toBe(1);
   });
 
   it("desvincula el presupuesto y permite volver a generar la orden", async () => {

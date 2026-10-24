@@ -39,7 +39,7 @@ export function alicuotaValida(alicuota: number): boolean {
   return Number.isFinite(alicuota) && alicuota >= 0 && alicuota <= 100;
 }
 
-// El calculo es el mismo para facturas fiscales (ARCA) e internas: la unica
+// El calculo es el mismo para comprobantes fiscales (ARCA) e internas: la unica
 // diferencia entre ambas es si se declaran, no cuanto se cobra.
 export function calcularImportes({
   lineas,
@@ -85,7 +85,7 @@ export function calcularImportes({
       throw new Error("El importe del equipo debe ser mayor a cero.");
     }
     if (imp >= netoBruto) {
-      throw new Error("El descuento no puede igualar o superar el subtotal de la factura.");
+      throw new Error("El descuento no puede igualar o superar el subtotal del comprobante.");
     }
     descuentoMonto = redondear2(imp);
   }

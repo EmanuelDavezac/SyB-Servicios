@@ -1,66 +1,66 @@
 import { describe, it, test, expect } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { registrarCobro, anularCobro, anularFactura, obtenerClientesConDeuda, obtenerDeudaPorCliente, obtenerReciboCompleto } from "@/actions/cobros";
+import { registrarCobro, anularCobro, anularComprobante, obtenerClientesConDeuda, obtenerDeudaPorCliente, obtenerReciboCompleto } from "@/actions/cobros";
 import { formatearMediosDePago } from "@/lib/cobros";
-import { crearFactura } from "@/actions/facturacion";
-import { crearCliente, crearInsumo, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
+import { crearComprobante } from "@/actions/comprobantes";
+import { crearCliente, crearInsumo, crearOrdenFinalizada, crearComprobanteEmitido } from "./factories";
 
-async function facturaDeCliente(id_cliente: number, overrides: Parameters<typeof crearFacturaEmitida>[0] = {}) {
+async function comprobanteDeCliente(id_cliente: number, overrides: Parameters<typeof crearComprobanteEmitido>[0] = {}) {
   const orden = await crearOrdenFinalizada({ id_cliente });
-  return crearFacturaEmitida({ id_orden: orden.id_orden, ...overrides });
+  return crearComprobanteEmitido({ id_orden: orden.id_orden, ...overrides });
 }
 
 describe("registrarCobro", () => {
   it("cobro total: PAGADA con saldo 0", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 1000 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 1000 }],
     });
 
     expect(resultado.success).toBe(true);
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("PAGADA");
-    expect(Number(facturaFinal?.saldo_pendiente)).toBe(0);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("PAGADA");
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(0);
   });
 
   it("cobro parcial: PARCIAL con el saldo correcto", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 400 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 400 }],
     });
 
     expect(resultado.success).toBe(true);
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("PARCIAL");
-    expect(Number(facturaFinal?.saldo_pendiente)).toBe(600);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("PARCIAL");
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(600);
   });
 
-  it("un recibo imputado a tres facturas del mismo cliente recalcula las tres", async () => {
+  it("un recibo imputado a tres comprobantes del mismo cliente recalcula las tres", async () => {
     const cliente = await crearCliente();
-    const f1 = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
-    const f2 = await facturaDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
-    const f3 = await facturaDeCliente(cliente.id_cliente, { monto_total: 300, saldo_pendiente: 300 });
+    const f1 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const f2 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
+    const f3 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 300, saldo_pendiente: 300 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [
-        { id_factura: f1.id_factura, monto: 1000 },
-        { id_factura: f2.id_factura, monto: 200 },
-        { id_factura: f3.id_factura, monto: 300 },
+        { id_comprobante: f1.id_comprobante, monto: 1000 },
+        { id_comprobante: f2.id_comprobante, monto: 200 },
+        { id_comprobante: f3.id_comprobante, monto: 300 },
       ],
     });
 
     expect(resultado.success).toBe(true);
     const [r1, r2, r3] = await Promise.all([
-      prisma.factura.findUnique({ where: { id_factura: f1.id_factura } }),
-      prisma.factura.findUnique({ where: { id_factura: f2.id_factura } }),
-      prisma.factura.findUnique({ where: { id_factura: f3.id_factura } }),
+      prisma.comprobante.findUnique({ where: { id_comprobante: f1.id_comprobante } }),
+      prisma.comprobante.findUnique({ where: { id_comprobante: f2.id_comprobante } }),
+      prisma.comprobante.findUnique({ where: { id_comprobante: f3.id_comprobante } }),
     ]);
     expect(r1?.estado_pago).toBe("PAGADA");
     expect(r2?.estado_pago).toBe("PARCIAL");
@@ -70,24 +70,24 @@ describe("registrarCobro", () => {
 
   it("dos cobros parciales sucesivos terminan en PAGADA", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
-    await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_factura: factura.id_factura, monto: 600 }] });
-    const resultado = await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_factura: factura.id_factura, monto: 400 }] });
+    await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 600 }] });
+    const resultado = await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 400 }] });
 
     expect(resultado.success).toBe(true);
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("PAGADA");
-    expect(Number(facturaFinal?.saldo_pendiente)).toBe(0);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("PAGADA");
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(0);
   });
 
   it("imputar mas que el saldo falla y no crea el recibo", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 1500 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 1500 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -95,14 +95,14 @@ describe("registrarCobro", () => {
     expect(recibos).toBe(0);
   });
 
-  it("imputar a factura de otro cliente falla", async () => {
+  it("imputar a comprobante de otro cliente falla", async () => {
     const clienteA = await crearCliente();
     const clienteB = await crearCliente();
-    const facturaDeB = await facturaDeCliente(clienteB.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobanteDeB = await comprobanteDeCliente(clienteB.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: clienteA.id_cliente,
-      imputaciones: [{ id_factura: facturaDeB.id_factura, monto: 500 }],
+      imputaciones: [{ id_comprobante: comprobanteDeB.id_comprobante, monto: 500 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -110,7 +110,7 @@ describe("registrarCobro", () => {
 
   it("imputar a ANULADA falla", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, {
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, {
       monto_total: 1000,
       saldo_pendiente: 0,
       estado_pago: "ANULADA",
@@ -118,7 +118,7 @@ describe("registrarCobro", () => {
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 100 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 100 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -126,7 +126,7 @@ describe("registrarCobro", () => {
 
   it("imputar a NO_APLICA falla", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, {
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, {
       tipo: "Informe Tecnico",
       monto_total: 0,
       saldo_pendiente: 0,
@@ -135,7 +135,7 @@ describe("registrarCobro", () => {
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 100 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 100 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -143,11 +143,11 @@ describe("registrarCobro", () => {
 
   it("monto 0 falla", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 0 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 0 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -155,11 +155,11 @@ describe("registrarCobro", () => {
 
   it("monto negativo falla", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: -100 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: -100 }],
     });
 
     expect(resultado.success).toBe(false);
@@ -167,14 +167,14 @@ describe("registrarCobro", () => {
 
   it("el recibo guarda monto_total igual a la suma de imputaciones", async () => {
     const cliente = await crearCliente();
-    const f1 = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
-    const f2 = await facturaDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
+    const f1 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const f2 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [
-        { id_factura: f1.id_factura, monto: 300 },
-        { id_factura: f2.id_factura, monto: 200 },
+        { id_comprobante: f1.id_comprobante, monto: 300 },
+        { id_comprobante: f2.id_comprobante, monto: 200 },
       ],
     });
 
@@ -185,11 +185,11 @@ describe("registrarCobro", () => {
 
   it("las retenciones se persisten con direccion SUFRIDA", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 900 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 900 }],
       retenciones: [{ tipo: "IVA", monto: 100 }],
     });
 
@@ -203,37 +203,37 @@ describe("registrarCobro", () => {
 
   it("si una imputacion falla no queda ni recibo ni imputaciones parciales", async () => {
     const cliente = await crearCliente();
-    const f1 = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
-    const f2 = await facturaDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
+    const f1 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const f2 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [
-        { id_factura: f1.id_factura, monto: 500 },
-        { id_factura: f2.id_factura, monto: 999999 },
+        { id_comprobante: f1.id_comprobante, monto: 500 },
+        { id_comprobante: f2.id_comprobante, monto: 999999 },
       ],
     });
 
     expect(resultado.success).toBe(false);
     expect(await prisma.recibo.count()).toBe(0);
     expect(await prisma.pagos_parciales.count()).toBe(0);
-    const f1Final = await prisma.factura.findUnique({ where: { id_factura: f1.id_factura } });
+    const f1Final = await prisma.comprobante.findUnique({ where: { id_comprobante: f1.id_comprobante } });
     expect(Number(f1Final?.saldo_pendiente)).toBe(1000);
   });
 
-  // Bug conocido con issue abierto: no deduplica facturas repetidas dentro de
-  // las imputaciones, asi que dos lineas sobre la misma factura pueden
+  // Bug conocido con issue abierto: no deduplica comprobantes repetidas dentro de
+  // las imputaciones, asi que dos lineas sobre la mismo comprobante pueden
   // superar juntas su saldo pendiente (cada una se valida contra el saldo
   // original, no contra el acumulado ya imputado en el mismo cobro).
-  test.fails("dos lineas de imputacion sobre la misma factura no deberian superar su saldo", async () => {
+  test.fails("dos lineas de imputacion sobre la mismo comprobante no deberian superar su saldo", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [
-        { id_factura: factura.id_factura, monto: 700 },
-        { id_factura: factura.id_factura, monto: 700 },
+        { id_comprobante: comprobante.id_comprobante, monto: 700 },
+        { id_comprobante: comprobante.id_comprobante, monto: 700 },
       ],
     });
 
@@ -242,13 +242,13 @@ describe("registrarCobro", () => {
 });
 
 describe("anularCobro", () => {
-  it("las facturas vuelven al saldo y estado previos", async () => {
+  it("los comprobantes vuelven al saldo y estado previos", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const cobro = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 400 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 400 }],
     });
     expect(cobro.success).toBe(true);
     if (!cobro.success) return;
@@ -256,21 +256,21 @@ describe("anularCobro", () => {
     const resultado = await anularCobro(cobro.recibo.id_recibo);
     expect(resultado.success).toBe(true);
 
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("IMPAGA");
-    expect(Number(facturaFinal?.saldo_pendiente)).toBe(1000);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("IMPAGA");
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(1000);
   });
 
-  it("un recibo imputado a varias facturas las recalcula todas al anularlo", async () => {
+  it("un recibo imputado a varias comprobantes las recalcula todas al anularlo", async () => {
     const cliente = await crearCliente();
-    const f1 = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
-    const f2 = await facturaDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
+    const f1 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const f2 = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 500 });
 
     const cobro = await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [
-        { id_factura: f1.id_factura, monto: 1000 },
-        { id_factura: f2.id_factura, monto: 500 },
+        { id_comprobante: f1.id_comprobante, monto: 1000 },
+        { id_comprobante: f2.id_comprobante, monto: 500 },
       ],
     });
     expect(cobro.success).toBe(true);
@@ -279,8 +279,8 @@ describe("anularCobro", () => {
     await anularCobro(cobro.recibo.id_recibo);
 
     const [r1, r2] = await Promise.all([
-      prisma.factura.findUnique({ where: { id_factura: f1.id_factura } }),
-      prisma.factura.findUnique({ where: { id_factura: f2.id_factura } }),
+      prisma.comprobante.findUnique({ where: { id_comprobante: f1.id_comprobante } }),
+      prisma.comprobante.findUnique({ where: { id_comprobante: f2.id_comprobante } }),
     ]);
     expect(r1?.estado_pago).toBe("IMPAGA");
     expect(Number(r1?.saldo_pendiente)).toBe(1000);
@@ -294,36 +294,36 @@ describe("anularCobro", () => {
   });
 });
 
-describe("anularFactura", () => {
+describe("anularComprobante", () => {
   it("marca ANULADA con saldo 0", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
-    const resultado = await anularFactura(factura.id_factura);
+    const resultado = await anularComprobante(comprobante.id_comprobante);
     expect(resultado.success).toBe(true);
 
-    const facturaFinal = await prisma.factura.findUnique({ where: { id_factura: factura.id_factura } });
-    expect(facturaFinal?.estado_pago).toBe("ANULADA");
-    expect(Number(facturaFinal?.saldo_pendiente)).toBe(0);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante: comprobante.id_comprobante } });
+    expect(comprobanteFinal?.estado_pago).toBe("ANULADA");
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(0);
   });
 
-  it("una factura con cobros no se puede anular", async () => {
+  it("un comprobante con cobros no se puede anular", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
-    await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_factura: factura.id_factura, monto: 200 }] });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    await registrarCobro({ id_cliente: cliente.id_cliente, imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 200 }] });
 
-    const resultado = await anularFactura(factura.id_factura);
+    const resultado = await anularComprobante(comprobante.id_comprobante);
     expect(resultado.success).toBe(false);
   });
 
-  it("anular una factura devuelve el stock descontado", async () => {
+  it("anular un comprobante devuelve el stock descontado", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
-    const factura = await crearFactura({ id_orden: orden.id_orden, num_factura: "F-1", tipo: "Factura", fiscal: true });
-    expect(factura.success).toBe(true);
-    if (!factura.success) return;
+    const comprobante = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "F-1", tipo: "Factura", fiscal: true });
+    expect(comprobante.success).toBe(true);
+    if (!comprobante.success) return;
 
-    const resultado = await anularFactura(factura.factura.id_factura);
+    const resultado = await anularComprobante(comprobante.comprobante.id_comprobante);
     expect(resultado.success).toBe(true);
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
@@ -333,11 +333,11 @@ describe("anularFactura", () => {
   it("anular un remito no toca el stock", async () => {
     const insumo = await crearInsumo({ stock_actual: 10 });
     const orden = await crearOrdenFinalizada({ insumos: [{ id_insumo: insumo.id_insumo, cantidad_usada: 3 }] });
-    const remito = await crearFactura({ id_orden: orden.id_orden, num_factura: "R-1", tipo: "Remito", fiscal: true });
+    const remito = await crearComprobante({ id_orden: orden.id_orden, num_comprobante: "R-1", tipo: "Remito", fiscal: true });
     expect(remito.success).toBe(true);
     if (!remito.success) return;
 
-    const resultado = await anularFactura(remito.factura.id_factura);
+    const resultado = await anularComprobante(remito.comprobante.id_comprobante);
     expect(resultado.success).toBe(true);
 
     const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
@@ -348,10 +348,10 @@ describe("anularFactura", () => {
 describe("obtenerClientesConDeuda y obtenerDeudaPorCliente", () => {
   it("suman solo IMPAGA y PARCIAL, excluyen ANULADA y NO_APLICA", async () => {
     const cliente = await crearCliente();
-    await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
-    await facturaDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 200, estado_pago: "PARCIAL" });
-    await facturaDeCliente(cliente.id_cliente, { monto_total: 300, saldo_pendiente: 0, estado_pago: "ANULADA" });
-    await facturaDeCliente(cliente.id_cliente, {
+    await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000, estado_pago: "IMPAGA" });
+    await comprobanteDeCliente(cliente.id_cliente, { monto_total: 500, saldo_pendiente: 200, estado_pago: "PARCIAL" });
+    await comprobanteDeCliente(cliente.id_cliente, { monto_total: 300, saldo_pendiente: 0, estado_pago: "ANULADA" });
+    await comprobanteDeCliente(cliente.id_cliente, {
       tipo: "Informe Tecnico",
       monto_total: 0,
       saldo_pendiente: 0,
@@ -368,7 +368,7 @@ describe("obtenerClientesConDeuda y obtenerDeudaPorCliente", () => {
 
   it("cliente sin deuda no aparece", async () => {
     const cliente = await crearCliente();
-    await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 0, estado_pago: "PAGADA" });
+    await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 0, estado_pago: "PAGADA" });
 
     const clientesConDeuda = await obtenerClientesConDeuda();
     expect(clientesConDeuda.find((c: { id_cliente: number }) => c.id_cliente === cliente.id_cliente)).toBeUndefined();
@@ -380,8 +380,8 @@ describe("obtenerClientesConDeuda y obtenerDeudaPorCliente", () => {
   it("orden de mayor a menor", async () => {
     const clienteBajo = await crearCliente({ nombre: "Bajo" });
     const clienteAlto = await crearCliente({ nombre: "Alto" });
-    await facturaDeCliente(clienteBajo.id_cliente, { monto_total: 100, saldo_pendiente: 100, estado_pago: "IMPAGA" });
-    await facturaDeCliente(clienteAlto.id_cliente, { monto_total: 5000, saldo_pendiente: 5000, estado_pago: "IMPAGA" });
+    await comprobanteDeCliente(clienteBajo.id_cliente, { monto_total: 100, saldo_pendiente: 100, estado_pago: "IMPAGA" });
+    await comprobanteDeCliente(clienteAlto.id_cliente, { monto_total: 5000, saldo_pendiente: 5000, estado_pago: "IMPAGA" });
 
     const clientesConDeuda = await obtenerClientesConDeuda();
     const idxAlto = clientesConDeuda.findIndex((c: { id_cliente: number }) => c.id_cliente === clienteAlto.id_cliente);
@@ -393,11 +393,11 @@ describe("obtenerClientesConDeuda y obtenerDeudaPorCliente", () => {
 describe("registrarCobro - multiples medios de pago", () => {
   it("combina efectivo y transferencia en el mismo cobro", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 800 }],
       formasPago: [
         { forma_pago: "Efectivo", monto: 500 },
         { forma_pago: "Transferencia", monto: 300 },
@@ -415,11 +415,11 @@ describe("registrarCobro - multiples medios de pago", () => {
 
   it("rechaza si los medios de pago no suman lo imputado", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 800 }],
       formasPago: [{ forma_pago: "Efectivo", monto: 500 }],
     });
 
@@ -430,11 +430,11 @@ describe("registrarCobro - multiples medios de pago", () => {
 
   it("los medios de pago tienen que sumar lo imputado MENOS las retenciones", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 1000 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 1000 }],
       retenciones: [{ tipo: "IVA", monto: 100 }],
       formasPago: [{ forma_pago: "Efectivo", monto: 900 }],
     });
@@ -448,11 +448,11 @@ describe("registrarCobro - multiples medios de pago", () => {
 
   it("rechaza un medio de pago con monto 0", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 800 }],
       formasPago: [
         { forma_pago: "Efectivo", monto: 800 },
         { forma_pago: "Transferencia", monto: 0 },
@@ -464,11 +464,11 @@ describe("registrarCobro - multiples medios de pago", () => {
 
   it("sin formasPago sigue funcionando (cobro informal, compatibilidad hacia atras)", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
 
     const resultado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 800 }],
     });
 
     expect(resultado.success).toBe(true);
@@ -479,11 +479,11 @@ describe("registrarCobro - multiples medios de pago", () => {
 
   it("obtenerReciboCompleto expone el desglose de medios de pago", async () => {
     const cliente = await crearCliente();
-    const factura = await facturaDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 800, saldo_pendiente: 800 });
 
     const creado = await registrarCobro({
       id_cliente: cliente.id_cliente,
-      imputaciones: [{ id_factura: factura.id_factura, monto: 800 }],
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 800 }],
       formasPago: [
         { forma_pago: "Efectivo", monto: 500 },
         { forma_pago: "Transferencia", monto: 300 },

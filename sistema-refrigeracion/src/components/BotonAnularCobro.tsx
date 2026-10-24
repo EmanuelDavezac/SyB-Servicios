@@ -48,7 +48,7 @@ export default function BotonAnularCobro({ idRecibo }: Props) {
             <ModalConfirmacion
                 isOpen={showConfirm}
                 titulo="Anular recibo"
-                mensaje="¿Anular este recibo? Se recalculará el saldo de las facturas imputadas."
+                mensaje="¿Anular este recibo? Se recalculará el saldo de los comprobantes imputadas."
                 labelConfirmar="Anular recibo"
                 labelProcesando="Anulando..."
                 iconoConfirmar="fa-ban"

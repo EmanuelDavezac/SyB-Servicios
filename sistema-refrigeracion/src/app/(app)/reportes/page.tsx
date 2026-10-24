@@ -193,7 +193,7 @@ export default async function ReportesPage({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
-                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Ventas <span className="normal-case font-normal text-gray-400">(solo facturas cargadas en ARCA)</span></p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Ventas <span className="normal-case font-normal text-gray-400">(solo comprobantes cargadas en ARCA)</span></p>
                             <div className="space-y-1 text-sm">
                                 <div className="flex justify-between"><span className="text-gray-500">Importe Ventas (neto)</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.neto)}</span></div>
                                 <div className="flex justify-between"><span className="text-gray-500">IVA Ventas</span><span className="font-semibold">{formatCurrency(posicionIva.ventas.iva)}</span></div>

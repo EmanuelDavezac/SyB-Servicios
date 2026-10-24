@@ -39,7 +39,7 @@ export default async function CobrosPage() {
                 <div className="bg-white rounded shadow text-black overflow-hidden">
                     <div className="hidden md:grid grid-cols-3 font-bold bg-gray-50 border-b p-4 text-sm text-gray-700">
                         <div>Cliente</div>
-                        <div>Facturas Pendientes</div>
+                        <div>Comprobantes Pendientes</div>
                         <div className="text-right">Saldo</div>
                     </div>
 
@@ -53,14 +53,14 @@ export default async function CobrosPage() {
                                     <div className="font-semibold text-gray-800">{c.apellido}, {c.nombre}</div>
                                     <div className="text-right">
                                         <div className="font-bold text-red-700">{formatCurrency(c.saldo)}</div>
-                                        <div className="text-xs text-gray-500">{c.cantidadFacturas} factura(s)</div>
+                                        <div className="text-xs text-gray-500">{c.cantidadComprobantes} comprobante(s)</div>
                                     </div>
                                 </div>
 
                                 {/* Fila escritorio */}
                                 <div className="hidden md:grid grid-cols-3 items-center p-4">
                                     <div className="font-semibold text-gray-800">{c.apellido}, {c.nombre}</div>
-                                    <div className="text-gray-600">{c.cantidadFacturas}</div>
+                                    <div className="text-gray-600">{c.cantidadComprobantes}</div>
                                     <div className="text-right font-bold text-red-700">{formatCurrency(c.saldo)}</div>
                                 </div>
                             </div>
@@ -77,7 +77,7 @@ export default async function CobrosPage() {
                         <div>Fecha</div>
                         <div>Cliente</div>
                         <div>Forma de Pago</div>
-                        <div>Facturas Imputadas</div>
+                        <div>Comprobantes Imputadas</div>
                         <div className="text-right">Monto</div>
                         <div className="text-right">Acciones</div>
                     </div>
@@ -86,7 +86,7 @@ export default async function CobrosPage() {
                         <div className="p-8 text-center text-gray-500">Todavía no se registraron cobros.</div>
                     ) : (
                         cobros.map((r) => {
-                            const facturasImputadas = r.pagos_parciales.map((p) => p.factura?.num_factura || `#${p.id_factura}`).join(", ");
+                            const comprobantesImputadas = r.pagos_parciales.map((p) => p.comprobante?.num_comprobante || `#${p.id_comprobante}`).join(", ");
                             const medioPago = formatearMediosDePago(r.recibo_medio_pago || [], r.forma_pago);
                             return (
                                 <div key={r.id_recibo} className="border-b hover:bg-gray-50 text-sm">
@@ -100,8 +100,8 @@ export default async function CobrosPage() {
                                             <span>{formatDate(r.fecha_pago)}</span>
                                             <span>{medioPago}</span>
                                         </div>
-                                        {facturasImputadas && (
-                                            <div className="text-gray-500 text-xs mt-1">{facturasImputadas}</div>
+                                        {comprobantesImputadas && (
+                                            <div className="text-gray-500 text-xs mt-1">{comprobantesImputadas}</div>
                                         )}
                                         <div className="flex justify-end gap-4 items-center text-lg opacity-70 mt-3">
                                             <BotonImprimirRecibo idRecibo={r.id_recibo} />
@@ -114,7 +114,7 @@ export default async function CobrosPage() {
                                         <div className="text-gray-900">{formatDate(r.fecha_pago)}</div>
                                         <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
                                         <div className="text-gray-600">{medioPago}</div>
-                                        <div className="text-gray-600 text-xs">{facturasImputadas}</div>
+                                        <div className="text-gray-600 text-xs">{comprobantesImputadas}</div>
                                         <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
                                         <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">
                                             <BotonImprimirRecibo idRecibo={r.id_recibo} />

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import type { insumo } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
-import { ESTADOS_FACTURA } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE } from "@/lib/estadoComprobante";
 import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 export type Movimiento = {
@@ -22,7 +22,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        // 1. Obtener Ingresos (criterio de caja: recibos cobrados en el mes, no facturas emitidas)
+        // 1. Obtener Ingresos (criterio de caja: recibos cobrados en el mes, no comprobantes emitidas)
         const recibos = await prisma.recibo.findMany({
             where: {
                 fecha_pago: {
@@ -33,25 +33,25 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
             include: {
                 cliente: true, retencion: true,
                 pagos_parciales: {
-                    include: { factura: true },
+                    include: { comprobante: true },
                 },
             },
             orderBy: { fecha_pago: 'asc' }
         });
 
         // 2. Total facturado del mes (por fecha de emisión, informativo, no es el ingreso de caja)
-        const facturasDelMes = await prisma.factura.findMany({
+        const comprobantesDelMes = await prisma.comprobante.findMany({
             where: {
                 fecha_emision: {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
-                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+                estado_pago: { notIn: [ESTADOS_COMPROBANTE.ANULADA, ESTADOS_COMPROBANTE.NO_APLICA] },
             },
         });
         let totalFacturadoFiscal = 0;
         let totalFacturadoInterno = 0;
-        for (const f of facturasDelMes) {
+        for (const f of comprobantesDelMes) {
             if (f.fiscal) totalFacturadoFiscal += Number(f.monto_total);
             else totalFacturadoInterno += Number(f.monto_total);
         }
@@ -80,14 +80,14 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
             const monto = Math.max(0, Number(r.monto_total) - sumRetenciones);
             totalIngresos += monto;
             const clienteNombre = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Sin Cliente";
-            const facturasImputadas = r.pagos_parciales
-                .map((p) => p.factura?.num_factura || `#${p.id_factura}`)
+            const comprobantesImputadas = r.pagos_parciales
+                .map((p) => p.comprobante?.num_comprobante || `#${p.id_comprobante}`)
                 .join(", ");
 
             movimientos.push({
                 id: `rec-${r.id_recibo}`,
                 fecha: r.fecha_pago.toISOString(),
-                comprobante: `Recibo #${r.id_recibo} (${facturasImputadas})`,
+                comprobante: `Recibo #${r.id_recibo} (${comprobantesImputadas})`,
                 tipo_comprobante: "Ingreso",
                 entidad: `${clienteNombre}${r.observacion ? ` - ${r.observacion}` : ""}`,
                 monto: monto,
@@ -168,8 +168,8 @@ export async function obtenerDatosDashboard() {
             LIMIT 5
         `;
 
-        // 3. Facturas por Vencer (Impagas o parciales, ordenadas por vencimiento)
-        const facturasPorVencer = await prisma.factura.findMany({
+        // 3. Comprobantes por Vencer (Impagas o parciales, ordenadas por vencimiento)
+        const comprobantesPorVencer = await prisma.comprobante.findMany({
             where: {
                 estado_pago: {
                     in: ["IMPAGA", "PARCIAL"]
@@ -189,7 +189,7 @@ export async function obtenerDatosDashboard() {
         });
 
         // 4. Cuentas por cobrar (total y top clientes con deuda)
-        const facturasConSaldo = await prisma.factura.findMany({
+        const comprobantesConSaldo = await prisma.comprobante.findMany({
             where: {
                 estado_pago: { in: ["IMPAGA", "PARCIAL"] }
             },
@@ -200,7 +200,7 @@ export async function obtenerDatosDashboard() {
 
         const deudaPorCliente = new Map<number, { id_cliente: number; nombre: string; apellido: string; saldo: number }>();
         let totalCuentasPorCobrar = 0;
-        for (const f of facturasConSaldo) {
+        for (const f of comprobantesConSaldo) {
             const saldo = Number(f.saldo_pendiente);
             totalCuentasPorCobrar += saldo;
             const cliente = f.orden_trabajo?.cliente;
@@ -224,7 +224,7 @@ export async function obtenerDatosDashboard() {
         return {
             ordenesEnCurso: serializar(ordenesEnCurso),
             alertasStock: serializar(alertasStock),
-            facturasPorVencer: serializar(facturasPorVencer),
+            comprobantesPorVencer: serializar(comprobantesPorVencer),
             cuentasPorCobrar: {
                 total: totalCuentasPorCobrar,
                 topClientes: topClientesConDeuda,
@@ -235,7 +235,7 @@ export async function obtenerDatosDashboard() {
         return {
             ordenesEnCurso: [],
             alertasStock: [],
-            facturasPorVencer: [],
+            comprobantesPorVencer: [],
             cuentasPorCobrar: { total: 0, topClientes: [] },
         };
     }
@@ -247,26 +247,26 @@ export async function obtenerPosicionIVA(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        // Ventas: facturas emitidas en el mes, excluyendo anuladas y no-facturables.
+        // Ventas: comprobantes emitidas en el mes, excluyendo anuladas y no-facturables.
         // Solo las fiscales (cargadas en ARCA): es el IVA que se declara.
-        const facturas = await prisma.factura.findMany({
+        const comprobantes = await prisma.comprobante.findMany({
             where: {
                 fecha_emision: { gte: fechaInicio, lte: fechaFin },
-                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+                estado_pago: { notIn: [ESTADOS_COMPROBANTE.ANULADA, ESTADOS_COMPROBANTE.NO_APLICA] },
                 fiscal: true,
             },
-            include: { factura_iva: true },
+            include: { comprobante_iva: true },
         });
 
         let netoVentas = 0;
         let ivaVentas = 0;
-        for (const f of facturas) {
+        for (const f of comprobantes) {
             const neto = Number(f.neto ?? 0);
             netoVentas += neto;
-            if (f.factura_iva.length > 0) {
-                ivaVentas += f.factura_iva.reduce((acc, fi) => acc + Number(fi.monto_iva), 0);
+            if (f.comprobante_iva.length > 0) {
+                ivaVentas += f.comprobante_iva.reduce((acc, fi) => acc + Number(fi.monto_iva), 0);
             } else {
-                // Facturas anteriores al IVA por linea: una sola alicuota
+                // Comprobantes anteriores al IVA por linea: una sola alicuota
                 const alicuota = Number(f.alicuota_iva ?? 0);
                 ivaVentas += neto * alicuota / 100;
             }
@@ -328,13 +328,13 @@ export async function obtenerReporteServicios(mes: number, anio: number) {
         const fechaInicio = new Date(anio, mes - 1, 1);
         const fechaFin = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-        const facturas = await prisma.factura.findMany({
+        const comprobantes = await prisma.comprobante.findMany({
             where: {
                 fecha_emision: {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
-                estado_pago: { notIn: [ESTADOS_FACTURA.ANULADA, ESTADOS_FACTURA.NO_APLICA] },
+                estado_pago: { notIn: [ESTADOS_COMPROBANTE.ANULADA, ESTADOS_COMPROBANTE.NO_APLICA] },
                 orden_trabajo: {
                     estado_trabajo: "Finalizado"
                 }
@@ -356,7 +356,7 @@ export async function obtenerReporteServicios(mes: number, anio: number) {
             }
         });
 
-        const ordenes = facturas
+        const ordenes = comprobantes
             .filter((f) => f.orden_trabajo !== null)
             .map((f) => {
                 const orden = f.orden_trabajo!;

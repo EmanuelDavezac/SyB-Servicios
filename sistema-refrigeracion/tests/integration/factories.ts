@@ -68,7 +68,7 @@ interface OrdenFinalizadaOptions {
 
 // Orden de trabajo con estado_trabajo "Finalizado", con al menos un servicio
 // y un insumo cargados (por default, si no se pasan lineas explicitas), lista
-// para pasarle a crearFactura.
+// para pasarle a crearComprobante.
 export async function crearOrdenFinalizada(options: OrdenFinalizadaOptions = {}) {
   const id_cliente = options.id_cliente ?? (await crearCliente()).id_cliente;
 
@@ -108,7 +108,7 @@ export async function crearOrdenFinalizada(options: OrdenFinalizadaOptions = {})
   });
 }
 
-interface FacturaEmitidaOptions {
+interface ComprobanteEmitidoOptions {
   id_orden?: number;
   tipo?: string;
   neto?: number;
@@ -118,23 +118,23 @@ interface FacturaEmitidaOptions {
   estado_pago?: string;
   fecha_vencimiento?: Date;
   fiscal?: boolean;
-  /** IVA discriminado (factura_iva); si no se pasa, la factura queda como las anteriores al IVA por linea */
+  /** IVA discriminado (comprobante_iva); si no se pasa, el comprobante queda como las anteriores al IVA por linea */
   iva?: { alicuota: number; neto_gravado: number; monto_iva: number }[];
 }
 
-// Comprobante ya emitido directo en la base (sin pasar por crearFactura), util
-// para tests que necesitan una factura preexistente sin ejercitar esa action.
-export async function crearFacturaEmitida(overrides: FacturaEmitidaOptions = {}) {
+// Comprobante ya emitido directo en la base (sin pasar por crearComprobante), util
+// para tests que necesitan un comprobante preexistente sin ejercitar esa action.
+export async function crearComprobanteEmitido(overrides: ComprobanteEmitidoOptions = {}) {
   const id_orden = overrides.id_orden ?? (await crearOrdenFinalizada()).id_orden;
   const neto = overrides.neto ?? 1000;
   const alicuota_iva = overrides.alicuota_iva ?? 21;
   const monto_total = overrides.monto_total ?? neto + neto * (alicuota_iva / 100);
 
-  return prisma.factura.create({
+  return prisma.comprobante.create({
     data: {
       id_orden,
       tipo: overrides.tipo ?? "Factura",
-      num_factura: `F-${id_orden}`,
+      num_comprobante: `F-${id_orden}`,
       fecha_emision: new Date(),
       fecha_vencimiento: overrides.fecha_vencimiento ?? null,
       neto,
@@ -143,7 +143,7 @@ export async function crearFacturaEmitida(overrides: FacturaEmitidaOptions = {})
       saldo_pendiente: overrides.saldo_pendiente ?? monto_total,
       estado_pago: overrides.estado_pago ?? "IMPAGA",
       fiscal: overrides.fiscal ?? true,
-      factura_iva: overrides.iva ? { create: overrides.iva } : undefined,
+      comprobante_iva: overrides.iva ? { create: overrides.iva } : undefined,
     },
   });
 }

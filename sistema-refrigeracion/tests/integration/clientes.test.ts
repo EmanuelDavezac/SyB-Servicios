@@ -8,7 +8,7 @@ import {
 } from "@/actions/clientes";
 import { crearOrden } from "@/actions/ordenes";
 import { buscarDestinatarios } from "@/actions/presupuestos";
-import { crearCliente, crearOrdenFinalizada, crearFacturaEmitida } from "./factories";
+import { crearCliente, crearOrdenFinalizada, crearComprobanteEmitido } from "./factories";
 
 function formatCurrency(n: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
@@ -26,10 +26,10 @@ describe("darDeBajaCliente", () => {
     expect(actualizado?.estado).toBe(false);
   });
 
-  it("con factura IMPAGA: rechaza y el mensaje incluye el importe formateado", async () => {
+  it("con comprobante IMPAGA: rechaza y el mensaje incluye el importe formateado", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, estado_pago: "IMPAGA", saldo_pendiente: 125430 });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, estado_pago: "IMPAGA", saldo_pendiente: 125430 });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
 
@@ -41,10 +41,10 @@ describe("darDeBajaCliente", () => {
     expect(actualizado?.estado).toBe(true);
   });
 
-  it("con factura PARCIAL: rechaza", async () => {
+  it("con comprobante PARCIAL: rechaza", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, estado_pago: "PARCIAL", saldo_pendiente: 500 });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, estado_pago: "PARCIAL", saldo_pendiente: 500 });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
 
@@ -75,7 +75,7 @@ describe("darDeBajaCliente", () => {
   it("con deuda y orden en curso a la vez: el mensaje menciona los dos motivos", async () => {
     const cliente = await crearCliente();
     const ordenFacturada = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    await crearFacturaEmitida({ id_orden: ordenFacturada.id_orden, estado_pago: "IMPAGA", saldo_pendiente: 1000 });
+    await crearComprobanteEmitido({ id_orden: ordenFacturada.id_orden, estado_pago: "IMPAGA", saldo_pendiente: 1000 });
     await crearOrdenFinalizada({ id_cliente: cliente.id_cliente, estado_trabajo: "Pendiente" });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
@@ -85,18 +85,18 @@ describe("darDeBajaCliente", () => {
     expect(resultado.error).toContain("orden de trabajo sin cerrar");
   });
 
-  it("facturas ANULADA, PAGADA o NO_APLICA no cuentan como deuda", async () => {
+  it("comprobantes ANULADA, PAGADA o NO_APLICA no cuentan como deuda", async () => {
     const cliente = await crearCliente();
-    // ordenA tiene, ademas de la anulada, una factura vigente (PAGADA): asi
+    // ordenA tiene, ademas de la anulada, un comprobante vigente (PAGADA): asi
     // se prueba que la ANULADA no suma deuda sin confundirse con el otro
-    // motivo de bloqueo (orden Finalizado sin ninguna factura vigente).
+    // motivo de bloqueo (orden Finalizado sin ninguna comprobante vigente).
     const ordenA = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
     const ordenB = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
     const ordenC = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
-    await crearFacturaEmitida({ id_orden: ordenA.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
-    await crearFacturaEmitida({ id_orden: ordenA.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
-    await crearFacturaEmitida({ id_orden: ordenB.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
-    await crearFacturaEmitida({ id_orden: ordenC.id_orden, estado_pago: "NO_APLICA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: ordenA.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: ordenA.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: ordenB.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: ordenC.id_orden, estado_pago: "NO_APLICA", saldo_pendiente: 0 });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
 
@@ -113,20 +113,20 @@ describe("darDeBajaCliente", () => {
     expect(resultado.error).toContain("sin cerrar");
   });
 
-  it("una orden Finalizado CON factura vigente (pagada) no bloquea la baja", async () => {
+  it("una orden Finalizado CON comprobante vigente (pagada) no bloquea la baja", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente, estado_trabajo: "Finalizado" });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, estado_pago: "PAGADA", saldo_pendiente: 0 });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
 
     expect(resultado.success).toBe(true);
   });
 
-  it("una orden Finalizado cuya unica factura esta ANULADA sigue contando como sin facturar: bloquea", async () => {
+  it("una orden Finalizado cuya unica comprobante esta ANULADA sigue contando como sin facturar: bloquea", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente, estado_trabajo: "Finalizado" });
-    await crearFacturaEmitida({ id_orden: orden.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
+    await crearComprobanteEmitido({ id_orden: orden.id_orden, estado_pago: "ANULADA", saldo_pendiente: 0 });
 
     const resultado = await darDeBajaCliente(cliente.id_cliente);
 

@@ -84,7 +84,7 @@ describe("calcularImportes", () => {
         equipoDescripcion: "Heladera vieja",
         facturable: true,
       })
-    ).toThrow("El descuento no puede igualar o superar el subtotal de la factura.");
+    ).toThrow("El descuento no puede igualar o superar el subtotal del comprobante.");
   });
 
   it("descuento por equipo mayor al neto lanza error", () => {
@@ -96,7 +96,7 @@ describe("calcularImportes", () => {
         equipoDescripcion: "Heladera vieja",
         facturable: true,
       })
-    ).toThrow("El descuento no puede igualar o superar el subtotal de la factura.");
+    ).toThrow("El descuento no puede igualar o superar el subtotal del comprobante.");
   });
 
   it("descuento por equipo con importe 0 lanza error", () => {

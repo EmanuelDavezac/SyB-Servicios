@@ -24,7 +24,7 @@ export async function enviarRecordatoriosPendientes(diasAnticipacion: number = 3
 
 export async function obtenerHistorialNotificaciones(filtros?: {
     id_cliente?: number;
-    id_factura?: number;
+    id_comprobante?: number;
     estado?: string;
 }) {
     try {
@@ -32,12 +32,12 @@ export async function obtenerHistorialNotificaciones(filtros?: {
         const notificaciones = await prisma.historial_notificaciones.findMany({
             where: {
                 id_cliente: filtros?.id_cliente,
-                id_factura: filtros?.id_factura,
+                id_comprobante: filtros?.id_comprobante,
                 estado: filtros?.estado,
             },
             include: {
                 cliente: true,
-                factura: true,
+                comprobante: true,
             },
             orderBy: { fecha_creacion: "desc" },
         });

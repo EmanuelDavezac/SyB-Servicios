@@ -3,7 +3,7 @@ import ModalOrden from "@/components/ModalOrden";
 import FiltrosOrdenes from "@/components/FiltrosOrdenes";
 import BotonEliminarOrden from "@/components/BotonEliminarOrden";
 import Link from "next/link";
-import { ESTADOS_FACTURA, esTipoFacturable } from "@/lib/estadoFactura";
+import { ESTADOS_COMPROBANTE, esTipoFacturable } from "@/lib/estadoComprobante";
 import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
 // Colores por estado
@@ -86,9 +86,9 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                             </tr>
                         ) : (
                             ordenes.map((orden) => {
-                                // Factura vigente: bloquea la edición. Los Remitos no cuentan.
-                                const facturaVigente = orden.factura.find(
-                                    (f) => esTipoFacturable(f.tipo) && f.estado_pago !== ESTADOS_FACTURA.ANULADA
+                                // Comprobante vigente: bloquea la edición. Los Remitos no cuentan.
+                                const comprobanteVigente = orden.comprobante.find(
+                                    (f) => esTipoFacturable(f.tipo) && f.estado_pago !== ESTADOS_COMPROBANTE.ANULADA
                                 );
                                 const numeroOrden = String(orden.id_orden).padStart(5, "0");
                                 return (
@@ -121,7 +121,7 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${ESTILOS_ESTADO[orden.estado_trabajo ?? "Pendiente"] ?? "bg-gray-100 text-gray-800"}`}>
                                             {orden.estado_trabajo?.toUpperCase() ?? "PENDIENTE"}
                                         </span>
-                                        {facturaVigente && (
+                                        {comprobanteVigente && (
                                             <span className="ml-1 px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-800">
                                                 FACTURADA
                                             </span>
@@ -131,10 +131,10 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                     {/* Acciones */}
                                     <td className="p-4 text-center">
 
-                                        {facturaVigente ? (
+                                        {comprobanteVigente ? (
                                             <Link
-                                                href="/facturacion"
-                                                title={`Ver en Facturación (factura #${facturaVigente.id_factura})`}
+                                                href="/comprobantes"
+                                                title={`Ver en Comprobantes (comprobante #${comprobanteVigente.id_comprobante})`}
                                                 className="text-blue-600 hover:text-blue-800"
                                             >
                                                 <i className="fas fa-file-invoice" />
@@ -163,8 +163,8 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         {/* Botón Facturar → solo habilitado si la orden está Finalizada */}
                                         {orden.estado_trabajo === "Finalizado" ? (
                                             <Link
-                                                href={`/facturacion?orden=${orden.id_orden}`}
-                                                title="Generar Factura"
+                                                href={`/comprobantes?orden=${orden.id_orden}`}
+                                                title="Generar Comprobante"
                                                 className="text-green-600 hover:text-green-800 font-bold"
                                             >
                                                 <i className="fas fa-file-invoice-dollar" />
@@ -186,8 +186,8 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                             idOrden={orden.id_orden}
                                             numeroOrden={numeroOrden}
                                             motivoDeshabilitado={
-                                                orden.factura.length > 0
-                                                    ? "No se puede eliminar: la orden tiene comprobantes asociados (facturas, remitos o informes, incluso anulados)"
+                                                orden.comprobante.length > 0
+                                                    ? "No se puede eliminar: la orden tiene comprobantes asociados (comprobantes, remitos o informes, incluso anulados)"
                                                     : undefined
                                             }
                                         />

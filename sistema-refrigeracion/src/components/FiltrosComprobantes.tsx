@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { esTipoFacturable } from "@/lib/estadoFactura";
+import { esTipoFacturable } from "@/lib/estadoComprobante";
 
-export default function FiltrosFacturacion() {
+export default function FiltrosComprobantes() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -26,7 +26,7 @@ export default function FiltrosFacturacion() {
     const [conSaldo, setConSaldo] = useState(inicialConSaldo);
     const [fiscal, setFiscal] = useState(inicialFiscal);
 
-    // "Recibo" no es un tipo facturable (ni siquiera es un tipo de `factura`,
+    // "Recibo" no es un tipo facturable (ni siquiera es un tipo de `comprobante`,
     // vive en su propia tabla): el estado de pago no le aplica en ninguno de
     // los dos casos, así que el select de Estado se deshabilita igual.
     const estadoAplica = tipo === "" || esTipoFacturable(tipo);
@@ -49,7 +49,7 @@ export default function FiltrosFacturacion() {
             const newQueryString = params.toString();
 
             if (newQueryString !== searchParams.toString()) {
-                router.push(`/facturacion?${newQueryString}`);
+                router.push(`/comprobantes?${newQueryString}`);
             }
         }, 400);
 
@@ -103,7 +103,7 @@ export default function FiltrosFacturacion() {
                 <select
                     value={fiscal}
                     onChange={(e) => setFiscal(e.target.value)}
-                    title="Facturas cargadas en ARCA o internas"
+                    title="Comprobantes cargadas en ARCA o internas"
                     className="border p-2 rounded w-full md:w-1/5 outline-none focus:border-blue-500"
                 >
                     <option value="">Todas</option>
