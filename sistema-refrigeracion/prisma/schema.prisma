@@ -237,6 +237,9 @@ model recibo {
   // que solo tienen esto y no filas en recibo_medio_pago.
   forma_pago        String?             @db.VarChar(50)
   observacion       String?
+  // Un recibo anulado no se borra: queda con sus imputaciones como registro,
+  // pero deja de contar para saldos de comprobantes, ingresos y retenciones.
+  fecha_anulacion   DateTime?
   pagos_parciales   pagos_parciales[]
   cliente           cliente             @relation(fields: [id_cliente], references: [id_cliente], onUpdate: NoAction)
   retencion         retencion[]

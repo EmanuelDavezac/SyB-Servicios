@@ -20,7 +20,7 @@ Sistema de gestión para un negocio de service de refrigeración (instalación/r
 - `servicio` — catálogo de servicios ofrecidos.
 - `orden_trabajo` — la orden en sí, une cliente + detalle de servicios e insumos.
 - `detalle_orden_servicio` / `detalle_orden_insumo` — líneas de la orden (servicio o insumo usado, cantidad, precio aplicado).
-- `comprobante` — 1 orden puede tener comprobante(s) (antes `factura`; el tipo "Factura" es ahora un valor de `comprobante.tipo`); `pagos_parciales` registra abonos.
+- `comprobante` — 1 orden puede tener comprobante(s) (antes `comprobante`; el tipo "Factura" es ahora un valor de `comprobante.tipo`); `pagos_parciales` registra abonos.
 - `compra_insumo` / `detalle_compra` — compras a proveedores (egresos), poco usado actualmente.
 - `servicio_insumo` — insumos típicamente asociados a un servicio (catálogo/receta, no movimiento de stock).
 - `historial_notificaciones` — log de notificaciones enviadas por comprobante/cliente.

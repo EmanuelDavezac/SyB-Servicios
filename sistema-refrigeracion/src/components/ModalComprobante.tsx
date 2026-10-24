@@ -166,13 +166,14 @@ export default function ModalComprobante({ ordenes, openWithOrdenId }: Props) {
     const netoBrutoNum = importes?.netoBruto ?? 0;
     const descuentoMontoNum = importes?.descuentoMonto ?? 0;
 
-    /* Abrir con orden preseleccionada desde URL */
+    /* Abrir con orden preseleccionada desde URL (solo si está entre las facturables) */
     useEffect(() => {
         if (openWithOrdenId) {
-            setIdOrden(openWithOrdenId);
+            const esFacturable = ordenes.some((o) => String(o.id_orden) === openWithOrdenId);
+            setIdOrden(esFacturable ? openWithOrdenId : "");
             setAbierto(true);
         }
-    }, [openWithOrdenId]);
+    }, [openWithOrdenId, ordenes]);
 
     /* Obtener numero sugerido al abrir o cambiar tipo/fiscal */
     useEffect(() => {

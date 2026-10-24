@@ -7,6 +7,24 @@ import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
 import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoComprobante";
 import { nombreDeServicioYaExiste } from "@/actions/servicios";
+import { ESTADOS_ORDEN } from "@/lib/estadosOrden";
+
+function validarEstadoTrabajo(estado: string): void {
+    if (!ESTADOS_ORDEN.includes(estado)) {
+        throw new Error(`Estado de orden inválido: "${estado}".`);
+    }
+}
+
+// Cantidad > 0 (admite fracciones, ej. 0.5 kg) y precio >= 0 (una linea
+// bonificada puede ir en 0).
+function validarCantidadYPrecio(cantidad: number, precio: number): void {
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new Error("La cantidad debe ser mayor a 0.");
+    }
+    if (!Number.isFinite(precio) || precio < 0) {
+        throw new Error("El precio no puede ser negativo.");
+    }
+}
 
 function validarAlicuota(alicuota: number | undefined): number {
     const valor = alicuota ?? ALICUOTA_IVA_DEFAULT;
@@ -125,6 +143,7 @@ export async function crearOrden(datos: {
 }) {
     try {
         await requerirUsuario();
+        validarEstadoTrabajo(datos.estado_trabajo);
         await asegurarClienteActivo(datos.id_cliente);
         const nuevaOrden = await prisma.orden_trabajo.create({
             data: {
@@ -151,6 +170,7 @@ export async function editarOrden(id_orden: number, datos: {
 }) {
     try {
         await requerirUsuario();
+        validarEstadoTrabajo(datos.estado_trabajo);
         await asegurarOrdenEditable(id_orden);
         // Una orden ya asignada a un cliente que despues se dio de baja se
         // sigue pudiendo editar (notas, estado_trabajo): no se revalida el
@@ -233,6 +253,7 @@ export async function agregarServicioAOrden(datos: {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
         await asegurarServicioActivo(datos.id_servicio);
+        validarCantidadYPrecio(datos.cantidad, datos.precio_acordado);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
@@ -262,6 +283,7 @@ export async function agregarServicioLibreAOrden(datos: {
     try {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
+        validarCantidadYPrecio(datos.cantidad, datos.precio_acordado);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_servicio.create({
             data: {
@@ -293,6 +315,7 @@ export async function crearServicioYAgregarAOrden(datos: {
     try {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
+        validarCantidadYPrecio(datos.cantidad, datos.precio);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         const nombre = datos.nombre.trim();
         if (await nombreDeServicioYaExiste(nombre)) {
@@ -398,6 +421,7 @@ export async function agregarInsumoAOrden(datos: {
         await requerirUsuario();
         await asegurarOrdenEditable(datos.id_orden);
         await asegurarInsumoActivo(datos.id_insumo);
+        validarCantidadYPrecio(datos.cantidad, datos.precio_aplicado);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
         await prisma.detalle_orden_insumo.create({
             data: {

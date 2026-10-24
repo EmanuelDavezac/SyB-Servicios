@@ -29,6 +29,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
+                fecha_anulacion: null,
             },
             include: {
                 cliente: true, retencion: true,
@@ -294,7 +295,7 @@ export async function obtenerPosicionIVA(mes: number, anio: number) {
         const retenciones = await prisma.retencion.findMany({
             where: {
                 direccion: "SUFRIDA",
-                recibo: { fecha_pago: { gte: fechaInicio, lte: fechaFin } },
+                recibo: { fecha_pago: { gte: fechaInicio, lte: fechaFin }, fecha_anulacion: null },
             },
         });
         const porTipo = new Map<string, number>();

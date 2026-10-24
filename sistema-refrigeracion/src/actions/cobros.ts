@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { ESTADOS_COMPROBANTE, TOLERANCIA_MONTO, calcularEstado, esTipoFacturable } from "@/lib/estadoComprobante";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { requerirUsuario } from "@/lib/sesion";
-import { fechaActualArgentina } from "@/lib/fechas";
+import { diasHastaFecha, fechaActualArgentina } from "@/lib/fechas";
 import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 
 type Tx = Prisma.TransactionClient;
@@ -15,8 +15,10 @@ async function recalcularComprobante(tx: Tx, id_comprobante: number) {
   const comprobante = await tx.comprobante.findUnique({ where: { id_comprobante } });
   if (!comprobante || comprobante.estado_pago === ESTADOS_COMPROBANTE.ANULADA || comprobante.estado_pago === ESTADOS_COMPROBANTE.NO_APLICA) return;
 
+  // Las imputaciones de un recibo anulado se conservan como registro pero
+  // no cuentan como pagado.
   const agregado = await tx.pagos_parciales.aggregate({
-    where: { id_comprobante },
+    where: { id_comprobante, recibo: { fecha_anulacion: null } },
     _sum: { monto_pagado: true },
   });
   const pagado = Number(agregado._sum.monto_pagado ?? 0);
@@ -52,6 +54,9 @@ export async function registrarCobro(data: {
     if (!data.imputaciones || data.imputaciones.length === 0) {
       return { success: false, error: "Agregá al menos una imputación a un comprobante." };
     }
+    if (data.fecha_pago && diasHastaFecha(data.fecha_pago) > 0) {
+      return { success: false, error: "La fecha de pago no puede ser posterior a hoy." };
+    }
     if (data.imputaciones.some((i) => i.monto <= 0)) {
       return { success: false, error: "Los montos imputados deben ser mayores a cero." };
     }
@@ -74,14 +79,30 @@ export async function registrarCobro(data: {
       }
     }
 
+    // La mismo comprobante repetida en varias imputaciones se valida contra su
+    // saldo por el total, no linea por linea (700 + 700 sobre un saldo de
+    // 1000 pasaba cada chequeo por separado).
+    const imputadoPorComprobante = new Map<number, number>();
+    for (const imp of data.imputaciones) {
+      imputadoPorComprobante.set(imp.id_comprobante, (imputadoPorComprobante.get(imp.id_comprobante) ?? 0) + imp.monto);
+    }
+    const idsComprobante = [...imputadoPorComprobante.keys()].sort((a, b) => a - b);
+
     const nuevoRecibo = await prisma.$transaction(async (tx) => {
-      const idsComprobante = data.imputaciones.map((i) => i.id_comprobante);
+      // Bloquea los comprobantes imputadas hasta el commit: dos cobros
+      // simultaneos sobre el mismo saldo leian los dos el saldo viejo y se
+      // cobraba dos veces. El segundo ahora espera y lee el saldo ya
+      // actualizado. Orden por id para que dos cobros con varias comprobantes
+      // en comun no se bloqueen mutuamente.
+      await tx.$queryRaw`SELECT id_comprobante FROM comprobante WHERE id_comprobante IN (${Prisma.join(idsComprobante)}) ORDER BY id_comprobante FOR UPDATE`;
+
       const comprobantes = await tx.comprobante.findMany({
         where: { id_comprobante: { in: idsComprobante } },
         include: { orden_trabajo: true },
       });
 
-      for (const imp of data.imputaciones) {
+      for (const [id_comprobante, monto] of imputadoPorComprobante) {
+        const imp = { id_comprobante, monto };
         const comprobante = comprobantes.find((f) => f.id_comprobante === imp.id_comprobante);
         if (!comprobante) {
           throw new Error(`Comprobante #${imp.id_comprobante} no encontrada`);
@@ -157,12 +178,18 @@ export async function anularCobro(id_recibo: number) {
   try {
     await requerirUsuario();
     await prisma.$transaction(async (tx) => {
-      const pagos = await tx.pagos_parciales.findMany({ where: { id_recibo } });
-      if (pagos.length === 0) {
-        throw new Error("El recibo no existe o no tiene imputaciones");
+      const recibo = await tx.recibo.findUnique({ where: { id_recibo }, include: { pagos_parciales: true } });
+      if (!recibo) {
+        throw new Error("El recibo no existe");
       }
+      if (recibo.fecha_anulacion) {
+        throw new Error("El recibo ya está anulado");
+      }
+      const pagos = recibo.pagos_parciales;
 
-      await tx.recibo.delete({ where: { id_recibo } });
+      // El recibo y sus imputaciones quedan como registro; recalcularComprobante
+      // ya no suma las imputaciones de un recibo anulado.
+      await tx.recibo.update({ where: { id_recibo }, data: { fecha_anulacion: new Date() } });
 
       const idsComprobante = [...new Set(pagos.map((p) => p.id_comprobante))];
       for (const id_comprobante of idsComprobante) {
@@ -192,7 +219,7 @@ export async function anularComprobante(id_comprobante: number) {
         throw new Error("El comprobante ya está anulada");
       }
 
-      const tienePagos = await tx.pagos_parciales.count({ where: { id_comprobante } });
+      const tienePagos = await tx.pagos_parciales.count({ where: { id_comprobante, recibo: { fecha_anulacion: null } } });
       if (tienePagos > 0) {
         throw new Error("No se puede anular un comprobante que ya tiene cobros registrados");
       }
@@ -364,6 +391,7 @@ export async function obtenerRetencionesDelMes(mes: number, anio: number) {
         direccion: "SUFRIDA",
         recibo: {
           fecha_pago: { gte: fechaInicio, lte: fechaFin },
+          fecha_anulacion: null,
         },
       },
     });

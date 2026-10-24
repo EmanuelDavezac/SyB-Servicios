@@ -114,12 +114,19 @@ export async function eliminarCompra(id_compra: number) {
         await prisma.$transaction(async (tx) => {
             const detalles = await tx.detalle_compra.findMany({ where: { id_compra } });
 
+            // Si parte de lo comprado ya se facturo, devolverlo dejaria el stock
+            // en negativo: se rechaza (mismo criterio que crearComprobante).
             for (const d of detalles) {
                 if (d.id_insumo) {
-                    await tx.insumo.update({
+                    const insumo = await tx.insumo.update({
                         where: { id_insumo: d.id_insumo },
                         data: { stock_actual: { decrement: d.cantidad } },
                     });
+                    if (Number(insumo.stock_actual) < 0) {
+                        throw new Error(
+                            `No se puede eliminar la compra: parte del stock de "${insumo.nombre}" ya se usó y quedaría en negativo.`
+                        );
+                    }
                 }
             }
 
@@ -133,6 +140,6 @@ export async function eliminarCompra(id_compra: number) {
         return { success: true };
     } catch (error) {
         console.error("Error eliminando compra:", error);
-        return { success: false, error: "No se pudo eliminar la compra" };
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo eliminar la compra" };
     }
 }

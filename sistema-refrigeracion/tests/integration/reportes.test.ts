@@ -6,7 +6,7 @@ import {
   obtenerDatosDashboard,
   obtenerReporteServicios,
 } from "@/actions/reportes";
-import { registrarCobro } from "@/actions/cobros";
+import { registrarCobro, anularCobro } from "@/actions/cobros";
 import { crearCompra } from "@/actions/compras";
 import { crearComprobante } from "@/actions/comprobantes";
 import { crearCliente, crearOrdenFinalizada, crearComprobanteEmitido, crearInsumo, crearProveedor } from "./factories";
@@ -45,28 +45,42 @@ describe("obtenerReporteMensual", () => {
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
     const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
 
-    const finDeMes = new Date(ANIO, MES - 1, 28, 12, 0, 0);
-    const mesSiguiente = new Date(ANIO, MES, 5, 12, 0, 0);
+    // Meses ya pasados: registrarCobro rechaza fechas de pago futuras.
+    const finDeMesAnterior = new Date(ANIO, MES - 3, 28, 12, 0, 0);
+    const mesAnterior = new Date(ANIO, MES - 2, 5, 12, 0, 0);
 
     await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 400 }],
-      fecha_pago: finDeMes,
+      fecha_pago: finDeMesAnterior,
     });
     await registrarCobro({
       id_cliente: cliente.id_cliente,
       imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 600 }],
-      fecha_pago: mesSiguiente,
+      fecha_pago: mesAnterior,
     });
 
-    const anioSiguiente = MES === 12 ? ANIO + 1 : ANIO;
-    const mesSiguienteNum = MES === 12 ? 1 : MES + 1;
+    const reportePrimerMes = await obtenerReporteMensual(finDeMesAnterior.getMonth() + 1, finDeMesAnterior.getFullYear());
+    const reporteSegundoMes = await obtenerReporteMensual(mesAnterior.getMonth() + 1, mesAnterior.getFullYear());
 
-    const reporteMesActual = await obtenerReporteMensual(MES, ANIO);
-    const reporteMesSiguiente = await obtenerReporteMensual(mesSiguienteNum, anioSiguiente);
+    expect(reportePrimerMes.totalIngresos).toBe(400);
+    expect(reporteSegundoMes.totalIngresos).toBe(600);
+  });
 
-    expect(reporteMesActual.totalIngresos).toBe(400);
-    expect(reporteMesSiguiente.totalIngresos).toBe(600);
+  it("un cobro anulado no cuenta como ingreso", async () => {
+    const cliente = await crearCliente();
+    const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
+    const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
+
+    const cobro = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 300 }],
+    });
+    if (!cobro.success) throw new Error(cobro.error);
+    await anularCobro(cobro.recibo.id_recibo);
+
+    const reporte = await obtenerReporteMensual(MES, ANIO);
+    expect(reporte.totalIngresos).toBe(0);
   });
 
   it("los egresos son las compras del mes", async () => {

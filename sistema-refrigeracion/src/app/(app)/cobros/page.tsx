@@ -13,6 +13,10 @@ function formatDate(date: string | Date | null) {
     return new Date(date).toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
+function EtiquetaAnulado() {
+    return <span className="text-xs font-semibold text-red-600 uppercase">Anulado</span>;
+}
+
 export default async function CobrosPage() {
     const [clientesConDeuda, cobros] = await Promise.all([
         obtenerClientesConDeuda(),
@@ -88,13 +92,14 @@ export default async function CobrosPage() {
                         cobros.map((r) => {
                             const comprobantesImputadas = r.pagos_parciales.map((p) => p.comprobante?.num_comprobante || `#${p.id_comprobante}`).join(", ");
                             const medioPago = formatearMediosDePago(r.recibo_medio_pago || [], r.forma_pago);
+                            const anulado = !!r.fecha_anulacion;
                             return (
                                 <div key={r.id_recibo} className="border-b hover:bg-gray-50 text-sm">
                                     {/* Tarjeta móvil */}
                                     <div className="p-4 md:hidden">
                                         <div className="flex justify-between items-start gap-2">
                                             <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
-                                            <div className="font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
+                                            <div className={anulado ? "font-bold text-gray-400 line-through" : "font-bold text-green-700"}>{formatCurrency(Number(r.monto_total))}</div>
                                         </div>
                                         <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
                                             <span>{formatDate(r.fecha_pago)}</span>
@@ -105,7 +110,7 @@ export default async function CobrosPage() {
                                         )}
                                         <div className="flex justify-end gap-4 items-center text-lg opacity-70 mt-3">
                                             <BotonImprimirRecibo idRecibo={r.id_recibo} />
-                                            <BotonAnularCobro idRecibo={r.id_recibo} />
+                                            {anulado ? <EtiquetaAnulado /> : <BotonAnularCobro idRecibo={r.id_recibo} />}
                                         </div>
                                     </div>
 
@@ -115,10 +120,10 @@ export default async function CobrosPage() {
                                         <div className="text-gray-600">{r.cliente?.apellido}, {r.cliente?.nombre}</div>
                                         <div className="text-gray-600">{medioPago}</div>
                                         <div className="text-gray-600 text-xs">{comprobantesImputadas}</div>
-                                        <div className="text-right font-bold text-green-700">{formatCurrency(Number(r.monto_total))}</div>
+                                        <div className={anulado ? "text-right font-bold text-gray-400 line-through" : "text-right font-bold text-green-700"}>{formatCurrency(Number(r.monto_total))}</div>
                                         <div className="text-right flex justify-end gap-3 items-center text-lg opacity-70">
                                             <BotonImprimirRecibo idRecibo={r.id_recibo} />
-                                            <BotonAnularCobro idRecibo={r.id_recibo} />
+                                            {anulado ? <EtiquetaAnulado /> : <BotonAnularCobro idRecibo={r.id_recibo} />}
                                         </div>
                                     </div>
                                 </div>
