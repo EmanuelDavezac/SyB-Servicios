@@ -43,8 +43,16 @@ describe("GET /api/cron/recordatorios", () => {
     expect(procesarRecordatoriosMock).not.toHaveBeenCalled();
   });
 
-  it("procesa (3D y 0D) con el secreto correcto por query param", async () => {
+  it("rechaza el secreto por query param", async () => {
     const res = await GET(new NextRequest(`${URL}?secret=el-secreto`));
+    expect(res.status).toBe(401);
+    expect(procesarRecordatoriosMock).not.toHaveBeenCalled();
+  });
+
+  it("procesa (3D y 0D) con el secreto correcto", async () => {
+    const res = await GET(
+      new NextRequest(URL, { headers: { authorization: "Bearer el-secreto" } })
+    );
     expect(res.status).toBe(200);
     expect(procesarRecordatoriosMock).toHaveBeenCalledTimes(2);
     expect(procesarRecordatoriosMock).toHaveBeenCalledWith(3);

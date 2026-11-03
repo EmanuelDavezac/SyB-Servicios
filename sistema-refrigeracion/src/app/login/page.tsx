@@ -9,11 +9,11 @@ const MENSAJES_ERROR: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; error_description?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const { error, error_description } = await searchParams;
+  const { error } = await searchParams;
   const mensaje = error
-    ? (error_description || MENSAJES_ERROR[error] || "No se pudo iniciar sesión. Intentá de nuevo.")
+    ? (MENSAJES_ERROR[error] || "No se pudo iniciar sesión. Intentá de nuevo.")
     : null;
 
   return (

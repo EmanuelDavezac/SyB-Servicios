@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
 import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
 import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoComprobante";
-import { nombreDeServicioYaExiste } from "@/actions/servicios";
+import { nombreDeServicioYaExiste } from "@/lib/servicios";
 import { ESTADOS_ORDEN } from "@/lib/estadosOrden";
 
 function validarEstadoTrabajo(estado: string): void {

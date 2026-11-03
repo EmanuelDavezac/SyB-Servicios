@@ -1,5 +1,13 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { procesarRecordatorios } from "@/lib/recordatorios";
+
+// Solo por header: un secreto en el query string queda en los logs de acceso.
+function secretosIguales(a: string, b: string) {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 export async function GET(request: NextRequest) {
     const secretEsperado = process.env.CRON_SECRET;
@@ -8,11 +16,9 @@ export async function GET(request: NextRequest) {
     }
 
     const authHeader = request.headers.get("authorization");
-    const secretHeader = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    const secretQuery = request.nextUrl.searchParams.get("secret");
-    const provisto = secretHeader ?? secretQuery;
+    const provisto = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-    if (provisto !== secretEsperado) {
+    if (!provisto || !secretosIguales(provisto, secretEsperado)) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 

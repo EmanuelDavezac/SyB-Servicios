@@ -123,6 +123,9 @@ export async function crearComprobante(data: {
     }
 
     for (const item of data.insumos ?? []) {
+      if (!Number.isFinite(item.cantidad) || item.cantidad <= 0) {
+        throw new Error("La cantidad de cada insumo debe ser mayor a 0.");
+      }
       if (item.alicuota_iva !== undefined && !alicuotaValida(item.alicuota_iva)) {
         throw new Error("La alícuota de IVA debe estar entre 0 y 100.");
       }

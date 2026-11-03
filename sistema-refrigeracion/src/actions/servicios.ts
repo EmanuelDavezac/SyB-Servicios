@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { serializar } from "@/lib/serializar";
 import { revalidatePath } from "next/cache";
 import { requerirUsuario } from "@/lib/sesion";
+import { nombreDeServicioYaExiste } from "@/lib/servicios";
 import { formatearListaConLimite } from "@/lib/formato";
 import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
@@ -59,19 +60,6 @@ export async function obtenerServicios(opciones?: {
         console.error("Error al obtener servicios:", error);
         return [];
     }
-}
-
-// Exportado: lo usa tambien crearServicioYAgregarAOrden (ordenes.ts), el otro
-// lugar donde se puede dar de alta un servicio nuevo en el catalogo.
-export async function nombreDeServicioYaExiste(nombre: string, idExcluir?: number) {
-    const existente = await prisma.servicio.findFirst({
-        where: {
-            nombre: { equals: nombre, mode: "insensitive" },
-            ...(idExcluir ? { id_servicio: { not: idExcluir } } : {}),
-        },
-        select: { id_servicio: true },
-    });
-    return !!existente;
 }
 
 export async function crearServicio(datos: {

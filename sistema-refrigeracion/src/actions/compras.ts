@@ -37,7 +37,7 @@ export async function crearCompra(data: {
         if (!data.insumos || data.insumos.length === 0) {
             return { success: false, error: "Agregá al menos un insumo a la compra." };
         }
-        if (data.insumos.some((i) => i.cantidad <= 0 || i.precio_unitario <= 0)) {
+        if (data.insumos.some((i) => !Number.isFinite(i.cantidad) || !Number.isFinite(i.precio_unitario) || i.cantidad <= 0 || i.precio_unitario <= 0)) {
             return { success: false, error: "Las cantidades y precios deben ser mayores a cero." };
         }
 
@@ -61,6 +61,10 @@ export async function crearCompra(data: {
             const nombres = insumosInactivos.map((i) => i.nombre);
             const verbo = insumosInactivos.length === 1 ? "está dado de baja" : "están dados de baja";
             return { success: false, error: `No se puede comprar: ${formatearListaConLimite(nombres)} ${verbo}.` };
+        }
+
+        if (data.alicuota_iva !== undefined && (!Number.isFinite(data.alicuota_iva) || data.alicuota_iva < 0 || data.alicuota_iva > 100)) {
+            return { success: false, error: "La alícuota de IVA debe estar entre 0 y 100." };
         }
 
         const neto = data.insumos.reduce((acc, i) => acc + i.cantidad * i.precio_unitario, 0);

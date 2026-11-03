@@ -57,13 +57,13 @@ export async function registrarCobro(data: {
     if (data.fecha_pago && diasHastaFecha(data.fecha_pago) > 0) {
       return { success: false, error: "La fecha de pago no puede ser posterior a hoy." };
     }
-    if (data.imputaciones.some((i) => i.monto <= 0)) {
+    if (data.imputaciones.some((i) => !Number.isFinite(i.monto) || i.monto <= 0)) {
       return { success: false, error: "Los montos imputados deben ser mayores a cero." };
     }
-    if (data.retenciones?.some((r) => r.monto <= 0)) {
+    if (data.retenciones?.some((r) => !Number.isFinite(r.monto) || r.monto <= 0)) {
       return { success: false, error: "Los montos de retención deben ser mayores a cero." };
     }
-    if (data.formasPago?.some((f) => f.monto <= 0)) {
+    if (data.formasPago?.some((f) => !Number.isFinite(f.monto) || f.monto <= 0)) {
       return { success: false, error: "Los montos por medio de pago deben ser mayores a cero." };
     }
     if (data.formasPago && data.formasPago.length > 0) {

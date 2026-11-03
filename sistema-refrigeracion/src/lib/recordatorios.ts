@@ -87,6 +87,15 @@ function formatDate(d: Date) {
     return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
 }
 
+function escaparHtml(s: string) {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function esperar(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -259,8 +268,8 @@ export async function procesarRecordatorios(
             intentoInicial,
             asunto: `Recordatorio de vencimiento - ${numComprobante}`,
             html: `
-                <p>Hola ${nombreCliente},</p>
-                <p>Te recordamos que el comprobante <strong>${numComprobante}</strong> vence ${vencimientoTexto}.</p>
+                <p>Hola ${escaparHtml(nombreCliente)},</p>
+                <p>Te recordamos que el comprobante <strong>${escaparHtml(numComprobante)}</strong> vence ${vencimientoTexto}.</p>
                 <p>Saldo adeudado: <strong>${formatCurrency(saldo)}</strong></p>
                 <p>Gracias.</p>
             `,
