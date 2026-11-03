@@ -24,10 +24,10 @@ const anio = hoy.getFullYear();
 describe("Flujo completo de negocio via actions", () => {
   it("proveedor -> insumo -> compra -> servicio -> cliente -> presupuesto -> orden -> remito -> comprobante -> cobro -> reportes", async () => {
     // Proveedor (alta, modificacion, listado)
-    const prov = await crearProveedor({ razon_social: "Frio SA", cuit: "30-11111111-1", email: "frio@sa.com" });
+    const prov = await crearProveedor({ razon_social: "Frio SA", cuit: "30111111118", email: "frio@sa.com" });
     expect(prov.success).toBe(true);
     const [p] = await obtenerProveedores();
-    expect((await editarProveedor(p.id_proveedor, { razon_social: "Frio SA (editado)", cuit: "30-11111111-1" })).success).toBe(true);
+    expect((await editarProveedor(p.id_proveedor, { razon_social: "Frio SA (editado)", cuit: "30111111118" })).success).toBe(true);
 
     // Insumo con fracciones
     const ins = await crearInsumo({ nombre: "Gas R22", descripcion: "kg", id_proveedor: p.id_proveedor, stock_actual: 2, stock_minimo: 1, precio_costo: 5000, precio_venta: 10000 });
@@ -48,10 +48,10 @@ describe("Flujo completo de negocio via actions", () => {
     expect((await editarServicio(idServicio, { nombre: "Carga de gas R22", precio: 22000 })).success).toBe(true);
 
     // Cliente
-    const cli = await crearCliente({ nombre: "Ana", apellido: "Gomez", cuit: "27-22222222-2", email: "ana@x.com", condicion_pago_dias: 15 });
+    const cli = await crearCliente({ nombre: "Ana", apellido: "Gomez", cuit: "27222222228", email: "ana@x.com", condicion_pago_dias: 15 });
     expect(cli.success).toBe(true);
     const idCliente = cli.cliente!.id_cliente;
-    expect((await actualizarCliente(idCliente, { nombre: "Ana Maria", apellido: "Gomez", cuit: "27-22222222-2", email: "ana@x.com" })).success).toBe(true);
+    expect((await actualizarCliente(idCliente, { nombre: "Ana Maria", apellido: "Gomez", cuit: "27222222228", email: "ana@x.com" })).success).toBe(true);
     expect((await obtenerClientes({ nombre: "maria" })).length).toBe(1);
 
     // Presupuesto -> aceptado -> vinculo cliente -> orden

@@ -688,3 +688,48 @@ describe("crearComprobante - validaciones de orden y numero", () => {
     expect(r.filter((x) => x.success).length).toBe(1);
   });
 });
+
+describe("crearComprobante - cantidad de insumos adicionales invalida", () => {
+  it.each([
+    ["negativa", -2],
+    ["cero", 0],
+    ["NaN", NaN],
+    ["Infinity", Infinity],
+  ])("cantidad %s falla, no toca stock y no crea comprobante ni linea", async (_nombre, cantidad) => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearComprobante({
+      id_orden: orden.id_orden,
+      num_comprobante: "F-1",
+      tipo: "Factura",
+      fiscal: true,
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad }],
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error).toContain("mayor a 0");
+
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(10);
+    expect(await prisma.comprobante.count({ where: { id_orden: orden.id_orden } })).toBe(0);
+    expect(await prisma.detalle_orden_insumo.count({ where: { id_orden: orden.id_orden } })).toBe(0);
+  });
+
+  it("tambien se rechaza en un Remito (no facturable), que registraria la linea igual", async () => {
+    const insumo = await crearInsumo({ stock_actual: 10 });
+    const orden = await crearOrdenFinalizada({ insumos: [] });
+
+    const resultado = await crearComprobante({
+      id_orden: orden.id_orden,
+      num_comprobante: "R-1",
+      tipo: "Remito",
+      fiscal: true,
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad: -5 }],
+    });
+
+    expect(resultado.success).toBe(false);
+    expect(await prisma.detalle_orden_insumo.count({ where: { id_orden: orden.id_orden } })).toBe(0);
+  });
+});

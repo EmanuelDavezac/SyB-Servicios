@@ -405,28 +405,28 @@ describe("crearInsumo / actualizarInsumo - insumo duplicado (CU12)", () => {
 
 describe("crearProveedor / editarProveedor - CUIT duplicado con mensaje claro (CU31)", () => {
   it("crearProveedor rechaza un CUIT ya usado, sin exponer el error generico de la base", async () => {
-    await crearProveedor({ cuit: "30712345678" });
+    await crearProveedor({ cuit: "30712345671" });
 
-    const resultado = await crearProveedorAction({ razon_social: "Otro Proveedor SRL", cuit: "30712345678" });
+    const resultado = await crearProveedorAction({ razon_social: "Otro Proveedor SRL", cuit: "30712345671" });
 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toBe("Ya existe un proveedor con ese CUIT");
   });
 
   it("editarProveedor rechaza cambiar el CUIT a uno que ya tiene otro proveedor", async () => {
-    await crearProveedor({ cuit: "30712345678" });
-    const otro = await crearProveedor({ cuit: "30787654321" });
+    await crearProveedor({ cuit: "30712345671" });
+    const otro = await crearProveedor({ cuit: "30787654327" });
 
-    const resultado = await editarProveedor(otro.id_proveedor, { razon_social: "Proveedor SRL", cuit: "30712345678" });
+    const resultado = await editarProveedor(otro.id_proveedor, { razon_social: "Proveedor SRL", cuit: "30712345671" });
 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toBe("Ya existe un proveedor con ese CUIT");
   });
 
   it("editarProveedor permite guardar el proveedor sin cambiar su propio CUIT", async () => {
-    const proveedor = await crearProveedor({ cuit: "30712345678" });
+    const proveedor = await crearProveedor({ cuit: "30712345671" });
 
-    const resultado = await editarProveedor(proveedor.id_proveedor, { razon_social: "Nueva Razon Social", cuit: "30712345678" });
+    const resultado = await editarProveedor(proveedor.id_proveedor, { razon_social: "Nueva Razon Social", cuit: "30712345671" });
 
     expect(resultado.success).toBe(true);
   });
@@ -536,8 +536,8 @@ describe("obtenerProveedores - filtros (CU33)", () => {
   });
 
   it("filtra por CUIT", async () => {
-    await crearProveedor({ razon_social: "Uno", cuit: "30712345678" });
-    await crearProveedor({ razon_social: "Dos", cuit: "30798765432" });
+    await crearProveedor({ razon_social: "Uno", cuit: "30712345671" });
+    await crearProveedor({ razon_social: "Dos", cuit: "30798765430" });
 
     const resultado = await obtenerProveedores({ cuit: "712345" });
 

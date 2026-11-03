@@ -198,31 +198,31 @@ describe("buscarDestinatarios", () => {
 
 describe("crearCliente / actualizarCliente - DNI/CUIT duplicado (CU04)", () => {
   it("crearCliente rechaza un CUIT ya usado", async () => {
-    await crearCliente({ cuit: "20-12345678-9" });
+    await crearCliente({ cuit: "20123456786" });
 
-    const resultado = await crearClienteAction({ nombre: "Pedro", apellido: "Gomez", cuit: "20-12345678-9" });
+    const resultado = await crearClienteAction({ nombre: "Pedro", apellido: "Gomez", cuit: "20123456786" });
 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toBe("Ya existe un cliente con ese DNI/CUIT");
   });
 
   it("actualizarCliente rechaza cambiar el CUIT a uno que ya tiene otro cliente", async () => {
-    await crearCliente({ cuit: "20-12345678-9" });
-    const otro = await crearCliente({ nombre: "Pedro", apellido: "Gomez", cuit: "20-98765432-1" });
+    await crearCliente({ cuit: "20123456786" });
+    const otro = await crearCliente({ nombre: "Pedro", apellido: "Gomez", cuit: "20987654326" });
 
-    const resultado = await actualizarCliente(otro.id_cliente, { nombre: "Pedro", apellido: "Gomez", cuit: "20-12345678-9" });
+    const resultado = await actualizarCliente(otro.id_cliente, { nombre: "Pedro", apellido: "Gomez", cuit: "20123456786" });
 
     expect(resultado.success).toBe(false);
     expect(resultado.error).toBe("Ya existe un cliente con ese DNI/CUIT");
   });
 
   it("actualizarCliente permite guardar el cliente sin cambiar su propio CUIT", async () => {
-    const cliente = await crearCliente({ cuit: "20-12345678-9" });
+    const cliente = await crearCliente({ cuit: "20123456786" });
 
     const resultado = await actualizarCliente(cliente.id_cliente, {
       nombre: cliente.nombre,
       apellido: "Apellido Nuevo",
-      cuit: "20-12345678-9",
+      cuit: "20123456786",
     });
 
     expect(resultado.success).toBe(true);

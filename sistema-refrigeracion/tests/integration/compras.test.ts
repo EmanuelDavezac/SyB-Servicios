@@ -105,3 +105,45 @@ describe("eliminarCompra", () => {
     expect(Number(trasEliminar?.stock_actual)).toBe(5);
   });
 });
+
+describe("crearCompra - valores numericos invalidos", () => {
+  it.each([
+    ["cantidad negativa", { cantidad: -3, precio_unitario: 100 }],
+    ["cantidad NaN", { cantidad: NaN, precio_unitario: 100 }],
+    ["cantidad Infinity", { cantidad: Infinity, precio_unitario: 100 }],
+    ["precio negativo", { cantidad: 3, precio_unitario: -100 }],
+    ["precio NaN", { cantidad: 3, precio_unitario: NaN }],
+    ["precio Infinity", { cantidad: 3, precio_unitario: Infinity }],
+  ])("%s falla y no toca stock ni crea la compra", async (_nombre, linea) => {
+    const insumo = await crearInsumo({ stock_actual: 5 });
+
+    const resultado = await crearCompra({
+      alicuota_iva: 21,
+      insumos: [{ id_insumo: insumo.id_insumo, ...linea }],
+    });
+
+    expect(resultado.success).toBe(false);
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(5);
+    expect(await prisma.compra_insumo.count()).toBe(0);
+  });
+
+  it.each([
+    ["alicuota NaN", NaN],
+    ["alicuota Infinity", Infinity],
+    ["alicuota negativa", -1],
+    ["alicuota mayor a 100", 101],
+  ])("%s falla y no toca stock ni crea la compra", async (_nombre, alicuota_iva) => {
+    const insumo = await crearInsumo({ stock_actual: 5 });
+
+    const resultado = await crearCompra({
+      alicuota_iva,
+      insumos: [{ id_insumo: insumo.id_insumo, cantidad: 3, precio_unitario: 100 }],
+    });
+
+    expect(resultado.success).toBe(false);
+    const insumoFinal = await prisma.insumo.findUnique({ where: { id_insumo: insumo.id_insumo } });
+    expect(Number(insumoFinal?.stock_actual)).toBe(5);
+    expect(await prisma.compra_insumo.count()).toBe(0);
+  });
+});

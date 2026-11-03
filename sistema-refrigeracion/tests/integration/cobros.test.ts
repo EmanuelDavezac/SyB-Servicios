@@ -556,3 +556,68 @@ describe("registrarCobro - cobros simultaneos", () => {
     expect(await prisma.recibo.count()).toBe(1);
   });
 });
+
+describe("registrarCobro - montos invalidos", () => {
+  async function escenario() {
+    const cliente = await crearCliente();
+    const comprobante = await comprobanteDeCliente(cliente.id_cliente, { monto_total: 1000, saldo_pendiente: 1000 });
+    return { cliente, comprobante };
+  }
+
+  async function verificarSinEfectos(id_comprobante: number) {
+    expect(await prisma.recibo.count()).toBe(0);
+    const comprobanteFinal = await prisma.comprobante.findUnique({ where: { id_comprobante } });
+    expect(Number(comprobanteFinal?.saldo_pendiente)).toBe(1000);
+    expect(comprobanteFinal?.estado_pago).toBe("IMPAGA");
+  }
+
+  it.each([
+    ["negativo", -100],
+    ["NaN", NaN],
+    ["Infinity", Infinity],
+  ])("imputacion con monto %s falla y no registra el cobro", async (_nombre, monto) => {
+    const { cliente, comprobante } = await escenario();
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto }],
+    });
+
+    expect(resultado.success).toBe(false);
+    await verificarSinEfectos(comprobante.id_comprobante);
+  });
+
+  it.each([
+    ["negativo", -50],
+    ["NaN", NaN],
+    ["Infinity", Infinity],
+  ])("retencion con monto %s falla y no registra el cobro", async (_nombre, monto) => {
+    const { cliente, comprobante } = await escenario();
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 500 }],
+      retenciones: [{ tipo: "Ganancias", monto }],
+    });
+
+    expect(resultado.success).toBe(false);
+    await verificarSinEfectos(comprobante.id_comprobante);
+  });
+
+  it.each([
+    ["negativo", -500],
+    ["NaN", NaN],
+    ["Infinity", Infinity],
+  ])("medio de pago con monto %s falla y no registra el cobro", async (_nombre, monto) => {
+    const { cliente, comprobante } = await escenario();
+
+    const resultado = await registrarCobro({
+      id_cliente: cliente.id_cliente,
+      imputaciones: [{ id_comprobante: comprobante.id_comprobante, monto: 500 }],
+      formasPago: [{ forma_pago: "Efectivo", monto }],
+    });
+
+    expect(resultado.success).toBe(false);
+    await verificarSinEfectos(comprobante.id_comprobante);
+  });
+});
