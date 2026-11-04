@@ -44,9 +44,11 @@ export default function BotonExportarExcel({ reporte, mes, anio }: Props) {
       const rows: Record<string, string | number>[] = movimientos.map((m) => ({
         Fecha: new Date(m.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" }),
         Comprobante: m.comprobante,
-        Tipo: m.tipo_comprobante,
-        Entidad: m.entidad,
-        Ingreso: m.tipo_comprobante === "Ingreso" ? m.monto : "",
+        Tipo: m.anulado ? `${m.tipo_comprobante} (ANULADO)` : m.tipo_comprobante,
+        Entidad: m.anulado
+          ? `${m.entidad} - Anulado el ${new Date(m.anulado.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}`
+          : m.entidad,
+        Ingreso: m.tipo_comprobante === "Ingreso" && !m.anulado ? m.monto : "",
         Egreso: m.tipo_comprobante === "Egreso" ? m.monto : "",
       }));
 

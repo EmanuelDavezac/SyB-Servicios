@@ -14,6 +14,8 @@ export type Movimiento = {
     tipo_comprobante: "Ingreso" | "Egreso" | "Otro";
     entidad: string;
     monto: number;
+    /** Presente si el recibo esta anulado: se lista pero no suma a los totales. */
+    anulado?: { fecha: string };
 };
 
 export async function obtenerReporteMensual(mes: number, anio: number) {
@@ -29,7 +31,6 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                     gte: fechaInicio,
                     lte: fechaFin,
                 },
-                fecha_anulacion: null,
             },
             include: {
                 cliente: true, retencion: true,
@@ -79,7 +80,8 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
         for (const r of recibos) {
             const sumRetenciones = r.retencion?.reduce((a, c) => a + Number(c.monto), 0) || 0;
             const monto = Math.max(0, Number(r.monto_total) - sumRetenciones);
-            totalIngresos += monto;
+            // Un recibo anulado se muestra pero no suma al ingreso.
+            if (!r.fecha_anulacion) totalIngresos += monto;
             const clienteNombre = r.cliente ? `${r.cliente.nombre} ${r.cliente.apellido}` : "Sin Cliente";
             const comprobantesImputadas = r.pagos_parciales
                 .map((p) => p.comprobante?.num_comprobante || `#${p.id_comprobante}`)
@@ -92,6 +94,7 @@ export async function obtenerReporteMensual(mes: number, anio: number) {
                 tipo_comprobante: "Ingreso",
                 entidad: `${clienteNombre}${r.observacion ? ` - ${r.observacion}` : ""}`,
                 monto: monto,
+                ...(r.fecha_anulacion ? { anulado: { fecha: r.fecha_anulacion.toISOString() } } : {}),
             });
         }
 

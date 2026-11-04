@@ -341,17 +341,24 @@ export default async function ReportesPage({
                                 ) : (
                                     movimientos.map((mov) => {
                                         const isIngreso = mov.tipo_comprobante === "Ingreso";
+                                        const anulado = !!mov.anulado;
                                         return (
-                                            <tr key={mov.id} className="hover:bg-slate-50">
+                                            <tr key={mov.id} className={`hover:bg-slate-50 ${anulado ? "opacity-50" : ""}`}>
                                                 <td className="px-4 py-4">{formatDate(mov.fecha)}</td>
                                                 <td className="px-4 py-4">
                                                     <span className={`inline-block text-xs font-semibold px-2 py-1 rounded ${isIngreso ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                                                         {mov.comprobante}
                                                     </span>
+                                                    {mov.anulado && (
+                                                        <div className="mt-1">
+                                                            <span className="inline-block text-xs font-bold px-2 py-1 rounded bg-gray-200 text-gray-600 border border-gray-300">ANULADO</span>
+                                                            <span className="ml-2 text-xs text-gray-500">{formatDate(mov.anulado.fecha)}</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4">{mov.entidad}</td>
                                                 <td className="px-4 py-4 text-right font-medium text-green-600">
-                                                    {isIngreso ? formatCurrency(mov.monto) : <span className="text-gray-300 font-normal">-</span>}
+                                                    {isIngreso ? <span className={anulado ? "line-through text-gray-400" : ""}>{formatCurrency(mov.monto)}</span> : <span className="text-gray-300 font-normal">-</span>}
                                                 </td>
                                                 <td className="px-4 py-4 text-right font-medium text-red-600">
                                                     {!isIngreso ? formatCurrency(mov.monto) : <span className="text-gray-300 font-normal">-</span>}

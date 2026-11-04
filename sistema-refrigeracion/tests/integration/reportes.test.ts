@@ -67,7 +67,7 @@ describe("obtenerReporteMensual", () => {
     expect(reporteSegundoMes.totalIngresos).toBe(600);
   });
 
-  it("un cobro anulado no cuenta como ingreso", async () => {
+  it("un cobro anulado se lista como anulado pero no cuenta como ingreso", async () => {
     const cliente = await crearCliente();
     const orden = await crearOrdenFinalizada({ id_cliente: cliente.id_cliente });
     const comprobante = await crearComprobanteEmitido({ id_orden: orden.id_orden, monto_total: 1000, saldo_pendiente: 1000 });
@@ -81,6 +81,12 @@ describe("obtenerReporteMensual", () => {
 
     const reporte = await obtenerReporteMensual(MES, ANIO);
     expect(reporte.totalIngresos).toBe(0);
+    expect(reporte.balanceGeneral).toBe(0);
+
+    const mov = reporte.movimientos.find((m) => m.id === `rec-${cobro.recibo.id_recibo}`);
+    expect(mov).toBeDefined();
+    expect(mov?.anulado?.fecha).toBeTruthy();
+    expect(mov?.monto).toBe(300);
   });
 
   it("los egresos son las compras del mes", async () => {
