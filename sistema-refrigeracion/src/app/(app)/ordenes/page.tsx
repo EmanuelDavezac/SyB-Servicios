@@ -134,6 +134,7 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         {comprobanteVigente ? (
                                             <Link
                                                 href="/comprobantes"
+                                                prefetch={false}
                                                 title={`Ver en Comprobantes (comprobante #${comprobanteVigente.id_comprobante})`}
                                                 className="text-blue-600 hover:text-blue-800"
                                             >
@@ -164,6 +165,7 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
                                         {orden.estado_trabajo === "Finalizado" ? (
                                             <Link
                                                 href={`/comprobantes?orden=${orden.id_orden}`}
+                                                prefetch={false}
                                                 title="Generar Comprobante"
                                                 className="text-green-600 hover:text-green-800 font-bold"
                                             >

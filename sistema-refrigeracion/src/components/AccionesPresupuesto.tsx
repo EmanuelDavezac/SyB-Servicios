@@ -209,6 +209,7 @@ export default function AccionesPresupuesto({ presupuesto }: Props) {
             {esAceptado && presupuesto.id_orden && (
                 <Link
                     href="/ordenes"
+                    prefetch={false}
                     title={`Orden de trabajo #${presupuesto.id_orden} generada`}
                     className="text-green-600 hover:text-green-800"
                 >

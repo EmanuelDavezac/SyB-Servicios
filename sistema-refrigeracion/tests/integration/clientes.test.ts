@@ -5,9 +5,10 @@ import {
   reactivarCliente,
   crearCliente as crearClienteAction,
   actualizarCliente,
+  crearClienteDesdePresupuesto,
 } from "@/actions/clientes";
 import { crearOrden } from "@/actions/ordenes";
-import { buscarDestinatarios } from "@/actions/presupuestos";
+import { buscarDestinatarios, crearPresupuesto } from "@/actions/presupuestos";
 import { crearCliente, crearOrdenFinalizada, crearComprobanteEmitido } from "./factories";
 
 function formatCurrency(n: number) {
@@ -259,5 +260,70 @@ describe("crearCliente / actualizarCliente - correo duplicado (CU06)", () => {
     });
 
     expect(resultado.success).toBe(true);
+  });
+});
+
+describe("crearClienteDesdePresupuesto (alta de cliente + vinculo, atomico)", () => {
+  async function presupuestoSinCliente() {
+    const creado = await crearPresupuesto({
+      destinatario: { nombre: "pepe", cuit: "20455666", localidad: "Esperanza" },
+      lineas: [{ cantidad: 1, descripcion: "arreglo", precio_unitario: 50000 }],
+    });
+    if (!creado.success) throw new Error("no se pudo crear el presupuesto de prueba");
+    return creado.presupuesto.id_presupuesto as number;
+  }
+
+  it("crea el cliente y deja el presupuesto vinculado", async () => {
+    const id_presupuesto = await presupuestoSinCliente();
+
+    const resultado = await crearClienteDesdePresupuesto(id_presupuesto, {
+      nombre: "pepe", apellido: "Gomez", cuit: "20455666",
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const presupuesto = await prisma.presupuesto.findUnique({ where: { id_presupuesto } });
+    expect(presupuesto?.id_cliente).toBe(resultado.cliente.id_cliente);
+    // Ya no sale como "Presupuesto anterior" sino como cliente cargado.
+    const sugerencias = await buscarDestinatarios("pepe");
+    expect(sugerencias).toHaveLength(1);
+    expect(sugerencias[0].id_cliente).toBe(resultado.cliente.id_cliente);
+  });
+
+  it("si falla el vinculo (presupuesto inexistente) no queda el cliente creado", async () => {
+    const antes = await prisma.cliente.count();
+
+    const resultado = await crearClienteDesdePresupuesto(999999, { nombre: "pepe", apellido: "Gomez" });
+
+    expect(resultado.success).toBe(false);
+    expect(await prisma.cliente.count()).toBe(antes);
+  });
+
+  it("CUIT duplicado: no crea cliente ni toca el presupuesto", async () => {
+    await crearCliente({ cuit: "20455666" });
+    const id_presupuesto = await presupuestoSinCliente();
+    const antes = await prisma.cliente.count();
+
+    const resultado = await crearClienteDesdePresupuesto(id_presupuesto, {
+      nombre: "pepe", apellido: "Gomez", cuit: "20455666",
+    });
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error).toBe("Ya existe un cliente con ese DNI/CUIT");
+    expect(await prisma.cliente.count()).toBe(antes);
+    const presupuesto = await prisma.presupuesto.findUnique({ where: { id_presupuesto } });
+    expect(presupuesto?.id_cliente).toBeNull();
+  });
+
+  it("rechaza un presupuesto que ya tiene cliente, sin crear otro", async () => {
+    const id_presupuesto = await presupuestoSinCliente();
+    expect((await crearClienteDesdePresupuesto(id_presupuesto, { nombre: "pepe", apellido: "Gomez" })).success).toBe(true);
+    const antes = await prisma.cliente.count();
+
+    const resultado = await crearClienteDesdePresupuesto(id_presupuesto, { nombre: "otro", apellido: "Gomez" });
+
+    expect(resultado.success).toBe(false);
+    expect(await prisma.cliente.count()).toBe(antes);
   });
 });

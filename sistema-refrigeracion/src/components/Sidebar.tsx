@@ -99,6 +99,7 @@ export default function Sidebar({ nombre }: { nombre: string }) {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className="flex items-center min-h-[44px] py-3 px-6 hover:bg-slate-800 hover:text-blue-400 transition-all duration-200 group"
             >
               <i className={`fas ${icon} mr-3 w-5 text-center text-slate-500 group-hover:text-blue-400`}></i>

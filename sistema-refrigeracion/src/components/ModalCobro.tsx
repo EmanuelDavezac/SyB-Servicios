@@ -63,15 +63,20 @@ export default function ModalCobro({ clientes }: Props) {
     });
 
     useEffect(() => {
-        if (idCliente) {
-            obtenerComprobantesPendientesCliente(Number(idCliente)).then((data: ComprobantePendiente[]) => {
-                setComprobantesPendientes(data);
-                setImputaciones({});
-            });
-        } else {
+        if (!idCliente) {
             setComprobantesPendientes([]);
             setImputaciones({});
+            return;
         }
+        // La action no se puede abortar: si cambia el cliente antes de que
+        // responda, se descarta la respuesta vieja para que no pise a la nueva.
+        let vigente = true;
+        obtenerComprobantesPendientesCliente(Number(idCliente)).then((data: ComprobantePendiente[]) => {
+            if (!vigente) return;
+            setComprobantesPendientes(data);
+            setImputaciones({});
+        });
+        return () => { vigente = false; };
     }, [idCliente]);
 
     function distribuirMontoEntregado() {

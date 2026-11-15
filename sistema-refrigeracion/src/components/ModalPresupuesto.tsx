@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { crearPresupuesto, actualizarPresupuesto, buscarDestinatarios } from "@/actions/presupuestos";
+import { createPortal } from "react-dom";
 import { limpiarCuit } from "@/lib/validaciones-cliente";
+import { conTimeout, mensajeErrorDeRed } from "@/lib/conTimeout";
 
 interface Sugerencia {
     id_cliente: number | null;
@@ -69,6 +71,7 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
     const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
     const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const busquedaRef = useRef(0);
 
     const editando = !!presupuestoAEditar;
 
@@ -126,15 +129,23 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
         setIdCliente(null); // escribir libre desvincula la coincidencia previa
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        const busqueda = ++busquedaRef.current;
         if (valor.trim().length < 2) {
             setSugerencias([]);
             setMostrarSugerencias(false);
             return;
         }
         debounceRef.current = setTimeout(async () => {
-            const resultado = await buscarDestinatarios(valor);
-            setSugerencias(resultado);
-            setMostrarSugerencias(resultado.length > 0);
+            try {
+                const resultado = await buscarDestinatarios(valor);
+                // Una respuesta lenta de un texto anterior no debe pisar la actual.
+                if (busqueda !== busquedaRef.current) return;
+                setSugerencias(resultado);
+                setMostrarSugerencias(resultado.length > 0);
+            } catch {
+                // El autocompletado es opcional: si falla, se sigue escribiendo a mano.
+                if (busqueda === busquedaRef.current) setMostrarSugerencias(false);
+            }
         }, 300);
     }
 
@@ -200,16 +211,25 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
             })),
         };
 
-        const resultado = editando
-            ? await actualizarPresupuesto(presupuestoAEditar!.id_presupuesto, payload)
-            : await crearPresupuesto(payload);
+        // try/finally para que el boton nunca quede en "Guardando..." si la
+        // action tira (conexion cortada) o no responde (conTimeout).
+        try {
+            const resultado = await conTimeout(
+                editando
+                    ? actualizarPresupuesto(presupuestoAEditar!.id_presupuesto, payload)
+                    : crearPresupuesto(payload)
+            );
 
-        setCargando(false);
-
-        if (resultado.success) {
-            cerrarModal();
-        } else {
-            setError(resultado.error || "Error al guardar el presupuesto.");
+            if (resultado.success) {
+                cerrarModal();
+            } else {
+                setError(resultado.error || "Error al guardar el presupuesto.");
+            }
+        } catch (err) {
+            console.error("Error al guardar presupuesto:", err);
+            setError(mensajeErrorDeRed(err, "el presupuesto"));
+        } finally {
+            setCargando(false);
         }
     }
 
@@ -224,7 +244,12 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
                 </button>
             )}
 
-            {abierto && (
+            {/* Portal a document.body, igual que el resto de los modales: al
+                editar, este componente se monta dentro de AccionesPresupuesto,
+                cuyo contenedor tiene opacity-70, y sin portal el modal entero
+                heredaba esa transparencia. "abierto" solo pasa a true en el
+                navegador (click o efecto), asi que document siempre existe. */}
+            {abierto && createPortal(
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-stretch md:items-center z-9999 p-0 md:p-4">
                     <div className="bg-white md:rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col text-gray-800 overflow-hidden md:max-h-[calc(100vh-2rem)]">
 
@@ -432,7 +457,8 @@ export default function ModalPresupuesto({ presupuestoAEditar, onCerrar }: Props
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

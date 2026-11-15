@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { crearCliente } from "@/actions/clientes";
-import { vincularClienteAPresupuesto } from "@/actions/presupuestos";
+import { crearClienteDesdePresupuesto } from "@/actions/clientes";
+import { conTimeout, mensajeErrorDeRed } from "@/lib/conTimeout";
 import { limpiarCuit, limpiarTelefono } from "@/lib/validaciones-cliente";
 
 interface Props {
@@ -49,33 +49,35 @@ export default function ModalClienteDesdePresupuesto({
         setLoading(true);
         setError(null);
 
-        const resCliente = await crearCliente({
-            nombre: nombre.trim(),
-            apellido: apellido.trim(),
-            cuit: cuit.trim() || undefined,
-            telefono: telefono.trim() || undefined,
-            email: email.trim() || undefined,
-            calle: calle.trim() || undefined,
-            localidad: localidad.trim() || undefined,
-            condicion_pago_dias: condicionPagoDias ? parseInt(condicionPagoDias) : 30,
-        });
+        // Una sola action: crea el cliente y lo vincula al presupuesto en la
+        // misma transaccion. try/finally para que el boton nunca quede en
+        // "Guardando..." si el pedido tira o no responde.
+        try {
+            const resultado = await conTimeout(
+                crearClienteDesdePresupuesto(idPresupuesto, {
+                    nombre: nombre.trim(),
+                    apellido: apellido.trim(),
+                    cuit: cuit.trim() || undefined,
+                    telefono: telefono.trim() || undefined,
+                    email: email.trim() || undefined,
+                    calle: calle.trim() || undefined,
+                    localidad: localidad.trim() || undefined,
+                    condicion_pago_dias: condicionPagoDias ? parseInt(condicionPagoDias) : 30,
+                })
+            );
 
-        if (!resCliente.success || !resCliente.cliente) {
+            if (!resultado.success) {
+                setError(resultado.error || "No se pudo guardar el cliente.");
+                return;
+            }
+
+            onCerrar();
+        } catch (err) {
+            console.error("Error al guardar cliente desde presupuesto:", err);
+            setError(mensajeErrorDeRed(err, "el cliente"));
+        } finally {
             setLoading(false);
-            setError(resCliente.error || "No se pudo crear el cliente.");
-            return;
         }
-
-        const resVinculo = await vincularClienteAPresupuesto(idPresupuesto, resCliente.cliente.id_cliente);
-
-        setLoading(false);
-
-        if (!resVinculo.success) {
-            setError(resVinculo.error || "Cliente creado, pero no se pudo vincular al presupuesto.");
-            return;
-        }
-
-        onCerrar();
     }
 
     const modal = (

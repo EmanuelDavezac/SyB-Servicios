@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from "./auth";
 
@@ -21,7 +22,12 @@ export type UsuarioSesion = {
 // En los tests de integracion este modulo se reemplaza por completo
 // (vi.mock en tests/integration/setup.ts, igual que next/cache) porque las
 // actions se invocan sin sesion real ni request de Next detras.
-export async function obtenerUsuarioSesion(): Promise<UsuarioSesion | null> {
+//
+// cache() de React la memoiza durante un mismo request: el layout, la pagina y
+// la action que corren juntos comparten una sola consulta de sesion (2 queries
+// a la base) en vez de repetirla en cada uno. No cruza requests, asi que la
+// revalidacion de usuario_autorizado en cada pedido se mantiene.
+export const obtenerUsuarioSesion = cache(async (): Promise<UsuarioSesion | null> => {
   try {
     const data = await auth.api.getSession({ headers: await headers() });
     if (!data) return null;
@@ -30,7 +36,7 @@ export async function obtenerUsuarioSesion(): Promise<UsuarioSesion | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function requerirUsuario(): Promise<UsuarioSesion> {
   const usuario = await obtenerUsuarioSesion();

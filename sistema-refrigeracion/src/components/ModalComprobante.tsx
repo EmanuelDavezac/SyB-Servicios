@@ -177,29 +177,39 @@ export default function ModalComprobante({ ordenes, openWithOrdenId }: Props) {
 
     /* Obtener numero sugerido al abrir o cambiar tipo/fiscal */
     useEffect(() => {
-        if (abierto) {
-            getSiguienteNumeroComprobante(tipo, fiscalEfectivo).then((num) => {
-                setLetraNumero(num);
-            });
-        }
+        if (!abierto) return;
+        let vigente = true;
+        getSiguienteNumeroComprobante(tipo, fiscalEfectivo).then((num) => {
+            if (vigente) setLetraNumero(num);
+        });
+        return () => { vigente = false; };
     }, [abierto, tipo, fiscalEfectivo]);
 
     /* Cargar insumos al abrir */
     useEffect(() => {
-        if (abierto) {
-            obtenerInsumos().then((data) => setInsumosDisponibles(data as Insumo[]));
-        }
+        if (!abierto) return;
+        let vigente = true;
+        obtenerInsumos().then((data) => {
+            if (vigente) setInsumosDisponibles(data as Insumo[]);
+        });
+        return () => { vigente = false; };
     }, [abierto]);
 
     /* Cargar servicios e insumos de la orden al seleccionarla */
     useEffect(() => {
-        if (idOrden) {
-            obtenerInsumosDeOrden(Number(idOrden)).then((data) => setInsumosDeOrden(data));
-            obtenerServiciosDeOrden(Number(idOrden)).then((data) => setServiciosDeOrden(data));
-        } else {
+        if (!idOrden) {
             setInsumosDeOrden([]);
             setServiciosDeOrden([]);
+            return;
         }
+        let vigente = true;
+        obtenerInsumosDeOrden(Number(idOrden)).then((data) => {
+            if (vigente) setInsumosDeOrden(data);
+        });
+        obtenerServiciosDeOrden(Number(idOrden)).then((data) => {
+            if (vigente) setServiciosDeOrden(data);
+        });
+        return () => { vigente = false; };
     }, [idOrden]);
 
     /* Orden seleccionada — se usa para autocompletar cliente y N° de orden */

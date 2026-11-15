@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export async function obtenerClientes(filtros?: {
     nombre?: string;
@@ -48,8 +49,10 @@ import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE, TOLERANCIA_MONTO } f
 import { obtenerDeudaCliente } from "@/lib/deudaCliente";
 import { ESTADOS_ORDEN_EN_CURSO } from "@/lib/estadosOrden";
 
-async function cuitYaExiste(cuit: string, idExcluir?: number) {
-    const existente = await prisma.cliente.findFirst({
+// db: el cliente normal o el de una transaccion (crearClienteDesdePresupuesto
+// valida y escribe dentro de la misma transaccion).
+async function cuitYaExiste(cuit: string, idExcluir?: number, db: Prisma.TransactionClient = prisma) {
+    const existente = await db.cliente.findFirst({
         where: {
             cuit: { equals: cuit, mode: "insensitive" },
             ...(idExcluir ? { id_cliente: { not: idExcluir } } : {}),
@@ -59,8 +62,8 @@ async function cuitYaExiste(cuit: string, idExcluir?: number) {
     return !!existente;
 }
 
-async function emailYaExiste(email: string, idExcluir?: number) {
-    const existente = await prisma.cliente.findFirst({
+async function emailYaExiste(email: string, idExcluir?: number, db: Prisma.TransactionClient = prisma) {
+    const existente = await db.cliente.findFirst({
         where: {
             email: { equals: email, mode: "insensitive" },
             ...(idExcluir ? { id_cliente: { not: idExcluir } } : {}),
@@ -131,6 +134,92 @@ export async function crearCliente(datos: {
     } catch (error) {
         console.error("Error al crear cliente:", error);
         return { success: false, error: "No se pudo crear el cliente" };
+    }
+}
+
+// Error con un mensaje pensado para mostrarle al usuario tal cual. Cualquier
+// otro error (base caida, timeout de la transaccion) se reemplaza por un
+// mensaje generico para no filtrar detalles internos.
+class ErrorDeNegocio extends Error {}
+
+/**
+ * Da de alta al destinatario de un presupuesto como cliente y lo vincula al
+ * presupuesto, todo en una sola transaccion: si falla cualquiera de las dos
+ * partes no queda ni un cliente suelto ni un presupuesto a medio vincular.
+ * Reemplaza a llamar crearCliente + vincularClienteAPresupuesto por separado
+ * desde el navegador (dos pedidos: si el segundo fallaba o se cortaba, el
+ * cliente quedaba creado sin vinculo).
+ */
+export async function crearClienteDesdePresupuesto(id_presupuesto: number, datos: {
+    nombre: string;
+    apellido: string;
+    cuit?: string;
+    telefono?: string;
+    email?: string;
+    calle?: string;
+    num_calle?: number;
+    localidad?: string;
+    condicion_pago_dias?: number;
+}) {
+    try {
+        await requerirUsuario();
+        const errorValidacion = validarDatosCliente(datos);
+        if (errorValidacion) {
+            return { success: false as const, error: errorValidacion };
+        }
+
+        const nuevoCliente = await prisma.$transaction(async (tx) => {
+            const presupuesto = await tx.presupuesto.findUnique({
+                where: { id_presupuesto },
+                select: { id_cliente: true },
+            });
+            if (!presupuesto) {
+                throw new ErrorDeNegocio("El presupuesto no existe");
+            }
+            if (presupuesto.id_cliente) {
+                throw new ErrorDeNegocio("El presupuesto ya tiene un cliente vinculado");
+            }
+
+            const cuit = datos.cuit?.trim();
+            if (cuit && (await cuitYaExiste(cuit, undefined, tx))) {
+                throw new ErrorDeNegocio("Ya existe un cliente con ese DNI/CUIT");
+            }
+            const email = datos.email?.trim();
+            if (email && (await emailYaExiste(email, undefined, tx))) {
+                throw new ErrorDeNegocio("Ya existe un cliente con ese email");
+            }
+
+            const cliente = await tx.cliente.create({
+                data: {
+                    nombre: datos.nombre,
+                    apellido: datos.apellido,
+                    cuit: datos.cuit || null,
+                    telefono: datos.telefono || null,
+                    email: datos.email || null,
+                    calle: datos.calle || null,
+                    num_calle: datos.num_calle ?? null,
+                    localidad: datos.localidad || null,
+                    condicion_pago_dias: datos.condicion_pago_dias ?? 30,
+                },
+            });
+            await tx.presupuesto.update({
+                where: { id_presupuesto },
+                data: { id_cliente: cliente.id_cliente },
+            });
+            return cliente;
+        });
+
+        revalidatePath("/clientes");
+        revalidatePath("/presupuestos");
+        return { success: true as const, cliente: nuevoCliente };
+    } catch (error) {
+        console.error("Error al crear cliente desde presupuesto:", error);
+        return {
+            success: false as const,
+            error: error instanceof ErrorDeNegocio
+                ? error.message
+                : "No se pudo guardar el cliente. No se hizo ningún cambio: probá de nuevo.",
+        };
     }
 }
 
