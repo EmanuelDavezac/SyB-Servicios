@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { registrarCobro, obtenerComprobantesPendientesCliente } from "@/actions/cobros";
 import { imprimirRecibo } from "@/components/BotonImprimirRecibo";
 import { distribuirCobro } from "@/lib/cobros";
+import {
+    calcularRetencion,
+    parsearPorcentaje,
+    porcentajeValido,
+    ratioIvaDeComprobante,
+} from "@/lib/retenciones";
 
 interface Cliente {
     id_cliente: number;
@@ -19,7 +25,16 @@ interface ComprobantePendiente {
     monto_total: number;
     saldo_pendiente: number;
     estado_pago: string;
+    alicuota_iva?: number | string | null;
+    comprobante_iva?: { alicuota: number | string; monto_iva: number | string }[];
 }
+
+const TIPOS_RETENCION = [
+    { tipo: "IVA", label: "IVA" },
+    { tipo: "GANANCIAS", label: "Ganancias" },
+    { tipo: "IIBB", label: "Ingresos Brutos" },
+    { tipo: "SUSS", label: "SUSS" },
+];
 
 interface Props {
     clientes: Cliente[];
@@ -61,6 +76,16 @@ export default function ModalCobro({ clientes }: Props) {
         IIBB: "",
         SUSS: "",
     });
+    // Porcentaje escrito por el usuario (sin valor por defecto) y de dónde viene
+    // el monto de cada retención: "pct" = calculado (se recalcula si cambia lo
+    // imputado), "manual" = escrito a mano.
+    const [retPct, setRetPct] = useState<Record<string, string>>({ IVA: "", GANANCIAS: "", IIBB: "", SUSS: "" });
+    const [retModo, setRetModo] = useState<Record<string, "pct" | "manual">>({
+        IVA: "manual",
+        GANANCIAS: "manual",
+        IIBB: "manual",
+        SUSS: "manual",
+    });
 
     useEffect(() => {
         if (!idCliente) {
@@ -89,7 +114,28 @@ export default function ModalCobro({ clientes }: Props) {
     }
 
     const totalImputado = Object.values(imputaciones).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
-    const totalRetenido = Object.values(retenciones).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+
+    // Base de cada comprobante = lo imputado a él (no el total de la factura)
+    const partesImputadas = comprobantesPendientes.map((c) => ({
+        imputado: parseFloat(imputaciones[c.id_comprobante] ?? "") || 0,
+        ratioIva: ratioIvaDeComprobante(c),
+    }));
+
+    // Monto efectivo de cada retención: calculado desde el % o escrito a mano
+    const retencionesEfectivas: Record<string, string> = {};
+    const pctInvalido: Record<string, boolean> = {};
+    for (const { tipo } of TIPOS_RETENCION) {
+        const pct = parsearPorcentaje(retPct[tipo] ?? "");
+        pctInvalido[tipo] = !porcentajeValido(pct);
+        if (retModo[tipo] === "pct") {
+            retencionesEfectivas[tipo] =
+                pct === null || pctInvalido[tipo] ? "0.00" : calcularRetencion(tipo, partesImputadas, pct).toFixed(2);
+        } else {
+            retencionesEfectivas[tipo] = retenciones[tipo];
+        }
+    }
+    const totalRetenido = Object.values(retencionesEfectivas).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    const retencionesExcedenImputado = totalRetenido > totalImputado + 0.005;
     // Lo que realmente entra en mano/banco: lo imputado menos lo retenido.
     const totalARepartirEnMedios = Math.max(0, totalImputado - totalRetenido);
     const totalEnMedios = medios.reduce((acc, m) => acc + (parseFloat(m.monto) || 0), 0);
@@ -130,11 +176,27 @@ export default function ModalCobro({ clientes }: Props) {
         setNuevoMedioMonto("");
         setMostrarRetenciones(false);
         setRetenciones({ IVA: "", GANANCIAS: "", IIBB: "", SUSS: "" });
+        setRetPct({ IVA: "", GANANCIAS: "", IIBB: "", SUSS: "" });
+        setRetModo({ IVA: "manual", GANANCIAS: "manual", IIBB: "manual", SUSS: "manual" });
         setError(null);
     }
 
+    // Monto escrito a mano: deja de recalcularse solo
     function actualizarRetencion(tipo: string, valor: string) {
         setRetenciones((prev) => ({ ...prev, [tipo]: valor }));
+        setRetModo((prev) => ({ ...prev, [tipo]: "manual" }));
+    }
+
+    // Cambiar el porcentaje completa el monto (y lo mantiene al día con lo imputado)
+    function actualizarPorcentaje(tipo: string, valor: string) {
+        if (!/^[\d.,]*$/.test(valor)) return;
+        setRetPct((prev) => ({ ...prev, [tipo]: valor }));
+        setRetModo((prev) => ({ ...prev, [tipo]: "pct" }));
+    }
+
+    // Botón "Calcular": vuelve a calcular el monto desde el porcentaje, pisando lo escrito a mano
+    function calcularRetencionDesdePorcentaje(tipo: string) {
+        setRetModo((prev) => ({ ...prev, [tipo]: "pct" }));
     }
 
     async function handleGuardar() {
@@ -163,7 +225,19 @@ export default function ModalCobro({ clientes }: Props) {
             return;
         }
 
-        const lineasRetenciones = Object.entries(retenciones)
+        const tipoPctInvalido = TIPOS_RETENCION.find((r) => pctInvalido[r.tipo]);
+        if (tipoPctInvalido) {
+            setError(`El porcentaje de ${tipoPctInvalido.label} debe estar entre 0 y 100.`);
+            return;
+        }
+        if (retencionesExcedenImputado) {
+            setError(
+                `Las retenciones (${formatCurrency(totalRetenido)}) no pueden superar lo imputado (${formatCurrency(totalImputado)}).`
+            );
+            return;
+        }
+
+        const lineasRetenciones = Object.entries(retencionesEfectivas)
             .map(([tipo, monto]) => ({ tipo, monto: parseFloat(monto) || 0 }))
             .filter((r) => r.monto > 0);
 
@@ -353,28 +427,60 @@ export default function ModalCobro({ clientes }: Props) {
 
                                     {mostrarRetenciones && (
                                         <div className="space-y-2">
-                                            {[
-                                                { tipo: "IVA", label: "IVA" },
-                                                { tipo: "GANANCIAS", label: "Ganancias" },
-                                                { tipo: "IIBB", label: "Ingresos Brutos" },
-                                                { tipo: "SUSS", label: "SUSS" },
-                                            ].map((r) => (
-                                                <div key={r.tipo} className="flex items-center justify-between bg-gray-50 border rounded-lg px-3 py-2 text-sm gap-3">
-                                                    <span className="font-medium text-gray-700">{r.label}</span>
-                                                    <div className="relative w-32">
-                                                        <span className="absolute left-3 top-2 text-gray-400 text-xs">$</span>
-                                                        <input
-                                                            type="number"
-                                                            value={retenciones[r.tipo]}
-                                                            onChange={(e) => actualizarRetencion(r.tipo, e.target.value)}
-                                                            placeholder="0.00"
-                                                            min="0"
-                                                            step="0.01"
-                                                            className="w-full border rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                                                        />
+                                            <p className="text-xs text-gray-500">
+                                                El porcentaje se aplica sobre lo imputado ({formatCurrency(totalImputado)}) en IVA, y sobre ese importe sin IVA (subtotal neto) en Ganancias, Ingresos Brutos y SUSS.
+                                            </p>
+                                            {TIPOS_RETENCION.map((r) => (
+                                                <div key={r.tipo} className="bg-gray-50 border rounded-lg px-3 py-2 text-sm">
+                                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                        <span className="font-medium text-gray-700 w-32">{r.label}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative w-20">
+                                                                <input
+                                                                    type="text"
+                                                                    inputMode="decimal"
+                                                                    value={retPct[r.tipo]}
+                                                                    onChange={(e) => actualizarPorcentaje(r.tipo, e.target.value)}
+                                                                    placeholder="0"
+                                                                    aria-label={`Porcentaje de retención de ${r.label}`}
+                                                                    className={`w-full border rounded-lg pl-2 pr-6 py-1.5 text-sm text-right focus:outline-none focus:ring-2 ${
+                                                                        pctInvalido[r.tipo] ? "border-red-400 focus:ring-red-400" : "focus:ring-green-400"
+                                                                    }`}
+                                                                />
+                                                                <span className="absolute right-2 top-1.5 text-gray-400 text-xs">%</span>
+                                                            </div>
+                                                            <div className="relative w-32">
+                                                                <span className="absolute left-3 top-2 text-gray-400 text-xs">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={retencionesEfectivas[r.tipo]}
+                                                                    onChange={(e) => actualizarRetencion(r.tipo, e.target.value)}
+                                                                    placeholder="0.00"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    aria-label={`Monto de retención de ${r.label}`}
+                                                                    className="w-full border rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => calcularRetencionDesdePorcentaje(r.tipo)}
+                                                                className="bg-green-50 text-green-700 hover:bg-green-100 font-semibold px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap"
+                                                            >
+                                                                Calcular
+                                                            </button>
+                                                        </div>
                                                     </div>
+                                                    {pctInvalido[r.tipo] && (
+                                                        <p className="text-xs text-red-600 mt-1">El porcentaje debe estar entre 0 y 100.</p>
+                                                    )}
                                                 </div>
                                             ))}
+                                            {retencionesExcedenImputado && (
+                                                <p className="text-xs text-red-600 font-semibold">
+                                                    Las retenciones ({formatCurrency(totalRetenido)}) superan lo imputado ({formatCurrency(totalImputado)}).
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </section>

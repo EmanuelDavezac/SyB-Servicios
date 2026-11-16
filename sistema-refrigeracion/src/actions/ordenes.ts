@@ -122,9 +122,11 @@ export async function obtenerOrdenes() {
     try {
         await requerirUsuario();
         const ordenes = await prisma.orden_trabajo.findMany({
-            orderBy: {
-                fecha_creacion: "desc",
-            },
+            // fecha_creacion es solo fecha (sin hora): id_orden desempata las del mismo dia
+            orderBy: [
+                { fecha_creacion: "desc" },
+                { id_orden: "desc" },
+            ],
             include: {
                 cliente: {
                     select: {

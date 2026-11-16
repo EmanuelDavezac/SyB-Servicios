@@ -272,6 +272,8 @@ export async function obtenerComprobantesPendientesCliente(id_cliente: number) {
         orden_trabajo: { id_cliente },
       },
       orderBy: { fecha_emision: "asc" },
+      // IVA del comprobante: ModalCobro lo usa para calcular retenciones por porcentaje
+      include: { comprobante_iva: { select: { alicuota: true, monto_iva: true } } },
     });
 
     return JSON.parse(JSON.stringify(comprobantes));
