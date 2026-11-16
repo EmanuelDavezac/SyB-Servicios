@@ -122,7 +122,7 @@ export async function imprimirComprobante(idComprobante: number): Promise<boolea
         let insumosHTML = "";
         let totalInsumos = 0;
         for (const di of insumos) {
-            const nombre = di.insumo?.nombre || "Insumo";
+            const nombre = di.descripcion_libre || di.insumo?.nombre || "Insumo";
             const cant = di.cantidad_usada || 1;
             const alicuota = alicuotaLinea(di.alicuota_iva);
             let precio = parseFloat(di.precio_aplicado);

@@ -42,6 +42,7 @@ export default async function ServiciosPage({
                         <tr className="text-gray-700 font-semibold">
                             <th className="p-4">Nombre</th>
                             <th className="p-4">Descripción</th>
+                            <th className="p-4">Insumos</th>
                             <th className="p-4 text-right">Precio</th>
                             <th className="p-4 text-center">Estado</th>
                             <th className="p-4 text-center">Acciones</th>
@@ -50,7 +51,7 @@ export default async function ServiciosPage({
                     <tbody className="text-black">
                         {servicios.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="p-8 text-center text-gray-500 bg-gray-50">
+                                <td colSpan={6}className="p-8 text-center text-gray-500 bg-gray-50">
                                     {hayFiltrosActivos ? (
                                         <>
                                             No se encontraron servicios que coincidan.{" "}
@@ -74,6 +75,24 @@ export default async function ServiciosPage({
                                     {/* Descripción */}
                                     <td className="p-4 text-gray-500 text-sm max-w-xs truncate">
                                         {srv.descripcion || "—"}
+                                    </td>
+
+                                    {/* Insumos de la receta del servicio */}
+                                    <td className="p-4">
+                                        {srv.servicio_insumo.length === 0 ? (
+                                            <span className="text-gray-400 text-sm">—</span>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {srv.servicio_insumo.map((si) => (
+                                                    <span
+                                                        key={si.id_insumo}
+                                                        className="bg-gray-100 text-gray-800 text-sm px-2 py-0.5 rounded"
+                                                    >
+                                                        {si.insumo?.nombre ?? "Insumo"} x{Number(si.cantidad)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
 
                                     {/* Precio */}

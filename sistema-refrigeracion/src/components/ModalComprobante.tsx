@@ -93,6 +93,7 @@ export default function ModalComprobante({ ordenes, openWithOrdenId }: Props) {
             precio_aplicado: number | string;
             alicuota_iva: number | string;
             insumo: { nombre: string } | null;
+            descripcion_libre?: string | null;
         }[]
     >([]);
 
@@ -687,7 +688,7 @@ export default function ModalComprobante({ ordenes, openWithOrdenId }: Props) {
                                                     className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-sm"
                                                 >
                                                     <span className="font-medium text-orange-900">
-                                                        {d.insumo?.nombre ?? "Insumo"}
+                                                        {d.descripcion_libre || d.insumo?.nombre || "Insumo"}
                                                     </span>
                                                     <span className="text-orange-600 text-xs font-semibold">
                                                         x{d.cantidad_usada} · IVA {formatearAlicuota(parseFloat(String(d.alicuota_iva)))}%

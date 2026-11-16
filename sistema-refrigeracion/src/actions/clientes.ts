@@ -129,6 +129,7 @@ export async function crearCliente(datos: {
 
         // Le avisa a Next.js que recargue la página de clientes para mostrar el nuevo
         revalidatePath("/clientes");
+        revalidatePath("/ordenes");
         return { success: true, cliente: nuevoCliente };
 
     } catch (error) {

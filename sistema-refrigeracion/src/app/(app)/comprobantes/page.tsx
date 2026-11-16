@@ -221,7 +221,6 @@ export default async function ComprobantesPage({
                         ) : (
                             <>
                                 <BotonImprimirComprobante idComprobante={fila.id} />
-                                <button title="Editar/Ver" className="hover:text-amber-600">📝</button>
                                 {fila.estado_pago !== ESTADOS_COMPROBANTE.ANULADA && (
                                     <BotonAnularComprobante idComprobante={fila.id} />
                                 )}

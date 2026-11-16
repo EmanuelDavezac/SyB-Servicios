@@ -8,6 +8,7 @@ import { ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
 import { ESTADOS_COMPROBANTE, TIPOS_COMPROBANTE_FACTURABLE } from "@/lib/estadoComprobante";
 import { nombreDeServicioYaExiste } from "@/lib/servicios";
 import { ESTADOS_ORDEN } from "@/lib/estadosOrden";
+import { crearInsumo } from "@/actions/insumos";
 
 function validarEstadoTrabajo(estado: string): void {
     if (!ESTADOS_ORDEN.includes(estado)) {
@@ -481,6 +482,88 @@ export async function agregarInsumoAOrden(datos: {
     } catch (error) {
         console.error("Error al agregar insumo a la orden:", error);
         return { success: false, error: error instanceof Error ? error.message : "No se pudo agregar el insumo" };
+    }
+}
+
+/**
+ * Agrega a la orden una linea de insumo "solo en esta orden": texto libre, sin
+ * insumo del catalogo, por lo que no mueve stock ni lo valida.
+ */
+export async function agregarInsumoLibreAOrden(datos: {
+    id_orden: number;
+    descripcion_libre: string;
+    cantidad: number;
+    precio_aplicado: number;
+    alicuota_iva?: number;
+}) {
+    try {
+        await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
+        const descripcion = datos.descripcion_libre.trim();
+        if (!descripcion) throw new Error("Describí el insumo utilizado.");
+        if (descripcion.length > 255) throw new Error("La descripción es demasiado larga (máx. 255 caracteres).");
+        validarCantidadYPrecio(datos.cantidad, datos.precio_aplicado);
+        const alicuota_iva = validarAlicuota(datos.alicuota_iva);
+        await prisma.detalle_orden_insumo.create({
+            data: {
+                id_orden: datos.id_orden,
+                id_insumo: null,
+                descripcion_libre: descripcion,
+                cantidad_usada: datos.cantidad,
+                precio_aplicado: datos.precio_aplicado,
+                alicuota_iva,
+            },
+        });
+        revalidatePath("/ordenes");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al agregar insumo libre a orden:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo agregar el insumo" };
+    }
+}
+
+/** Crea un insumo nuevo en el catalogo (con su stock inicial) y lo agrega a la orden */
+export async function crearInsumoYAgregarAOrden(datos: {
+    id_orden: number;
+    nombre: string;
+    unidad?: string;
+    stock_actual: number;
+    precio_costo: number;
+    precio_venta: number;
+    cantidad: number;
+    alicuota_iva?: number;
+}) {
+    try {
+        await requerirUsuario();
+        await asegurarOrdenEditable(datos.id_orden);
+        validarCantidadYPrecio(datos.cantidad, datos.precio_venta);
+        validarAlicuota(datos.alicuota_iva);
+        const creado = await crearInsumo({
+            nombre: datos.nombre,
+            descripcion: datos.unidad?.trim() || undefined,
+            stock_actual: datos.stock_actual,
+            stock_minimo: 0,
+            precio_costo: datos.precio_costo,
+            precio_venta: datos.precio_venta,
+        });
+        if (!creado.success || !creado.insumo) {
+            throw new Error(creado.error || "No se pudo crear el insumo");
+        }
+        const res = await agregarInsumoAOrden({
+            id_orden: datos.id_orden,
+            id_insumo: creado.insumo.id_insumo,
+            cantidad: datos.cantidad,
+            precio_aplicado: datos.precio_venta,
+            alicuota_iva: datos.alicuota_iva,
+        });
+        if (!res.success) {
+            throw new Error(`El insumo se creó en el catálogo pero no se agregó a la orden: ${res.error}`);
+        }
+        revalidatePath("/insumos");
+        return { success: true };
+    } catch (error) {
+        console.error("Error al crear insumo y agregar a orden:", error);
+        return { success: false, error: error instanceof Error ? error.message : "No se pudo crear el insumo" };
     }
 }
 

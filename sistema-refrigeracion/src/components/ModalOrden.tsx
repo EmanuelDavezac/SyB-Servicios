@@ -11,6 +11,8 @@ import {
     quitarServicioDeOrden,
     obtenerServiciosDeOrden,
     agregarInsumoAOrden,
+    agregarInsumoLibreAOrden,
+    crearInsumoYAgregarAOrden,
     quitarInsumoDeOrden,
     obtenerInsumosDeOrden,
     actualizarAlicuotaServicio,
@@ -20,6 +22,11 @@ import { obtenerServicios } from "@/actions/servicios";
 import { obtenerInsumos } from "@/actions/insumos";
 import ModalConfirmacion from "@/components/ModalConfirmacion";
 import { ALICUOTAS_IVA_SUGERIDAS, ALICUOTA_IVA_DEFAULT, alicuotaValida } from "@/lib/comprobantes";
+import { crearCliente } from "@/actions/clientes";
+import { limpiarCuit, limpiarTelefono, validarCuit, validarTelefono } from "@/lib/validaciones-cliente";
+
+// Valor del select de cliente que abre el alta inline
+const CLIENTE_NUEVO = "__nuevo__";
 
 /* ─── tipos ──────────────────────────────────────────────────── */
 interface Cliente {
@@ -74,17 +81,24 @@ interface DetalleInsumo {
     precio_aplicado: number | string;
     alicuota_iva: number | string;
     insumo: { nombre: string } | null;
+    descripcion_libre?: string | null;
 }
 
 /** Insumo pendiente de guardar (modo nueva orden) */
 interface InsumoPendiente {
     _tmpId: string;
-    id_insumo: number;
+    /** null en los insumos "solo en esta orden" y en los que se crean en el catálogo al guardar */
+    id_insumo: number | null;
     nombre: string;
     cantidad: number;
     precio_aplicado: number;
     alicuota_iva: number;
+    tipo?: "libre" | "nuevo";
+    /** solo tipo "nuevo": datos para crearlo en el catálogo */
+    nuevo?: { unidad?: string; stock_actual: number; precio_costo: number };
 }
+
+type ModoPanelInsumo = "existente" | "libre" | "nuevo";
 
 interface OrdenInicial {
     id_orden: number;
@@ -169,6 +183,18 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [idCliente, setIdCliente] = useState(
         ordenInicial ? String(ordenInicial.id_cliente ?? "") : ""
     );
+    /* cliente nuevo cargado ahí mismo (solo al crear una orden) */
+    const [clientesExtra, setClientesExtra] = useState<Cliente[]>([]);
+    const [ncNombre, setNcNombre] = useState("");
+    const [ncApellido, setNcApellido] = useState("");
+    const [ncCuit, setNcCuit] = useState("");
+    const [ncTelefono, setNcTelefono] = useState("");
+    const [ncEmail, setNcEmail] = useState("");
+    const [ncCalle, setNcCalle] = useState("");
+    const [ncLocalidad, setNcLocalidad] = useState("");
+    const [confirmarClienteAbierto, setConfirmarClienteAbierto] = useState(false);
+    const [guardandoCliente, setGuardandoCliente] = useState(false);
+    const [errorConfirmarCliente, setErrorConfirmarCliente] = useState<string | null>(null);
     const [estadoTrabajo, setEstadoTrabajo] = useState(
         ordenInicial?.estado_trabajo ?? "Pendiente"
     );
@@ -212,6 +238,16 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [insumosGuardados, setInsumosGuardados] = useState<DetalleInsumo[]>([]);
     const [insumosPendientes, setInsumosPendientes] = useState<InsumoPendiente[]>([]);
     const [panelInsumoAbierto, setPanelInsumoAbierto] = useState(false);
+    const [modoInsumo, setModoInsumo] = useState<ModoPanelInsumo>("existente");
+    const [libreInsDesc, setLibreInsDesc] = useState("");
+    const [libreInsPrecio, setLibreInsPrecio] = useState("");
+    const [libreInsCant, setLibreInsCant] = useState("1");
+    const [nuevoInsNombre, setNuevoInsNombre] = useState("");
+    const [nuevoInsUnidad, setNuevoInsUnidad] = useState("");
+    const [nuevoInsPrecio, setNuevoInsPrecio] = useState("");
+    const [nuevoInsCosto, setNuevoInsCosto] = useState("");
+    const [nuevoInsStock, setNuevoInsStock] = useState("");
+    const [nuevoInsCant, setNuevoInsCant] = useState("1");
     const [insumoSeleccionado, setInsumoSeleccionado] = useState("");
     const [cantInsumo, setCantInsumo] = useState("1");
     const [ivaInsumo, setIvaInsumo] = useState(String(ALICUOTA_IVA_DEFAULT));
@@ -225,6 +261,11 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     const [quitandoInsumo, setQuitandoInsumo] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
+
+    function resetClienteNuevo() {
+        setNcNombre(""); setNcApellido(""); setNcCuit(""); setNcTelefono("");
+        setNcEmail(""); setNcCalle(""); setNcLocalidad("");
+    }
 
     /* ── Abrir modal ── */
     async function handleAbrir() {
@@ -273,6 +314,10 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
 
     function resetPanelInsumo() {
         setPanelInsumoAbierto(false);
+        setModoInsumo("existente");
+        setLibreInsDesc(""); setLibreInsPrecio(""); setLibreInsCant("1");
+        setNuevoInsNombre(""); setNuevoInsUnidad(""); setNuevoInsPrecio(""); setNuevoInsCosto("");
+        setNuevoInsStock(""); setNuevoInsCant("1");
         setInsumoSeleccionado("");
         setCantInsumo("1");
         setIvaInsumo(String(ALICUOTA_IVA_DEFAULT));
@@ -307,18 +352,71 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     }
 
     /* ── Guardar toda la orden ── */
-    async function handleGuardar() {
+    function handleGuardar() {
         if (!idCliente) return;
         if (estadoTrabajo === "Finalizado" && bloqueaFinalizado) {
             setErrorGuardar(`No se puede finalizar: falta stock de ${insumosSinStock.join(", ")}.`);
             return;
         }
+        if (idCliente === CLIENTE_NUEVO) {
+            const errorCliente =
+                !ncNombre.trim() || !ncApellido.trim()
+                    ? "Nombre y apellido del cliente nuevo son obligatorios."
+                    : validarCuit(ncCuit) ?? validarTelefono(ncTelefono) ??
+                      (ncEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ncEmail.trim())
+                          ? "El email no tiene un formato válido."
+                          : null);
+            if (errorCliente) {
+                setErrorGuardar(errorCliente);
+                return;
+            }
+            setErrorGuardar(null);
+            setErrorConfirmarCliente(null);
+            setConfirmarClienteAbierto(true);
+            return;
+        }
+        void guardarOrden(Number(idCliente));
+    }
+
+    /* Cliente nuevo confirmado: se da de alta y recién después se crea la orden */
+    async function confirmarGuardarCliente() {
+        setGuardandoCliente(true);
+        setErrorConfirmarCliente(null);
+        try {
+            const res = await crearCliente({
+                nombre: ncNombre.trim(),
+                apellido: ncApellido.trim(),
+                cuit: ncCuit.trim() || undefined,
+                telefono: ncTelefono.trim() || undefined,
+                email: ncEmail.trim() || undefined,
+                calle: ncCalle.trim() || undefined,
+                localidad: ncLocalidad.trim() || undefined,
+            });
+            if (!res.success || !res.cliente) {
+                setErrorConfirmarCliente(res.error || "No se pudo guardar el cliente.");
+                return;
+            }
+            const creado = res.cliente;
+            // Queda seleccionado: si la orden falla, un reintento no vuelve a crear el cliente.
+            setClientesExtra((p) => [...p, { id_cliente: creado.id_cliente, nombre: creado.nombre, apellido: creado.apellido }]);
+            setIdCliente(String(creado.id_cliente));
+            setConfirmarClienteAbierto(false);
+            await guardarOrden(creado.id_cliente);
+        } catch (err) {
+            console.error("Error al guardar cliente desde orden:", err);
+            setErrorConfirmarCliente("No se pudo guardar el cliente. Probá de nuevo.");
+        } finally {
+            setGuardandoCliente(false);
+        }
+    }
+
+    async function guardarOrden(id_cliente: number) {
         setCargando(true);
         setErrorGuardar(null);
 
         if (modoEdicion && ordenInicial) {
             const res = await editarOrden(ordenInicial.id_orden, {
-                id_cliente: Number(idCliente),
+                id_cliente,
                 estado_trabajo: estadoTrabajo,
                 notas_internas: notasInternas || undefined,
             });
@@ -328,7 +426,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             } else setErrorGuardar(res.error || "Error al guardar los cambios. Intentá de nuevo.");
         } else {
             const res = await crearOrden({
-                id_cliente: Number(idCliente),
+                id_cliente,
                 estado_trabajo: estadoTrabajo,
                 notas_internas: notasInternas || undefined,
             });
@@ -371,17 +469,39 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             }
 
             for (const ins of insumosPendientes) {
-                await agregarInsumoAOrden({
-                    id_orden,
-                    id_insumo: ins.id_insumo,
-                    cantidad: ins.cantidad,
-                    precio_aplicado: ins.precio_aplicado,
-                    alicuota_iva: ins.alicuota_iva,
-                });
+                if (ins.tipo === "libre") {
+                    await agregarInsumoLibreAOrden({
+                        id_orden,
+                        descripcion_libre: ins.nombre,
+                        cantidad: ins.cantidad,
+                        precio_aplicado: ins.precio_aplicado,
+                        alicuota_iva: ins.alicuota_iva,
+                    });
+                } else if (ins.tipo === "nuevo" && ins.nuevo) {
+                    await crearInsumoYAgregarAOrden({
+                        id_orden,
+                        nombre: ins.nombre,
+                        unidad: ins.nuevo.unidad,
+                        stock_actual: ins.nuevo.stock_actual,
+                        precio_costo: ins.nuevo.precio_costo,
+                        precio_venta: ins.precio_aplicado,
+                        cantidad: ins.cantidad,
+                        alicuota_iva: ins.alicuota_iva,
+                    });
+                } else if (ins.id_insumo !== null) {
+                    await agregarInsumoAOrden({
+                        id_orden,
+                        id_insumo: ins.id_insumo,
+                        cantidad: ins.cantidad,
+                        precio_aplicado: ins.precio_aplicado,
+                        alicuota_iva: ins.alicuota_iva,
+                    });
+                }
             }
 
             setCargando(false);
             setIdCliente("");
+            resetClienteNuevo();
             setEstadoTrabajo("Pendiente");
             setNotasInternas("");
             setServiciosPendientes([]);
@@ -568,6 +688,84 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         }
     }
 
+    /* ── Insumo solo en esta orden (sin catálogo, sin stock) ── */
+    async function handleAgregarInsumoLibre() {
+        if (!libreInsDesc.trim()) { setErrInsumo("Describí el insumo utilizado."); return; }
+        const precio = parseFloat(libreInsPrecio);
+        if (isNaN(precio) || precio < 0) { setErrInsumo("El precio no es válido."); return; }
+        const cantidad = parseFloat(libreInsCant) || 0;
+        if (cantidad <= 0) { setErrInsumo("La cantidad debe ser mayor a 0."); return; }
+        const alicuota = parseAlicuota(ivaInsumo);
+        if (alicuota === null) { setErrInsumo("El IVA debe estar entre 0 y 100."); return; }
+
+        if (modoEdicion && ordenInicial) {
+            setAgregandoInsumo(true); setErrInsumo(null);
+            const res = await agregarInsumoLibreAOrden({
+                id_orden: ordenInicial.id_orden,
+                descripcion_libre: libreInsDesc.trim(),
+                cantidad,
+                precio_aplicado: precio,
+                alicuota_iva: alicuota,
+            });
+            if (res.success) {
+                setInsumosGuardados(await obtenerInsumosDeOrden(ordenInicial.id_orden));
+                resetPanelInsumo();
+            } else setErrInsumo(res.error || "Error al agregar.");
+            setAgregandoInsumo(false);
+        } else {
+            setInsumosPendientes((prev) => [
+                ...prev,
+                { _tmpId: tmpId(), tipo: "libre", id_insumo: null, nombre: libreInsDesc.trim(), cantidad, precio_aplicado: precio, alicuota_iva: alicuota },
+            ]);
+            resetPanelInsumo();
+        }
+    }
+
+    /* ── Crear insumo en el catálogo y agregarlo ── */
+    async function handleCrearInsumoNuevo() {
+        if (!nuevoInsNombre.trim()) { setErrInsumo("El nombre es obligatorio."); return; }
+        const precio = parseFloat(nuevoInsPrecio);
+        if (isNaN(precio) || precio < 0) { setErrInsumo("El precio de venta no es válido."); return; }
+        const costo = nuevoInsCosto.trim() === "" ? 0 : parseFloat(nuevoInsCosto);
+        if (isNaN(costo) || costo < 0) { setErrInsumo("El precio de costo no es válido."); return; }
+        const stock = nuevoInsStock.trim() === "" ? 0 : parseFloat(nuevoInsStock);
+        if (isNaN(stock) || stock < 0) { setErrInsumo("El stock inicial no es válido."); return; }
+        const cantidad = parseFloat(nuevoInsCant) || 0;
+        if (cantidad <= 0) { setErrInsumo("La cantidad debe ser mayor a 0."); return; }
+        const alicuota = parseAlicuota(ivaInsumo);
+        if (alicuota === null) { setErrInsumo("El IVA debe estar entre 0 y 100."); return; }
+
+        if (modoEdicion && ordenInicial) {
+            setAgregandoInsumo(true); setErrInsumo(null);
+            const res = await crearInsumoYAgregarAOrden({
+                id_orden: ordenInicial.id_orden,
+                nombre: nuevoInsNombre.trim(),
+                unidad: nuevoInsUnidad.trim() || undefined,
+                stock_actual: stock,
+                precio_costo: costo,
+                precio_venta: precio,
+                cantidad,
+                alicuota_iva: alicuota,
+            });
+            if (res.success) {
+                setInsumosGuardados(await obtenerInsumosDeOrden(ordenInicial.id_orden));
+                setCatalogoInsumos((await obtenerInsumos()) as unknown as InsumoCatalogo[]);
+                resetPanelInsumo();
+            } else setErrInsumo(res.error || "Error al crear.");
+            setAgregandoInsumo(false);
+        } else {
+            setInsumosPendientes((prev) => [
+                ...prev,
+                {
+                    _tmpId: tmpId(), tipo: "nuevo", id_insumo: null, nombre: nuevoInsNombre.trim(),
+                    cantidad, precio_aplicado: precio, alicuota_iva: alicuota,
+                    nuevo: { unidad: nuevoInsUnidad.trim() || undefined, stock_actual: stock, precio_costo: costo },
+                },
+            ]);
+            resetPanelInsumo();
+        }
+    }
+
     /* ── Quitar insumo ── */
     async function handleQuitarInsumo(item: DetalleInsumo | InsumoPendiente) {
         if ("id_detalle_ord_insumo" in item) {
@@ -631,7 +829,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     }[] = [
         ...insumosGuardados.map((d) => ({
             key: `gi-${d.id_detalle_ord_insumo}`,
-            nombre: d.insumo?.nombre || "Insumo",
+            nombre: d.descripcion_libre || d.insumo?.nombre || "Insumo",
             cantidad: Number(d.cantidad_usada),
             precio: parseFloat(String(d.precio_aplicado)),
             alicuota: parseFloat(String(d.alicuota_iva)),
@@ -720,13 +918,68 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                 >
                                     <option value="">Seleccioná un cliente...</option>
-                                    {clientes.map((c) => (
+                                    {!modoEdicion && (
+                                        <option value={CLIENTE_NUEVO}>+ Cliente nuevo (no cargado)</option>
+                                    )}
+                                    {[...clientes, ...clientesExtra].map((c) => (
                                         <option key={c.id_cliente} value={c.id_cliente}>
                                             {c.apellido}, {c.nombre}
                                         </option>
                                     ))}
                                 </select>
                             </div>
+                            {!modoEdicion && idCliente === CLIENTE_NUEVO && (
+                                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-4 space-y-3">
+                                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Datos del cliente nuevo</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {([
+                                            ["Nombre *", ncNombre, setNcNombre, undefined],
+                                            ["Apellido *", ncApellido, setNcApellido, undefined],
+                                            ["DNI / CUIT", ncCuit, (v: string) => setNcCuit(limpiarCuit(v)), "numeric"],
+                                            ["Teléfono", ncTelefono, (v: string) => setNcTelefono(limpiarTelefono(v)), "numeric"],
+                                        ] as const).map(([label, valor, setter, modo]) => (
+                                            <div key={label}>
+                                                <label className="block text-xs font-bold text-gray-700 mb-1">{label}</label>
+                                                <input
+                                                    type="text"
+                                                    value={valor}
+                                                    inputMode={modo}
+                                                    onChange={(e) => setter(e.target.value)}
+                                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                                />
+                                            </div>
+                                        ))}
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Email</label>
+                                            <input
+                                                type="text"
+                                                value={ncEmail}
+                                                onChange={(e) => setNcEmail(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Calle</label>
+                                            <input
+                                                type="text"
+                                                value={ncCalle}
+                                                onChange={(e) => setNcCalle(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Localidad</label>
+                                            <input
+                                                type="text"
+                                                value={ncLocalidad}
+                                                onChange={(e) => setNcLocalidad(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500">Al crear la orden se te va a preguntar si guardás este cliente en Clientes.</p>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Estado</label>
                                 <select
@@ -1039,9 +1292,81 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                         {/* Panel agregar insumo */}
                         {panelInsumoAbierto && (
                             <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+                                <div className="flex gap-2 flex-wrap">
+                                    <button onClick={() => setModoInsumo("existente")} className={tabCls(modoInsumo === "existente")}>
+                                        Del catalogo
+                                    </button>
+                                    <button onClick={() => setModoInsumo("libre")} className={tabCls(modoInsumo === "libre")}>
+                                        Solo en esta orden
+                                    </button>
+                                    <button onClick={() => setModoInsumo("nuevo")} className={tabCls(modoInsumo === "nuevo")}>
+                                        Crear en catalogo
+                                    </button>
+                                </div>
                                 {errInsumo && (
                                     <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-1.5">{errInsumo}</p>
                                 )}
+
+                                {modoInsumo === "libre" && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Que se uso *</label>
+                                            <input
+                                                value={libreInsDesc}
+                                                onChange={(e) => setLibreInsDesc(e.target.value)}
+                                                placeholder="Ej: Cano de cobre 1/4 (tramo extra)"
+                                                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-1">
+                                                Aparece tal cual en el comprobante. No se agrega al catalogo ni descuenta stock.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Precio unit. *</label>
+                                            <input type="number" value={libreInsPrecio} onChange={(e) => setLibreInsPrecio(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Cant.</label>
+                                            <input type="number" min="0.001" step="0.001" value={libreInsCant} onChange={(e) => setLibreInsCant(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {modoInsumo === "nuevo" && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
+                                            <input
+                                                value={nuevoInsNombre}
+                                                onChange={(e) => setNuevoInsNombre(e.target.value)}
+                                                placeholder="Ej: Gas R410A"
+                                                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Unidad (kg, m, unidad)</label>
+                                            <input value={nuevoInsUnidad} onChange={(e) => setNuevoInsUnidad(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Stock inicial</label>
+                                            <input type="number" min="0" step="0.001" value={nuevoInsStock} onChange={(e) => setNuevoInsStock(e.target.value)} placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Precio costo</label>
+                                            <input type="number" min="0" value={nuevoInsCosto} onChange={(e) => setNuevoInsCosto(e.target.value)} placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Precio venta *</label>
+                                            <input type="number" min="0" value={nuevoInsPrecio} onChange={(e) => setNuevoInsPrecio(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad utilizada en esta orden</label>
+                                            <input type="number" min="0.001" step="0.001" value={nuevoInsCant} onChange={(e) => setNuevoInsCant(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {modoInsumo === "existente" && (<>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Insumo del stock</label>
                                     <select
@@ -1068,6 +1393,7 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                         className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                                     />
                                 </div>
+                                </>)}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">IVA %</label>
                                     <input
@@ -1082,11 +1408,18 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                     />
                                 </div>
                                 <button
-                                    onClick={handleAgregarInsumo}
-                                    disabled={agregandoInsumo || !insumoSeleccionado}
+                                    onClick={
+                                        modoInsumo === "libre" ? handleAgregarInsumoLibre
+                                        : modoInsumo === "nuevo" ? handleCrearInsumoNuevo
+                                        : handleAgregarInsumo
+                                    }
+                                    disabled={agregandoInsumo || (modoInsumo === "existente" && !insumoSeleccionado)}
                                     className="w-full py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {agregandoInsumo ? "Agregando..." : "Agregar insumo a la orden"}
+                                    {agregandoInsumo
+                                        ? (modoInsumo === "nuevo" ? "Creando..." : "Agregando...")
+                                        : modoInsumo === "nuevo" ? "Crear y agregar a la orden"
+                                        : "Agregar insumo a la orden"}
                                 </button>
                             </div>
                         )}
@@ -1129,6 +1462,21 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
             {abierto && mounted && createPortal(modalContent, document.body)}
 
             {/* ── Confirmación quitar servicio ── */}
+            <ModalConfirmacion
+                isOpen={confirmarClienteAbierto}
+                titulo="Guardar cliente"
+                mensaje={`¿Querés guardar a ${ncNombre.trim()} ${ncApellido.trim()} en Clientes y crear la orden?`}
+                labelConfirmar="Guardar y crear orden"
+                labelCancelar="Volver"
+                labelProcesando="Guardando..."
+                iconoConfirmar="fa-check"
+                tono="neutro"
+                procesando={guardandoCliente}
+                error={errorConfirmarCliente}
+                onConfirmar={confirmarGuardarCliente}
+                onCancelar={() => { if (!guardandoCliente) setConfirmarClienteAbierto(false); }}
+            />
+
             <ModalConfirmacion
                 isOpen={!!itemAConfirmarSrv && "id_detalle_srv" in (itemAConfirmarSrv ?? {})}
                 titulo="Quitar servicio"
