@@ -45,6 +45,9 @@ export default function FiltrosComprobantes() {
             if (estadoAplica && estado) params.set("estado", estado);
             if (conSaldo) params.set("conSaldo", "1");
             if (fiscal) params.set("fiscal", fiscal);
+            // Mantiene el comprobante resaltado que viene desde Ordenes
+            const resaltado = searchParams.get("comprobante");
+            if (resaltado) params.set("comprobante", resaltado);
 
             const newQueryString = params.toString();
 

@@ -33,6 +33,7 @@ export default async function ComprobantesPage({
 }) {
     const params = await searchParams;
     const ordenIdQuery = typeof params.orden === "string" ? params.orden : undefined;
+    const comprobanteResaltado = typeof params.comprobante === "string" ? Number(params.comprobante) : null;
     const fechaInicioStr = typeof params.fechaInicio === "string" ? params.fechaInicio : "";
     const fechaFinStr = typeof params.fechaFin === "string" ? params.fechaFin : "";
     const filtroCliente = typeof params.cliente === "string" ? params.cliente.toLowerCase() : "";
@@ -228,7 +229,15 @@ export default async function ComprobantesPage({
                         );
 
                         return (
-                            <div key={fila.key} className="border-b hover:bg-gray-50 text-sm">
+                            <div
+                                key={fila.key}
+                                id={fila.key}
+                                className={`border-b text-sm scroll-mt-24 ${
+                                    fila.origen === "comprobante" && fila.id === comprobanteResaltado
+                                        ? "bg-blue-100 ring-2 ring-blue-500 ring-inset"
+                                        : "hover:bg-gray-50"
+                                }`}
+                            >
                                 {/* Tarjeta móvil */}
                                 <div className="p-4 md:hidden">
                                     <div className="flex justify-between items-start gap-2">

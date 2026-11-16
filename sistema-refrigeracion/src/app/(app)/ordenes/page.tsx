@@ -133,7 +133,7 @@ export default async function OrdenesPage({ searchParams }: { searchParams: Prom
 
                                         {comprobanteVigente ? (
                                             <Link
-                                                href="/comprobantes"
+                                                href={`/comprobantes?comprobante=${comprobanteVigente.id_comprobante}#comprobante-${comprobanteVigente.id_comprobante}`}
                                                 prefetch={false}
                                                 title={`Ver en Comprobantes (comprobante #${comprobanteVigente.id_comprobante})`}
                                                 className="text-blue-600 hover:text-blue-800"
