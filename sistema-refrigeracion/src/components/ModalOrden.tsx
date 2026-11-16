@@ -309,6 +309,10 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
     /* ── Guardar toda la orden ── */
     async function handleGuardar() {
         if (!idCliente) return;
+        if (estadoTrabajo === "Finalizado" && bloqueaFinalizado) {
+            setErrorGuardar(`No se puede finalizar: falta stock de ${insumosSinStock.join(", ")}.`);
+            return;
+        }
         setCargando(true);
         setErrorGuardar(null);
 
@@ -655,6 +659,25 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
         return insumo ? Number(insumo.stock_actual ?? 0) : null;
     }
 
+    // Insumos de la orden (guardados + pendientes, sumando lineas repetidas)
+    // cuya cantidad supera el stock: la orden no puede pasar a Finalizado.
+    const insumosSinStock: string[] = (() => {
+        const requerido = new Map<number, { nombre: string; total: number }>();
+        for (const i of insumosDisplay) {
+            if (i.id_insumo === null) continue;
+            const prev = requerido.get(i.id_insumo);
+            if (prev) prev.total += i.cantidad;
+            else requerido.set(i.id_insumo, { nombre: i.nombre, total: i.cantidad });
+        }
+        const faltan: string[] = [];
+        for (const [id, { nombre, total }] of requerido) {
+            const disponible = stockDisponibleDe(id);
+            if (disponible !== null && total - disponible > 0.0005) faltan.push(nombre);
+        }
+        return faltan;
+    })();
+    const bloqueaFinalizado = insumosSinStock.length > 0;
+
     const tabCls = (active: boolean) =>
         `px-4 py-1.5 rounded-full transition text-xs font-bold ${
             active ? "bg-blue-600 text-white shadow-md" : "bg-white border border-gray-200 text-gray-500"
@@ -713,8 +736,15 @@ export default function ModalOrden({ clientes, ordenInicial, trigger }: Props) {
                                 >
                                     <option value="Pendiente">Pendiente</option>
                                     <option value="En proceso">En proceso</option>
-                                    <option value="Finalizado">Finalizado</option>
+                                    <option value="Finalizado" disabled={bloqueaFinalizado}>
+                                        Finalizado{bloqueaFinalizado ? " (falta stock)" : ""}
+                                    </option>
                                 </select>
+                                {bloqueaFinalizado && (
+                                    <p className="text-xs text-amber-700 mt-1">
+                                        Sin stock suficiente de: {insumosSinStock.join(", ")}. Solo se puede dejar en Pendiente o En proceso.
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Notas internas</label>

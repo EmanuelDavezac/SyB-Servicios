@@ -56,6 +56,38 @@ async function asegurarOrdenEditable(id_orden: number | null): Promise<void> {
     }
 }
 
+// Una orden no puede quedar "Finalizado" si algun insumo cargado supera el
+// stock disponible (sumando todas las lineas del mismo insumo): despues no se
+// podria facturar. Solo "Pendiente" y "En proceso" admiten faltante de stock.
+const TOLERANCIA_STOCK_ORDEN = 0.0005;
+
+async function asegurarStockParaFinalizar(id_orden: number, estado: string): Promise<void> {
+    if (estado !== "Finalizado") return;
+    const lineas = await prisma.detalle_orden_insumo.findMany({
+        where: { id_orden },
+        include: { insumo: { select: { nombre: true, stock_actual: true } } },
+    });
+    const porInsumo = new Map<number, { nombre: string; requerido: number; disponible: number }>();
+    for (const l of lineas) {
+        if (l.id_insumo === null || !l.insumo) continue;
+        const previo = porInsumo.get(l.id_insumo);
+        const cantidad = Number(l.cantidad_usada);
+        if (previo) previo.requerido += cantidad;
+        else porInsumo.set(l.id_insumo, {
+            nombre: l.insumo.nombre,
+            requerido: cantidad,
+            disponible: Number(l.insumo.stock_actual ?? 0),
+        });
+    }
+    const faltantes = [...porInsumo.values()].filter((i) => i.requerido - i.disponible > TOLERANCIA_STOCK_ORDEN);
+    if (faltantes.length > 0) {
+        const detalle = faltantes
+            .map((i) => `${i.nombre} (necesita ${i.requerido}, hay ${i.disponible})`)
+            .join(", ");
+        throw new Error(`No se puede finalizar la orden: falta stock de ${detalle}. Dejala en "En proceso" hasta reponerlo.`);
+    }
+}
+
 // Una orden ya existente de un cliente dado de baja se puede seguir viendo
 // (no se toca su id_cliente al mostrarla); lo que se bloquea es crear una
 // orden nueva o reasignarle el cliente de una orden existente a uno inactivo.
@@ -172,6 +204,7 @@ export async function editarOrden(id_orden: number, datos: {
         await requerirUsuario();
         validarEstadoTrabajo(datos.estado_trabajo);
         await asegurarOrdenEditable(id_orden);
+        await asegurarStockParaFinalizar(id_orden, datos.estado_trabajo);
         // Una orden ya asignada a un cliente que despues se dio de baja se
         // sigue pudiendo editar (notas, estado_trabajo): no se revalida el
         // cliente si no cambia. Lo que se bloquea es reasignarle el cliente
@@ -423,7 +456,11 @@ export async function agregarInsumoAOrden(datos: {
         await asegurarInsumoActivo(datos.id_insumo);
         validarCantidadYPrecio(datos.cantidad, datos.precio_aplicado);
         const alicuota_iva = validarAlicuota(datos.alicuota_iva);
-        await prisma.detalle_orden_insumo.create({
+        const ordenActual = await prisma.orden_trabajo.findUnique({
+            where: { id_orden: datos.id_orden },
+            select: { estado_trabajo: true },
+        });
+        const detalleCreado = await prisma.detalle_orden_insumo.create({
             data: {
                 id_orden: datos.id_orden,
                 id_insumo: datos.id_insumo,
@@ -432,6 +469,13 @@ export async function agregarInsumoAOrden(datos: {
                 alicuota_iva,
             },
         });
+        // Si la orden ya esta Finalizado, el insumo nuevo no puede dejarla sin stock.
+        try {
+            await asegurarStockParaFinalizar(datos.id_orden, ordenActual?.estado_trabajo ?? "");
+        } catch (e) {
+            await prisma.detalle_orden_insumo.delete({ where: { id_detalle_ins: detalleCreado.id_detalle_ins } });
+            throw e;
+        }
         revalidatePath("/ordenes");
         return { success: true };
     } catch (error) {
